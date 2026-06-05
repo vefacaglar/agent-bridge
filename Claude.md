@@ -52,6 +52,7 @@ apps/
         providers.ts           GET /api/providers, POST /api/providers/test
         projects.ts            CRUD + macOS folder picker
         runs.ts                Create/continue/cancel/permission/list/SSE
+        permissions.ts         List/revoke standing tool permissions
       orchestrator/
         Orchestrator.ts        Run lifecycle + shared generation loop (drive)
         workspaceTools.ts      Tool schemas + executeWorkspaceTool (fs access)
@@ -76,6 +77,7 @@ apps/
         useAppShell.ts         Composes the other composables + lifecycle
         useChatSession.ts      Runs/messages/SSE/send/continue/cancel/permission
         useProjects.ts         Project list + active project + add/remove flow
+        usePermissions.ts      Standing-permissions list + settings modal
         useComposerSettings.ts Mode / model / bypass (persisted to localStorage)
         useChatAutoScroll.ts   Scroll-to-bottom watchers
       lib/                     Pure helpers (no state)
@@ -89,8 +91,9 @@ apps/
         ToolGroup.vue          Collapsible tool-call/response block
         ChatComposer.vue       Input + mode menu + model menu + cards
         ConfirmationCard.vue   Inline yes/no quick reply
-        PermissionCard.vue     Inline tool permission request
+        PermissionCard.vue     Inline tool permission request (diff + options)
         AddProjectModal.vue
+        SettingsModal.vue      View/revoke saved tool permissions
 
 packages/
   shared/src/index.ts          Shared TS contracts (Run, RunMessage, events, ...)
@@ -217,6 +220,11 @@ The `permission_requested` event carries a `PermissionPreview` (built by
 `buildPermissionPreview`): the tool, action (create/edit/delete/read/list),
 path, and the current on-disk content so the UI can render a red/green diff
 (Claude Code-style) in the inline permission card before the tool runs.
+
+Standing `allow_project` / `allow_always` grants are silent until revoked.
+The Settings modal (sidebar → Settings) lists them and can revoke individual
+rules or clear all, via `GET /api/permissions` and
+`DELETE /api/permissions[/:id]`.
 
 ---
 

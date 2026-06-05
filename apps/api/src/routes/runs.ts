@@ -2,7 +2,6 @@ import type { FastifyInstance } from "fastify";
 import type { Run, RunStatus } from "@bridgemind/shared";
 import { type AppContext, normalizeProject } from "../context.js";
 import { eventBus } from "../orchestrator/eventBus.js";
-import { db } from "../database/db.js";
 
 const PERMISSION_DECISIONS = ["allow_once", "allow_project", "allow_always", "deny"] as const;
 type PermissionDecision = (typeof PERMISSION_DECISIONS)[number];
@@ -145,15 +144,9 @@ export function registerRunRoutes(server: FastifyInstance, ctx: AppContext) {
 
     try {
       if (decision === "allow_project" && run.projectPath) {
-        db.prepare(`
-          INSERT OR REPLACE INTO permissions (scope, project_path, status)
-          VALUES ('project', ?, 'allowed')
-        `).run(run.projectPath);
+        ctx.permissionRepo.allowProject(run.projectPath);
       } else if (decision === "allow_always") {
-        db.prepare(`
-          INSERT OR REPLACE INTO permissions (scope, project_path, status)
-          VALUES ('global', '', 'allowed')
-        `).run();
+        ctx.permissionRepo.allowGlobal();
       }
     } catch (err: any) {
       console.error("[Server] Error saving permission:", err.message);

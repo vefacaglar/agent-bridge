@@ -20,12 +20,11 @@ const yesLabel = computed(() => (options.value.includes('Evet') ? 'Evet' : 'Yes'
   <transition name="slide-up">
     <div v-if="group" class="composer-confirmation-card">
       <div class="confirm-card-header">
-        <span class="yellow-dot">●</span>
         <strong>Confirm prompt action?</strong>
       </div>
       <div class="confirm-card-footer">
         <button class="composer-confirm-btn no" @click="emit('reply', noLabel)">{{ noLabel }}</button>
-        <button class="composer-confirm-btn yes" @click="emit('reply', yesLabel)">{{ yesLabel }} ↵</button>
+        <button class="composer-confirm-btn yes" @click="emit('reply', yesLabel)">{{ yesLabel }}</button>
       </div>
     </div>
   </transition>

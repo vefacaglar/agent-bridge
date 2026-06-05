@@ -109,12 +109,12 @@ onBeforeUnmount(() => {
           @keydown.enter.exact.prevent="emit('send')"
         />
         <button
-          class="composer-send-icon-btn"
+          class="composer-send-btn"
           :disabled="isRunning || !taskInput.trim() || !selectedModel"
           title="Send message"
           @click="emit('send')"
         >
-          <span class="send-arrow-icon">↩</span>
+          Send
         </button>
       </div>
 
@@ -127,11 +127,6 @@ onBeforeUnmount(() => {
           <div v-if="showModeMenu" class="mode-popup-menu">
             <header class="mode-popup-header">
               <span class="mode-popup-title">Mode</span>
-              <div class="mode-popup-icons">
-                <span>↕</span>
-                <span>⌘</span>
-                <span>M</span>
-              </div>
             </header>
             <ul class="mode-popup-list">
               <li
@@ -140,20 +135,12 @@ onBeforeUnmount(() => {
                 :class="{ active: currentMode === modeItem.id }"
                 @click.stop="selectMode(modeItem.id)"
               >
-                <span class="mode-item-name">
-                  <span class="checkmark-placeholder">
-                    <span v-if="currentMode === modeItem.id">✓</span>
-                  </span>
-                  {{ modeItem.label }}
-                </span>
+                <span class="mode-item-name">{{ modeItem.label }}</span>
                 <span class="mode-item-shortcut">{{ modeItem.shortcut }}</span>
               </li>
               <li class="mode-popup-divider"></li>
               <li @click.stop="emit('update:bypassPermissions', !bypassPermissions)">
-                <span class="mode-item-name">
-                  <span class="checkmark-placeholder"></span>
-                  Bypass permissions
-                </span>
+                <span class="mode-item-name">Bypass permissions</span>
                 <span class="bypass-toggle-badge" :class="{ enabled: bypassPermissions }">
                   {{ bypassPermissions ? 'Disable' : 'Enable' }}
                 </span>
@@ -204,7 +191,7 @@ onBeforeUnmount(() => {
   background: #1a1a1c;
   border: 1px solid #2d2d30;
   border-radius: 12px;
-  padding: 10px 48px 10px 14px;
+  padding: 10px 86px 10px 14px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
@@ -230,32 +217,31 @@ onBeforeUnmount(() => {
   margin: 0;
 }
 
-.composer-send-icon-btn {
+.composer-send-btn {
   position: absolute;
-  bottom: 12px;
-  right: 12px;
-  width: 26px;
-  height: 26px;
+  bottom: 10px;
+  right: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: transparent;
-  color: var(--faint);
-  border: 0;
+  background: var(--surface-strong);
+  color: var(--text);
+  border: 1px solid var(--border);
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s ease;
-  padding: 0;
+  padding: 6px 14px;
+  font-size: 0.82rem;
+  font-weight: 500;
 }
 
-.composer-send-icon-btn:hover:not(:disabled) {
-  color: var(--text);
-  background: rgba(255, 255, 255, 0.05);
+.composer-send-btn:hover:not(:disabled) {
+  background: var(--sidebar-active);
 }
 
-.send-arrow-icon {
-  font-size: 1.15rem;
-  line-height: 1;
+.composer-send-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .composer-menu-row {
@@ -331,13 +317,6 @@ onBeforeUnmount(() => {
   letter-spacing: 0.5px;
 }
 
-.mode-popup-icons {
-  display: flex;
-  gap: 6px;
-  color: var(--faint);
-  font-size: 0.72rem;
-}
-
 .mode-popup-list {
   list-style: none;
   padding: 4px 0 0 0;
@@ -373,17 +352,6 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.checkmark-placeholder {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 14px;
-  height: 14px;
-  font-size: 0.8rem;
-  color: var(--success);
-  font-weight: bold;
 }
 
 .mode-item-shortcut {

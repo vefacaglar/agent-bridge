@@ -21,13 +21,13 @@ const emit = defineEmits<{
     <div class="modal-card">
       <header class="modal-header">
         <h3>Add Project Folder</h3>
-        <button class="close-modal-btn" @click="emit('close')">×</button>
+        <button class="close-modal-btn" @click="emit('close')">Close</button>
       </header>
 
       <main class="modal-body">
         <div v-if="isMac" class="form-group">
           <button class="primary-button browse-btn" @click="emit('browse')">
-            📂 Select Folder (macOS Finder)
+            Select Folder (macOS Finder)
           </button>
           <div class="separator-text">or enter path manually</div>
         </div>

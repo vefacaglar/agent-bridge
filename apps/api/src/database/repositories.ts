@@ -1,4 +1,4 @@
-import type { Run, RunMessage, RunStatus, Project } from "@bridgemind/shared";
+import type { Run, RunMessage, RunStatus, Project, PermissionRule } from "@bridgemind/shared";
 import { db } from "./db.js";
 
 
@@ -184,6 +184,45 @@ export class ProjectRepository {
     const stmt = db.prepare("SELECT * FROM projects WHERE path = ?");
     const row = stmt.get(path) as any;
     return row ? mapRowToProject(row) : null;
+  }
+}
+
+function mapRowToPermission(row: any): PermissionRule {
+  return {
+    id: row.id,
+    scope: row.scope,
+    projectPath: row.project_path || "",
+    status: row.status
+  };
+}
+
+export class PermissionRepository {
+  list(): PermissionRule[] {
+    const rows = db.prepare("SELECT * FROM permissions ORDER BY scope, project_path").all() as any[];
+    return rows.map(mapRowToPermission);
+  }
+
+  allowProject(projectPath: string): void {
+    db.prepare(`
+      INSERT OR REPLACE INTO permissions (scope, project_path, status)
+      VALUES ('project', ?, 'allowed')
+    `).run(projectPath);
+  }
+
+  allowGlobal(): void {
+    db.prepare(`
+      INSERT OR REPLACE INTO permissions (scope, project_path, status)
+      VALUES ('global', '', 'allowed')
+    `).run();
+  }
+
+  deleteById(id: number): boolean {
+    const info = db.prepare("DELETE FROM permissions WHERE id = ?").run(id);
+    return info.changes > 0;
+  }
+
+  clear(): void {
+    db.prepare("DELETE FROM permissions").run();
   }
 }
 

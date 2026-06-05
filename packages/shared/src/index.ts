@@ -139,3 +139,11 @@ export interface Project {
   createdAt: string;
 }
 
+// A persisted standing approval for workspace tool calls.
+export interface PermissionRule {
+  id: number;
+  scope: "global" | "project";
+  projectPath: string;
+  status: string;
+}
+

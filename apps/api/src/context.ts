@@ -1,6 +1,6 @@
 import path from "node:path";
 import { ProviderRegistry } from "./providers/ProviderRegistry.js";
-import { RunRepository, MessageRepository, ProjectRepository } from "./database/repositories.js";
+import { RunRepository, MessageRepository, ProjectRepository, PermissionRepository } from "./database/repositories.js";
 import { Orchestrator } from "./orchestrator/Orchestrator.js";
 
 /**
@@ -12,6 +12,7 @@ export interface AppContext {
   runRepo: RunRepository;
   messageRepo: MessageRepository;
   projectRepo: ProjectRepository;
+  permissionRepo: PermissionRepository;
   orchestrator: Orchestrator;
   defaultProjectPath: string;
 }
@@ -21,6 +22,7 @@ export function createAppContext(): AppContext {
   const runRepo = new RunRepository();
   const messageRepo = new MessageRepository();
   const projectRepo = new ProjectRepository();
+  const permissionRepo = new PermissionRepository();
   const orchestrator = new Orchestrator(runRepo, messageRepo, registry);
 
   return {
@@ -28,6 +30,7 @@ export function createAppContext(): AppContext {
     runRepo,
     messageRepo,
     projectRepo,
+    permissionRepo,
     orchestrator,
     defaultProjectPath: process.cwd()
   };

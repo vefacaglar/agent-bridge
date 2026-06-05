@@ -23,6 +23,7 @@ const emit = defineEmits<{
   (e: 'select-project', path: string): void;
   (e: 'select-run', run: Run): void;
   (e: 'delete-project', path: string): void;
+  (e: 'open-settings'): void;
 }>();
 
 const filteredRuns = computed(() =>
@@ -63,10 +64,9 @@ function onDeleteProject(path: string, event: Event) {
             :class="{ active: project.path === activeProjectPath }"
             @click="emit('select-project', project.path)"
           >
-            <span class="chevron-icon">{{ project.path === activeProjectPath ? '▼' : '▶' }}</span>
             <span class="project-name-text">{{ project.name }}</span>
             <button class="delete-project-btn" title="Remove Project" @click="onDeleteProject(project.path, $event)">
-              ×
+              Remove
             </button>
           </div>
 
@@ -85,6 +85,10 @@ function onDeleteProject(path: string, event: Event) {
         </div>
       </div>
     </div>
+
+    <button class="nav-action muted settings-action" @click="emit('open-settings')">
+      Settings
+    </button>
   </aside>
 </template>
 
@@ -94,6 +98,14 @@ function onDeleteProject(path: string, event: Event) {
   overflow-y: auto;
   min-height: 0;
   margin-top: 14px;
+}
+
+.settings-action {
+  margin-top: 8px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .project-accordion-item {
@@ -124,12 +136,11 @@ function onDeleteProject(path: string, event: Event) {
   font-weight: 600;
 }
 
-.chevron-icon {
-  font-size: 0.65rem;
-  margin-right: 8px;
-  color: var(--faint);
-  display: inline-block;
-  width: 10px;
+.project-name-text {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .project-chats-list {
@@ -145,9 +156,9 @@ function onDeleteProject(path: string, event: Event) {
 .delete-project-btn {
   background: transparent;
   color: var(--faint);
-  font-size: 1.1rem;
+  font-size: 0.72rem;
   cursor: pointer;
-  padding: 0 4px;
+  padding: 2px 6px;
   line-height: 1;
   border-radius: 4px;
   display: none;

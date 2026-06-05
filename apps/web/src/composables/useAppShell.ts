@@ -4,6 +4,7 @@ import { useChatAutoScroll } from './useChatAutoScroll';
 import { useChatSession } from './useChatSession';
 import { useComposerSettings } from './useComposerSettings';
 import { useProjects } from './useProjects';
+import { usePermissions } from './usePermissions';
 
 export function useAppShell() {
   const providers = ref<ProviderMetadata[]>([]);
@@ -12,6 +13,7 @@ export function useAppShell() {
 
   const settings = useComposerSettings(providers);
   const projects = useProjects(runs);
+  const permissions = usePermissions();
   const chat = useChatSession({
     providers,
     runs,
@@ -69,6 +71,7 @@ export function useAppShell() {
     setMessagesContainer,
     settings,
     projects,
+    permissions,
     chat,
     isMac,
     selectProject,

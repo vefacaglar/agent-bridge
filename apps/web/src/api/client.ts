@@ -1,4 +1,4 @@
-import type { ProviderMetadata, Run, RunMessage, Project } from '@bridgemind/shared';
+import type { ProviderMetadata, Run, RunMessage, Project, PermissionRule } from '@bridgemind/shared';
 
 export const API_BASE = 'http://localhost:3000';
 
@@ -39,8 +39,17 @@ export const api = {
   getRuns: () => getJson<Run[]>('/api/runs'),
   getMessages: (runId: string) => getJson<RunMessage[]>(`/api/runs/${runId}/messages`),
   getProjects: () => getJson<Project[]>('/api/projects'),
+  getPermissions: () => getJson<PermissionRule[]>('/api/permissions'),
 
   eventsUrl: (runId: string) => `${API_BASE}/api/runs/${runId}/events`,
+
+  async revokePermission(id: number): Promise<void> {
+    await fetch(`${API_BASE}/api/permissions/${id}`, { method: 'DELETE' });
+  },
+
+  async clearPermissions(): Promise<void> {
+    await fetch(`${API_BASE}/api/permissions`, { method: 'DELETE' });
+  },
 
   async createRun(payload: CreateRunPayload): Promise<Run> {
     const response = await fetch(`${API_BASE}/api/runs`, {

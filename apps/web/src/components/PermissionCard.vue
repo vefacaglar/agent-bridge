@@ -117,7 +117,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeyDown, true));
           @mouseenter="selected = idx"
           @click="decide(option.decision)"
         >
-          <span class="cc-perm-caret">{{ idx === selected ? '❯' : '' }}</span>
           <span class="cc-perm-number">{{ idx + 1 }}.</span>
           <span class="cc-perm-label">{{ option.label }}</span>
           <span v-if="option.hint" class="cc-perm-hint">{{ option.hint }}</span>
@@ -274,18 +273,14 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeyDown, true));
   cursor: pointer;
   font-size: 0.85rem;
   color: #c7c7cc;
-  transition: background 0.12s ease, color 0.12s ease;
+  border-left: 2px solid transparent;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
 }
 
 .cc-perm-option.active {
   background: rgba(255, 255, 255, 0.07);
   color: #ffffff;
-}
-
-.cc-perm-caret {
-  width: 1ch;
-  color: #7bd88f;
-  font-weight: 700;
+  border-left-color: var(--success);
 }
 
 .cc-perm-number {

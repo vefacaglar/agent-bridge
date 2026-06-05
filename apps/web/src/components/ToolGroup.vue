@@ -29,7 +29,7 @@ const expanded = ref(false);
           {{ tc.function?.name || 'unknown' }}
         </span>
       </div>
-      <span class="tool-group-toggle-arrow">{{ expanded ? '▼' : '▶' }}</span>
+      <span class="tool-group-toggle-arrow">{{ expanded ? 'Hide' : 'Show' }}</span>
     </header>
 
     <div v-if="expanded" class="tool-group-details-list">

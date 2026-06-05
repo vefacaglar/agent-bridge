@@ -5,12 +5,14 @@ import AppSidebar from './components/AppSidebar.vue';
 import MessageThread from './components/MessageThread.vue';
 import ChatComposer from './components/ChatComposer.vue';
 import AddProjectModal from './components/AddProjectModal.vue';
+import SettingsScreen from './components/settings/SettingsScreen.vue';
 
 const {
   runs,
   setMessagesContainer,
   settings,
   projects,
+  permissions,
   chat,
   isMac,
   selectProject,
@@ -45,6 +47,7 @@ const {
       @select-project="selectProject"
       @select-run="chat.selectRun"
       @delete-project="deleteProject"
+      @open-settings="permissions.openSettings"
     />
 
     <main class="chat-shell">
@@ -95,6 +98,16 @@ const {
       @close="projects.closeAddProjectModal"
       @browse="projects.browseFolder"
       @submit="submitProject"
+    />
+
+    <SettingsScreen
+      :show="permissions.showSettings.value"
+      :permissions="permissions.permissions.value"
+      :is-loading="permissions.isLoading.value"
+      :providers="chat.providers.value"
+      @close="permissions.closeSettings"
+      @revoke="permissions.revokePermission"
+      @clear-all="permissions.clearPermissions"
     />
   </div>
 </template>
