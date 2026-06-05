@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { api } from '../../api/client';
 
 const configs = ref<Record<string, any>>({});
@@ -128,6 +128,15 @@ async function handleSave() {
   }
 }
 
+const canFetchModels = computed(() => {
+  if (formType.value === 'anthropic') return false;
+  const idLower = formId.value.trim().toLowerCase();
+  if (idLower === 'openai') return false;
+  const urlLower = formBaseUrl.value.trim().toLowerCase();
+  if (urlLower.includes('api.openai.com')) return false;
+  return true;
+});
+
 const isFetchingModels = ref(false);
 
 async function handleFetchModels() {
@@ -252,6 +261,7 @@ async function handleFetchModels() {
                 + Add Model
               </button>
               <button 
+                v-if="canFetchModels"
                 type="button" 
                 class="ghost-button fetch-models-btn" 
                 :disabled="isFetchingModels"

@@ -115,9 +115,42 @@ export function registerProviderRoutes(server: FastifyInstance, ctx: AppContext)
     }
 
     const cleanBaseUrl = resolvedBaseUrl.replace(/\/$/, "");
+    const isPlaceholderKey = !resolvedApiKey || 
+      resolvedApiKey === "YOUR_OPENAI_API_KEY" || 
+      resolvedApiKey === "YOUR_ANTHROPIC_API_KEY" || 
+      resolvedApiKey.trim() === "";
+
+    const OPENAI_DEFAULT_MODELS = [
+      "gpt-5.5",
+      "gpt-5.4",
+      "gpt-5.4-mini",
+      "gpt-5.3-codex",
+      "gpt-4.5",
+      "gpt-4o",
+      "gpt-4o-mini",
+      "o1",
+      "o3-mini"
+    ];
+
+    const ANTHROPIC_DEFAULT_MODELS = [
+      "claude-sonnet-4-6",
+      "claude-opus-4-8",
+      "claude-haiku-4-5-20251001",
+      "claude-3-5-sonnet-latest",
+      "claude-3-5-haiku-latest",
+      "claude-3-5-sonnet-20241022",
+      "claude-3-opus-20240229"
+    ];
+
+    const isOpenAI = resolvedType === "openai-compatible" && 
+      (cleanBaseUrl.includes("api.openai.com") || (providerId && providerId.toLowerCase().includes("openai")));
 
     try {
       if (resolvedType === "openai-compatible") {
+        if (isOpenAI && isPlaceholderKey) {
+          return { success: true, models: OPENAI_DEFAULT_MODELS };
+        }
+
         const headers: Record<string, string> = {};
         if (resolvedApiKey) {
           headers["Authorization"] = `Bearer ${resolvedApiKey}`;
@@ -169,17 +202,28 @@ export function registerProviderRoutes(server: FastifyInstance, ctx: AppContext)
         }
 
         if (!response || !response.ok) {
+          if (isOpenAI) {
+            console.warn(`OpenAI models fetch failed: ${lastError?.message}. Falling back to default list.`);
+            return { success: true, models: OPENAI_DEFAULT_MODELS };
+          }
           throw new Error(lastError?.message || "Failed to fetch models from provider.");
         }
 
         const data = await response.json() as any;
         const models = parseModelsResponse(data);
         if (models.length === 0) {
+          if (isOpenAI) {
+            return { success: true, models: OPENAI_DEFAULT_MODELS };
+          }
           throw new Error("Could not parse models from provider response (format unrecognized)");
         }
 
         return { success: true, models };
       } else if (resolvedType === "anthropic") {
+        if (isPlaceholderKey) {
+          return { success: true, models: ANTHROPIC_DEFAULT_MODELS };
+        }
+
         const url = `${cleanBaseUrl}/v1/models`;
         const headers: Record<string, string> = {
           "anthropic-version": "2023-06-01"
@@ -188,39 +232,33 @@ export function registerProviderRoutes(server: FastifyInstance, ctx: AppContext)
           headers["x-api-key"] = resolvedApiKey;
         }
 
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-        const response = await fetch(url, {
-          method: "GET",
-          headers,
-          signal: controller.signal
-        });
+          const response = await fetch(url, {
+            method: "GET",
+            headers,
+            signal: controller.signal
+          });
 
-        clearTimeout(timeoutId);
+          clearTimeout(timeoutId);
 
-        if (!response.ok) {
-          console.warn(`Anthropic models API failed with status ${response.status}. Falling back to default list.`);
-          return {
-            success: true,
-            models: [
-              "claude-3-5-sonnet-20241022",
-              "claude-3-5-sonnet-20240620",
-              "claude-3-opus-20240229",
-              "claude-3-sonnet-20240229",
-              "claude-3-haiku-20240307",
-              "claude-3-5-haiku-20241022"
-            ]
-          };
+          if (!response.ok) {
+            console.warn(`Anthropic models API failed with status ${response.status}. Falling back to default list.`);
+            return { success: true, models: ANTHROPIC_DEFAULT_MODELS };
+          }
+
+          const data = await response.json() as any;
+          if (data && Array.isArray(data.data)) {
+            const models = data.data.map((m: any) => m.id);
+            return { success: true, models };
+          }
+        } catch (e: any) {
+          console.warn(`Anthropic models fetch failed: ${e.message}. Falling back to default list.`);
         }
 
-        const data = await response.json() as any;
-        if (data && Array.isArray(data.data)) {
-          const models = data.data.map((m: any) => m.id);
-          return { success: true, models };
-        }
-
-        throw new Error("Invalid models response format (expected data array)");
+        return { success: true, models: ANTHROPIC_DEFAULT_MODELS };
       } else {
         reply.status(400);
         return { error: `Unsupported provider type: ${resolvedType}` };

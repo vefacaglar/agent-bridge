@@ -944,9 +944,12 @@ pre {
 .markdown-body pre {
   margin: 0;
   padding: 14px;
-  overflow-x: auto;
+  overflow: auto;
+  max-height: 480px;
   background: #141416;
   border-radius: 0 0 10px 10px;
+  white-space: pre !important;
+  word-break: normal !important;
 }
 
 .markdown-body a {
@@ -973,6 +976,8 @@ pre {
   overflow: hidden;
   background: #18181b;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+  width: 100%;
+  max-width: 100%;
 }
 
 .code-block-header {
