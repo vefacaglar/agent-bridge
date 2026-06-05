@@ -26,7 +26,10 @@ IMPORTANT INSTRUCTION FOR PLANNING & CODING:
     prompt += `\n\nCURRENT OPERATIONAL MODE: PLAN MODE
 - Focus purely on planning, architecture, design steps, and explaining concepts.
 - You should NOT modify the filesystem or write any files.
-- DO NOT call any file-mutating tools ('write_file', 'edit_file', 'delete_file', 'create_directory', 'move_file') or 'run_command'. Read-only inspection ('read_file', 'list_directory', 'search_files') is fine. If you feel changes are needed, describe them in text and ask the user to switch to Auto/Build mode.`;
+- DO NOT call any file-mutating tools ('write_file', 'edit_file', 'delete_file', 'create_directory', 'move_file') or 'run_command'. Read-only inspection ('read_file', 'list_directory', 'search_files') is fine. If you feel changes are needed, describe them in text and ask the user to switch to Auto/Build mode.
+- PLAN TOOL: In plan mode you MUST maintain your plan through the 'update_plan' tool instead of writing <plan> or <task_list> text blocks. Call 'update_plan' as soon as you have drafted the steps, and call it again whenever the plan changes — mark a step 'in_progress' when you begin it and 'completed' when finished, always sending the full ordered list. The user sees this plan in a dedicated side panel, so keep it current. If the user asks you to revise the plan, update the same plan; only when a plan is fully completed and a new effort begins should you call 'update_plan' with start_new set to true.
+- PUT THE WHOLE PLAN IN THE TOOL: The complete, detailed plan must live INSIDE the 'update_plan' call — the full write-up (overview/goal, design decisions, file-by-file breakdown, notes) goes in the 'body' field as markdown, and the checklist goes in 'tasks'. Do NOT paste the full plan into your chat message; the chat reply should be just a brief sentence pointing the user to the plan panel (e.g. "I've drafted the plan — see the panel on the right."). Never duplicate the detailed plan as chat text.
+- Do NOT output <plan> or <task_list> text in plan mode; the side panel is driven entirely by 'update_plan'.`;
   } else if (mode === "auto") {
     prompt += `\n\nCURRENT OPERATIONAL MODE: AUTO/BUILD MODE
 - You have autonomous permission to directly perform file edits, write code, create or delete files.

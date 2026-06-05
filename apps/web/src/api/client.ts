@@ -1,4 +1,4 @@
-import type { ProviderMetadata, Run, RunMessage, Project, PermissionRule } from '@agent-bridge/shared';
+import type { ProviderMetadata, Run, RunMessage, Project, PermissionRule, Plan } from '@agent-bridge/shared';
 
 export const API_BASE = 'http://localhost:3000';
 
@@ -47,6 +47,7 @@ export const api = {
   },
   getRuns: () => getJson<Run[]>('/api/runs'),
   getMessages: (runId: string) => getJson<RunMessage[]>(`/api/runs/${runId}/messages`),
+  getRunPlan: (runId: string) => getJson<Plan | null>(`/api/runs/${runId}/plan`),
   getProjects: () => getJson<Project[]>('/api/projects'),
   getPermissions: () => getJson<PermissionRule[]>('/api/permissions'),
 

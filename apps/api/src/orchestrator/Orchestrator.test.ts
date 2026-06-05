@@ -8,7 +8,7 @@ import { db } from "../database/db.js";
 process.env.NODE_ENV = "test";
 
 import { ProviderRegistry } from "../providers/ProviderRegistry.js";
-import { RunRepository, MessageRepository } from "../database/repositories.js";
+import { RunRepository, MessageRepository, PlanRepository } from "../database/repositories.js";
 import { Orchestrator } from "./Orchestrator.js";
 import { eventBus } from "./eventBus.js";
 import type { Run, RunStatus } from "@agent-bridge/shared";
@@ -45,7 +45,7 @@ test("Orchestrator Integration Tests", async (t) => {
     const registry = new ProviderRegistry(testConfigPath);
     const runRepo = new RunRepository();
     const messageRepo = new MessageRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry);
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository());
 
     const runId = "run-test-123";
     const runData: Run = {
@@ -109,7 +109,7 @@ test("Orchestrator Integration Tests", async (t) => {
     const registry = new ProviderRegistry(testConfigPath);
     const runRepo = new RunRepository();
     const messageRepo = new MessageRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry);
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository());
 
     const runId = "run-test-tool-call";
     const runData: Run = {
@@ -195,7 +195,7 @@ test("Orchestrator Integration Tests", async (t) => {
     const registry = new ProviderRegistry(testConfigPath);
     const runRepo = new RunRepository();
     const messageRepo = new MessageRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry);
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository());
 
     const runId = "run-test-mode-prompt";
     const runData: Run = {
@@ -239,7 +239,7 @@ test("Orchestrator Integration Tests", async (t) => {
     const registry = new ProviderRegistry(testConfigPath);
     const runRepo = new RunRepository();
     const messageRepo = new MessageRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry);
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository());
 
     const runId = "run-test-perm-ask";
     const runData: Run = {
@@ -322,7 +322,7 @@ test("Orchestrator Integration Tests", async (t) => {
     const registry = new ProviderRegistry(testConfigPath);
     const runRepo = new RunRepository();
     const messageRepo = new MessageRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry);
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository());
 
     const runId = "run-test-read-list";
     const tempDir = path.join(process.cwd(), "temp_test_dir");

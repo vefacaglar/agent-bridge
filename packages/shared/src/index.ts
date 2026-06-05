@@ -114,7 +114,31 @@ export type RunEvent =
       runId: string;
       toolCall: any;
       preview?: PermissionPreview | null;
+    }
+  | {
+      type: "plan_updated";
+      plan: Plan;
     };
+
+// A single step the assistant tracks inside a plan.
+export interface PlanTask {
+  text: string;
+  status: "pending" | "in_progress" | "completed";
+}
+
+// A chat-specific plan the assistant maintains via the update_plan tool.
+// Stored in SQLite, surfaced in the right-hand plan panel.
+export interface Plan {
+  id: string;
+  runId: string;
+  title: string;
+  body?: string;          // optional markdown context / rationale
+  tasks: PlanTask[];
+  status: "active" | "completed";
+  version: number;        // 1-based; increments each time a new plan supersedes the old
+  createdAt: string;
+  updatedAt: string;
+}
 
 // Context attached to a permission request so the UI can render a preview
 // (e.g. a red/green diff for file edits) instead of just raw arguments.

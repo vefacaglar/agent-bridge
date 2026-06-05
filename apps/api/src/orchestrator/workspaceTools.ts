@@ -204,6 +204,54 @@ export const WORKSPACE_TOOLS = [
   }
 ];
 
+/**
+ * Plan-mode-only tool. Lets the model create and maintain a structured,
+ * chat-specific plan (title + ordered steps with status). The orchestrator
+ * persists it to SQLite and pushes it to the plan panel; it never touches the
+ * filesystem, so it runs without a permission prompt.
+ */
+export const UPDATE_PLAN_TOOL = {
+  type: "function" as const,
+  function: {
+    name: "update_plan",
+    description: "Create or update the plan for this chat, shown to the user in a side panel. Put the COMPLETE plan write-up in the body field and the checklist in tasks — this tool's output IS the plan the user reads, so do not also paste the full plan into your chat reply. Call it when you first draft a plan and again every time progress changes — mark steps 'in_progress' when you start them and 'completed' when done. Always pass the FULL ordered list of steps (not just the changed ones). When the current plan is fully finished and you are starting a genuinely new plan, set start_new to true.",
+    parameters: {
+      type: "object",
+      properties: {
+        title: {
+          type: "string",
+          description: "A short title summarizing what this plan accomplishes."
+        },
+        body: {
+          type: "string",
+          description: "The full plan write-up in markdown, rendered above the checklist in the panel. Include everything the user should read: overview/goal, key design decisions (tables are fine), a file-by-file breakdown, and any notes. This is the primary place the detailed plan lives, so be thorough here rather than in the chat message."
+        },
+        tasks: {
+          type: "array",
+          description: "The complete ordered list of plan steps with their current status.",
+          items: {
+            type: "object",
+            properties: {
+              text: { type: "string", description: "The step description." },
+              status: {
+                type: "string",
+                enum: ["pending", "in_progress", "completed"],
+                description: "Current status of this step."
+              }
+            },
+            required: ["text", "status"]
+          }
+        },
+        start_new: {
+          type: "boolean",
+          description: "Set true to supersede the previous (finished) plan with a brand-new one. Omit or false to update the current plan in place."
+        }
+      },
+      required: ["title", "tasks"]
+    }
+  }
+};
+
 /** Tools that must always be gated behind an explicit permission prompt. */
 export const DANGEROUS_TOOLS = new Set(["run_command", "fetch_url"]);
 

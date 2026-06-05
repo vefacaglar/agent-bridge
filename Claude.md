@@ -211,6 +211,11 @@ ask_permissions  Each tool call requires explicit user approval first.
 auto             Autonomous; calls tools freely.
 ```
 
+In **plan mode** the model maintains a structured, chat-specific plan via the
+`update_plan` tool (see Workspace Tools / Plan Panel below) instead of emitting
+`<plan>` / `<task_list>` text. Other modes keep the lighter text-based
+`<task_list>` block, which the web UI pins above the composer.
+
 Only `ask_permissions` currently pauses for approval. The approval flow emits
 `permission_requested`, sets status `awaiting_permission`, and waits for a
 decision: `allow_once`, `allow_project`, `allow_always`, or `deny`.
@@ -264,6 +269,25 @@ executes tools through `executeWorkspaceToolAsync`.
 
 Do not add git integration or further network tools without an explicit request.
 
+### Plan Panel (`update_plan`)
+
+In plan mode the orchestrator additionally advertises an `update_plan` tool:
+
+```txt
+update_plan(title, tasks[{ text, status }], body?, start_new?)
+```
+
+It performs no filesystem/network I/O, so it runs silently (no permission
+prompt). The orchestrator persists the plan to the `plans` table via
+`PlanRepository` and emits a `plan_updated` SSE event. Each call replaces the
+active plan's steps in place; `start_new: true` supersedes a finished plan with
+a new versioned one (so a chat can move through several plans over time).
+
+The web client (`useChatSession.currentPlan`, `PlanPanel.vue`) renders the
+active plan in a right-hand side panel that opens automatically in plan mode,
+with an in-thread "Plan: …" link to re-open it once collapsed. The active plan
+is loaded on run select via `GET /api/runs/:id/plan`.
+
 ---
 
 ## Run States
@@ -291,6 +315,7 @@ runs         id, title, task, project_path/name, status, provider, model, mode, 
 messages     id, run_id, role, agent_role?, provider/model?, content, raw_response?, ...
 projects     path (pk), name, created_at
 permissions  scope ('global'|'project'), project_path, status; UNIQUE(scope, project_path)
+plans        id, run_id, title, body?, tasks (JSON), status ('active'|'completed'), version
 ```
 
 All agent messages are stored. A run must be reopenable after restart. On
@@ -311,6 +336,7 @@ round_started
 message_created
 model_snapshot_locked
 permission_requested
+plan_updated
 run_completed
 run_failed
 ```

@@ -83,6 +83,14 @@ pre {
   grid-template-columns: 0px minmax(0, 1fr);
 }
 
+.app-shell.plan-open {
+  grid-template-columns: 360px minmax(0, 1fr) minmax(320px, 420px);
+}
+
+.app-shell.plan-open.sidebar-collapsed {
+  grid-template-columns: 0px minmax(0, 1fr) minmax(320px, 420px);
+}
+
 .sidebar {
   display: flex;
   min-height: 0;

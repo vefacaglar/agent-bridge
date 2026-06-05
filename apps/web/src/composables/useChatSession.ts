@@ -1,5 +1,5 @@
 import { computed, ref, type ComputedRef, type Ref } from 'vue';
-import type { ProviderMetadata, Run, RunMessage, RunStatus } from '@agent-bridge/shared';
+import type { ProviderMetadata, Run, RunMessage, RunStatus, Plan } from '@agent-bridge/shared';
 import { api, type PermissionDecision } from '../api/client';
 import { ACTIVE_STATUSES, splitCombined } from '../lib/format';
 import { groupMessages, type MessageGroup } from '../lib/messageGroups';
@@ -31,6 +31,7 @@ export function useChatSession(options: ChatSessionOptions) {
   const activeRunId = ref<string | null>(null);
   const activeRun = ref<Run | null>(null);
   const isRunning = ref(false);
+  const currentPlan = ref<Plan | null>(null);
 
   const taskInput = ref('');
   const focusSignal = ref(0);
@@ -99,6 +100,7 @@ export function useChatSession(options: ChatSessionOptions) {
     taskInput.value = '';
 
     await loadMessages(run.id);
+    currentPlan.value = await api.getRunPlan(run.id);
 
     if (ACTIVE_STATUSES.includes(run.status)) {
       isRunning.value = true;
@@ -114,6 +116,7 @@ export function useChatSession(options: ChatSessionOptions) {
     activeRunId.value = null;
     activeRun.value = null;
     messages.value = [];
+    currentPlan.value = null;
     taskInput.value = '';
     requestFocus();
   }
@@ -154,6 +157,10 @@ export function useChatSession(options: ChatSessionOptions) {
         } else {
           messages.value.push(data.message);
         }
+      }
+
+      if (data.type === 'plan_updated' && activeRun.value?.id === runId) {
+        currentPlan.value = data.plan;
       }
 
       if (data.type === 'run_completed') {
@@ -220,6 +227,7 @@ export function useChatSession(options: ChatSessionOptions) {
       connectEventSource(runId);
     } else {
       messages.value = [];
+      currentPlan.value = null;
 
       try {
         const run = await api.createRun({
@@ -290,6 +298,7 @@ export function useChatSession(options: ChatSessionOptions) {
     activeRunId,
     activeRun,
     isRunning,
+    currentPlan,
     taskInput,
     focusSignal,
     showPermissionModal,

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, onUnmounted } from 'vue';
-import type { Run } from '@agent-bridge/shared';
+import type { Run, Plan } from '@agent-bridge/shared';
 import type { MessageGroup } from '../lib/messageGroups';
 import { renderMarkdown, cleanMessageContent } from '../lib/markdown';
 import { formatTime } from '../lib/format';
@@ -10,7 +10,17 @@ const props = defineProps<{
   activeRun: Run | null;
   groupedMessages: MessageGroup[];
   isRunning: boolean;
+  plan?: Plan | null;
+  planPanelOpen?: boolean;
+  canOpenPlan?: boolean;
 }>();
+
+const emit = defineEmits<{
+  (e: 'open-plan'): void;
+}>();
+
+// Progress summary shown on the in-thread plan link.
+const planDoneCount = computed(() => props.plan?.tasks.filter(t => t.status === 'completed').length ?? 0);
 
 const copiedMessageId = ref<string | null>(null);
 
@@ -114,6 +124,18 @@ onUnmounted(() => {
       <div class="user-markdown-body" v-html="renderMarkdown(activeRun.task)"></div>
     </article>
 
+    <!-- In-thread link to the plan; opens the side panel when collapsed. -->
+    <button
+      v-if="plan && canOpenPlan && !planPanelOpen"
+      type="button"
+      class="plan-thread-link"
+      @click="emit('open-plan')"
+    >
+      <span class="plan-thread-link-label">Plan: {{ plan.title }}</span>
+      <span v-if="plan.tasks.length" class="plan-thread-link-count">{{ planDoneCount }} / {{ plan.tasks.length }}</span>
+      <span class="plan-thread-link-action">Open</span>
+    </button>
+
     <template v-for="group in groupedMessages" :key="group.id">
       <article v-if="group.type === 'user'" class="user-bubble">
         <div class="user-markdown-body" v-html="renderMarkdown(group.message.content)"></div>
@@ -133,8 +155,8 @@ onUnmounted(() => {
           <span>{{ formatTime(group.message.createdAt) }}</span>
         </div>
 
-        <!-- AI Plan Accordion -->
-        <div v-if="extractPlan(group.message.content)" class="plan-terminal-container">
+        <!-- AI Plan Accordion (hidden while the side plan panel is showing it) -->
+        <div v-if="extractPlan(group.message.content) && !props.planPanelOpen" class="plan-terminal-container">
           <header class="terminal-header" @click="togglePlan(group.message.id + '-plan')">
             <div class="terminal-header-left">
               <svg class="header-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -262,6 +284,51 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+.plan-thread-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-strong);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.plan-thread-link:hover {
+  border-color: var(--muted);
+}
+
+.plan-thread-link-label {
+  flex: 1 1 auto;
+  font-size: 0.86rem;
+  font-weight: 550;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plan-thread-link-count {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  font-family: monospace;
+  font-size: 0.72rem;
+  color: var(--faint);
+}
+
+.plan-thread-link-action {
+  flex: 0 0 auto;
+  font-size: 0.74rem;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 8px;
+}
+
 .welcome-gradient-logo {
   width: 68px;
   height: 68px;

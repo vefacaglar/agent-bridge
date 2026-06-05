@@ -6,6 +6,7 @@ import ChatComposer from './components/ChatComposer.vue';
 import AddProjectModal from './components/AddProjectModal.vue';
 import SettingsScreen from './components/settings/SettingsScreen.vue';
 import AgentTaskList from './components/AgentTaskList.vue';
+import PlanPanel from './components/PlanPanel.vue';
 
 const {
   runs,
@@ -31,10 +32,11 @@ const {
   groupedMessages,
   visibleTitle,
   activeConfirmationGroup,
-  messages
+  messages,
+  currentPlan
 } = chat;
 
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useCustomDialog } from './composables/useCustomDialog';
 
 const { activeDialog } = useCustomDialog();
@@ -62,7 +64,8 @@ const currentProjectName = computed(() => {
 });
 
 // The most recent <task_list> the assistant emitted in the active run, shown
-// pinned above the composer so progress stays visible as the thread scrolls.
+// pinned above the composer (in build modes) so progress stays visible as the
+// thread scrolls. Plan mode instead uses the structured plan panel below.
 const currentTaskList = computed<string | null>(() => {
   const list = messages.value;
   if (!list) return null;
@@ -74,10 +77,23 @@ const currentTaskList = computed<string | null>(() => {
   }
   return null;
 });
+
+// The plan side panel mirrors Codex / Claude desktop: in plan mode it opens
+// automatically once the assistant has created a plan (via the update_plan
+// tool) for the active run. The user can collapse it and re-open it from the
+// plan link in the thread.
+const isPlanMode = computed(() => settings.currentMode.value === 'plan');
+const planPanelCollapsed = ref(false);
+const planPanelOpen = computed(() =>
+  isPlanMode.value && !!currentPlan.value && !planPanelCollapsed.value
+);
+
+// Reset the collapsed state when switching chats so each run's plan shows.
+watch(activeRunId, () => { planPanelCollapsed.value = false; });
 </script>
 
 <template>
-  <div class="app-shell" :class="{ 'sidebar-collapsed': isSidebarCollapsed }">
+  <div class="app-shell" :class="{ 'sidebar-collapsed': isSidebarCollapsed, 'plan-open': planPanelOpen }">
     <AppSidebar
       :project-options="projects.projectOptions.value"
       :active-project-path="projects.activeProjectPath.value"
@@ -126,10 +142,18 @@ const currentTaskList = computed<string | null>(() => {
             :active-run="activeRun"
             :grouped-messages="groupedMessages"
             :is-running="isRunning"
+            :plan="currentPlan"
+            :plan-panel-open="planPanelOpen"
+            :can-open-plan="isPlanMode"
+            @open-plan="planPanelCollapsed = false"
           />
         </section>
 
-        <AgentTaskList v-if="currentTaskList" :task-list-text="currentTaskList" class="pinned-task-list" />
+        <AgentTaskList
+          v-if="currentTaskList && !planPanelOpen"
+          :task-list-text="currentTaskList"
+          class="pinned-task-list"
+        />
 
         <ChatComposer
           v-model:task-input="taskInput"
@@ -178,6 +202,12 @@ const currentTaskList = computed<string | null>(() => {
         </div>
       </template>
     </main>
+
+    <PlanPanel
+      v-if="planPanelOpen"
+      :plan="currentPlan"
+      @close="planPanelCollapsed = true"
+    />
 
     <AddProjectModal
       :show="projects.showAddProjectModal.value"

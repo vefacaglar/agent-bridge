@@ -1,11 +1,11 @@
-import type { Run, RunStatus, RunMessage, ChatMessage } from "@agent-bridge/shared";
+import type { Run, RunStatus, RunMessage, ChatMessage, PlanTask } from "@agent-bridge/shared";
 import type { ModelProvider } from "../providers/ModelProvider.js";
-import { RunRepository, MessageRepository } from "../database/repositories.js";
+import { RunRepository, MessageRepository, PlanRepository } from "../database/repositories.js";
 import { ProviderRegistry } from "../providers/ProviderRegistry.js";
 import { eventBus } from "./eventBus.js";
 import { db } from "../database/db.js";
 import { buildSystemPrompt } from "./systemPrompt.js";
-import { WORKSPACE_TOOLS, executeWorkspaceToolAsync, buildPermissionPreview, DANGEROUS_TOOLS, permissionKey } from "./workspaceTools.js";
+import { WORKSPACE_TOOLS, UPDATE_PLAN_TOOL, executeWorkspaceToolAsync, buildPermissionPreview, DANGEROUS_TOOLS, permissionKey } from "./workspaceTools.js";
 
 type PermissionDecision = "allow_once" | "allow_project" | "allow_always" | "deny";
 
@@ -23,7 +23,8 @@ export class Orchestrator {
   constructor(
     private runRepo: RunRepository,
     private messageRepo: MessageRepository,
-    private registry: ProviderRegistry
+    private registry: ProviderRegistry,
+    private planRepo: PlanRepository
   ) {}
 
   // --- Permission handling -------------------------------------------------
@@ -253,11 +254,15 @@ export class Orchestrator {
         let accumulatedReasoning = "";
         let hasCreatedMessage = false;
 
+        // In plan mode the model maintains a structured plan via update_plan;
+        // other modes keep the lighter text-based <task_list> workflow.
+        const tools = run.mode === "plan" ? [...WORKSPACE_TOOLS, UPDATE_PLAN_TOOL] : WORKSPACE_TOOLS;
+
         const response = await provider.complete({
           model: run.model,
           systemPrompt: buildSystemPrompt(run.projectName, run.projectPath, run.mode),
           messages: currentMessages,
-          tools: WORKSPACE_TOOLS
+          tools
         }, (chunk) => {
           checkCancelled();
           if (chunk.content) accumulatedContent += chunk.content;
@@ -369,6 +374,12 @@ export class Orchestrator {
    * run_command always asks before executing), then runs it.
    */
   private async runToolCall(runId: string, run: Run, toolCall: any): Promise<string> {
+    // update_plan is an internal bookkeeping tool (no filesystem/network side
+    // effects), so it runs silently without any permission prompt.
+    if (toolCall.function?.name === "update_plan") {
+      return this.executePlanUpdate(runId, toolCall);
+    }
+
     const isDangerous = DANGEROUS_TOOLS.has(toolCall.function?.name);
     // run_command is always gated; other tools only in ask_permissions mode.
     // Either way a matching per-tool/per-command grant lets it run silently.
@@ -383,5 +394,40 @@ export class Orchestrator {
       this.emitStatus(runId, "generating");
     }
     return executeWorkspaceToolAsync(run, toolCall);
+  }
+
+  /**
+   * Persists the assistant's plan for a run and broadcasts it to the UI. Called
+   * when the model invokes update_plan; never throws — failures are returned to
+   * the model as a JSON error so it can react.
+   */
+  private executePlanUpdate(runId: string, toolCall: any): string {
+    try {
+      const args = JSON.parse(toolCall.function.arguments || "{}");
+      const rawTasks = Array.isArray(args.tasks) ? args.tasks : [];
+      const tasks: PlanTask[] = rawTasks.map((t: any) => ({
+        text: typeof t?.text === "string" ? t.text : "",
+        status: t?.status === "in_progress" || t?.status === "completed" ? t.status : "pending"
+      }));
+
+      const plan = this.planRepo.upsert(runId, {
+        title: typeof args.title === "string" ? args.title : undefined,
+        body: typeof args.body === "string" ? args.body : undefined,
+        tasks,
+        startNew: !!args.start_new
+      });
+
+      eventBus.emit(`run:${runId}`, { type: "plan_updated", plan });
+
+      return JSON.stringify({
+        success: true,
+        planId: plan.id,
+        version: plan.version,
+        taskCount: plan.tasks.length,
+        completed: plan.tasks.filter(t => t.status === "completed").length
+      });
+    } catch (err: any) {
+      return JSON.stringify({ success: false, error: err.message });
+    }
   }
 }

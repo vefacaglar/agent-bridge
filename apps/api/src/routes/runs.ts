@@ -196,6 +196,18 @@ export function registerRunRoutes(server: FastifyInstance, ctx: AppContext) {
     return ctx.messageRepo.listByRunId(id);
   });
 
+  // Active plan for a single run (drives the plan side panel). Returns null
+  // when the run has no plan yet.
+  server.get("/api/runs/:id/plan", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const run = ctx.runRepo.getById(id);
+    if (!run) {
+      reply.status(404);
+      return { error: `Run with id "${id}" not found` };
+    }
+    return ctx.planRepo.getActive(id);
+  });
+
   // SSE event stream for a specific run.
   server.get("/api/runs/:id/events", async (request, reply) => {
     const { id } = request.params as { id: string };

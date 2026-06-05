@@ -110,6 +110,26 @@ db.exec(`
   );
 `);
 
+// Create Plans Table.
+// Each run can have multiple plans over time (a new one supersedes the old when
+// the assistant finishes a plan and starts another). The active plan is the one
+// shown in the right-hand plan panel. Maintained by the update_plan tool.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS plans (
+    id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL,
+    title TEXT NOT NULL DEFAULT 'Plan',
+    body TEXT,
+    tasks TEXT NOT NULL DEFAULT '[]',
+    status TEXT NOT NULL DEFAULT 'active',
+    version INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (run_id) REFERENCES runs(id)
+  );
+`);
+db.exec("CREATE INDEX IF NOT EXISTS idx_plans_run ON plans(run_id)");
+
 // Seed default project if empty
 const projectCount = db.prepare("SELECT count(*) as count FROM projects").get() as { count: number };
 if (projectCount.count === 0) {
