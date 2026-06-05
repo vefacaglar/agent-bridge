@@ -126,14 +126,6 @@ function toggleBypassPermissions() {
   bypassPermissions.value = !bypassPermissions.value;
 }
 
-function handlePlusClick() {
-  console.log('Plus clicked');
-}
-
-function handleMicClick() {
-  console.log('Mic clicked');
-}
-
 const activeModelDisplayName = computed(() => {
   const opt = modelOptions.value.find(o => o.value === selectedModelCombined.value);
   if (!opt) return 'Select Model';
@@ -944,12 +936,6 @@ onBeforeUnmount(() => {
             <div class="mode-selector-wrap">
               <button class="mode-pill-btn" @click.stop="showModeMenu = !showModeMenu">
                 <span class="mode-pill-text">{{ getModeLabel(currentMode) }}</span>
-                <span class="mode-pill-divider">|</span>
-                <span class="mode-pill-icon-btn" @click.stop="handlePlusClick" title="Add">+</span>
-                <span class="mode-pill-divider">|</span>
-                <span class="mode-pill-icon-btn" @click.stop="handleMicClick" title="Voice Input">🎙️</span>
-                <span class="mode-pill-divider">|</span>
-                <span class="mode-pill-chevron">▼</span>
               </button>
 
               <!-- Mode Popup Menu -->
