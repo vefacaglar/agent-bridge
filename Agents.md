@@ -2,88 +2,92 @@
 
 ## Purpose
 
-This file defines how the AI agent works inside the Agent Bridge project.
+This file describes how the agent currently works inside Agent Bridge.
 
-Agent Bridge currently runs a **single workspace agent**: one provider/model
-chosen by the user, given a task, operating inside a selected local project
-folder. The agent reasons, optionally calls workspace filesystem tools, reads
-the results, and continues until it produces a final answer.
+Agent Bridge runs a **single workspace agent**. The user selects one
+provider/model, chooses a local project folder, sends a task, and the
+orchestrator lets that model respond, call workspace tools when appropriate,
+read tool results, and continue until it returns a final answer.
 
-> A two-agent planner/coder bridge was the original concept and is documented
-> only as a future direction. The sections below describe the agent that
-> actually exists.
+The original two-agent planner/coder bridge is a future direction only. Do not
+document or implement against that model unless the code is explicitly changed
+back to it.
 
 ---
 
 ## Agent Role
 
-The workspace agent is responsible for understanding a task and carrying it out
-inside the active project directory.
+The workspace agent should understand the user's request and act inside the
+active project directory.
 
 Responsibilities:
 
 ```txt
-understand the user's task
-plan the work (wrap planning in <plan>...</plan> tags)
-read existing files when context is needed
-write or modify files via workspace tools
-explain what it did and surface important decisions
+answer normal questions concisely
+plan before implementation work
+inspect files when context is needed
+modify files through workspace tools in build modes
+surface important decisions and uncertainty
+stop when the task is done or blocked
 ```
 
 The agent must not:
 
 ```txt
 touch files outside the active project workspace
-run terminal commands or git operations (not available)
-invent provider behavior or tool capabilities it does not have
+invent provider behavior or tool capabilities
 expand scope beyond the user's request without saying so
 silently perform destructive actions
+hide tool failures
 ```
 
 ---
 
 ## System Prompt
 
-The system prompt is built per-run by `buildSystemPrompt(projectName,
+The system prompt is built per run by `buildSystemPrompt(projectName,
 projectPath, mode)` in `apps/api/src/orchestrator/systemPrompt.ts`.
 
-It always instructs the agent to:
-
-```txt
-- outline a plan first, wrapped in <plan>...</plan> tags
-- wrap code changes in fenced markdown code blocks
-- treat the given project folder as its workspace
-```
-
-It then appends mode-specific guidance and the active project context.
+The prompt always includes the active project context when available. Non-chat
+modes include the workspace tool catalog and planning/checklist instructions.
+Chat mode intentionally stays lightweight and tells the model not to scan or
+modify the workspace unless the user explicitly asks.
 
 ---
 
 ## Operational Modes
 
-The run's `mode` decides how freely the agent may act:
+The run's `mode` controls the prompt and permission behavior:
 
 ```txt
-plan             Planning and explanation only. Do NOT write/delete files.
-accept_edits     May call tools; edits are applied directly. (default)
-ask_permissions  Each tool call must be approved by the user first.
-auto             Autonomous; calls tools freely to finish the task.
+chat             Lightweight conversation; no proactive workspace work.
+plan             Planning only; no file mutation or commands.
+accept_edits     Build mode; file edits are applied directly.
+ask_permissions  Every tool call requires user approval unless already granted.
+auto             Autonomous build mode; still gates dangerous tools.
 ```
 
-In `plan` mode the agent should describe needed changes in text and ask the
-user to switch to a build mode instead of calling write/delete tools.
+The web UI currently exposes Chat, Build (`accept_edits`), and Plan. Older runs
+or API callers may still use `ask_permissions` and `auto`.
 
 ---
 
 ## Workspace Tools
 
-The agent is offered these tools (defined in `workspaceTools.ts`):
+The agent is offered these tools from `apps/api/src/orchestrator/workspaceTools.ts`:
 
 ```txt
-write_file(path, content)    create or overwrite a file
-delete_file(path)            delete a file
-read_file(path)              read a file's contents
-list_directory(path)         list a directory ('' or '.' = workspace root)
+write_file(path, content)
+edit_file(path, old_string, new_string, replace_all?)
+delete_file(path)
+read_file(path)
+list_directory(path)
+create_directory(path)
+move_file(source_path, destination_path)
+search_files(query, path?)
+run_command(command)
+fetch_url(url)
+update_plan(title, tasks, body?, start_new?)   plan mode only
 ```
 
 Rules:
@@ -91,133 +95,83 @@ Rules:
 ```txt
 all paths are relative to the active project folder
 paths that resolve outside the workspace are rejected
-tool failures come back as JSON { success: false, error } — react to them
-prefer read_file / list_directory to understand context before editing
+tool failures return JSON, and the model should react to them
+prefer read/search/list before editing when context is missing
+prefer edit_file for targeted changes to existing files
 ```
+
+`run_command` and `fetch_url` are dangerous tools. They always route through the
+permission flow unless a matching standing grant exists. `update_plan` is
+internal bookkeeping only; it does not touch files or network and runs without a
+permission prompt.
 
 ---
 
-## Permission Flow (ask_permissions mode)
+## Permission Flow
 
-When a tool call is attempted in `ask_permissions` mode and no standing
-permission exists, the orchestrator pauses:
+When a gated tool call needs approval, the orchestrator pauses:
 
 ```txt
 1. status becomes "awaiting_permission"
-2. a permission_requested event is emitted to the UI
-3. the user responds with one decision:
-     allow_once | allow_project | allow_always | deny
-4. allow_project / allow_always are persisted in the permissions table
-5. deny returns a permission error to the agent (the run continues)
+2. a permission_requested event is emitted with a preview
+3. the user decides: allow_once | allow_project | allow_always | deny
+4. project/global grants are saved in the permissions table
+5. deny returns a JSON permission error to the model
 ```
 
-A standing project/global permission skips the prompt on later calls.
+Standing grants are scoped by tool. `run_command` grants are scoped to the exact
+command string; `fetch_url` grants are scoped to the host.
 
 ---
 
 ## Generation Loop
 
-The orchestrator drives one shared loop (`drive()` in `Orchestrator.ts`):
+The orchestrator drives one loop in `Orchestrator.ts`:
 
 ```txt
 1. build the mode-aware system prompt
-2. call the model with the workspace tools available
-3. if the model returns tool calls:
-     - save the assistant message (with raw tool calls)
-     - for each call: gate by mode/permissions, execute, save the tool result
-     - loop again with the tool results appended
-4. if the model returns no tool calls:
-     - save the final assistant message and finish (status "done")
+2. call the selected provider/model with the current history and tools
+3. stream and save assistant output
+4. if tool calls are returned, gate/execute/save each tool result
+5. append tool results to model history and continue
+6. if no tool calls are returned, mark the run done
 ```
 
-`run()` starts a fresh thread; `continueRun()` replays stored history and
-continues it. There is no fixed round limit — the loop ends when the model
-stops calling tools, the user cancels, or an error occurs.
+`run()` starts a fresh thread. `continueRun()` replays stored history and
+continues the same thread. The loop ends when the model stops calling tools, the
+user cancels, or an error occurs.
 
 ---
 
-## Loop Control & Safety
+## Safety
 
 The orchestrator enforces:
 
 ```txt
-cooperative cancellation (checkCancelled between steps)
+workspace path containment
+permission gating for dangerous tools and ask_permissions mode
+cooperative cancellation between steps
 provider timeout (60s per request)
-permission gating in ask_permissions mode
-workspace path containment for every tool call
-failure handling that preserves prior messages
+startup cleanup for runs left in active states
+error persistence without discarding prior messages
 ```
 
-Cancelling a run also resolves any pending permission request so the loop can
-unwind cleanly. Errors are saved to the run's `error_message`; previous
-messages are never discarded.
-
----
-
-## Message Passing
-
-Every message is persisted and streamed over SSE. The model receives, in order:
-
-```txt
-system prompt (mode + project context)
-the original user task
-the full prior conversation (assistant text, tool calls, tool results)
-any new user follow-up (on continueRun)
-```
-
-For MVP the full history is sent each turn. Summarization of long histories is
-a future improvement, not a current requirement.
-
----
-
-## Agent Output Guidelines
-
-Prefer:
-
-```txt
-a short <plan> before doing work
-concrete file edits via tools
-clear explanations of what changed and why
-complete, copy-pasteable code blocks when code is requested
-```
-
-Avoid:
-
-```txt
-long generic theory
-scope expansion
-fake certainty about tools or provider behavior
-editing files the user did not ask about
-```
-
----
-
-## Provider Notes
-
-Supported provider types:
-
-```txt
-openai-compatible   (OpenAI, OpenCode, CommandCode, ... — tools/tool_calls)
-anthropic           (Messages API — tool_use/tool_result blocks)
-```
-
-Provider-specific request/response details live inside the adapters, never in
-the orchestrator. Both adapters support the workspace tools: the orchestrator
-passes one OpenAI-shaped tool list, and each adapter maps it to/from its own
-wire format, returning the common `ToolCall` shape.
+Provider secrets stay server-side. The frontend receives only safe provider
+metadata.
 
 ---
 
 ## Done Definition
 
-The agent system is working when:
+The current agent system is working when:
 
 ```txt
-the user can pick one provider/model and a project folder
-the agent plans, then reads/writes files via workspace tools
-all file access stays inside the active workspace
-ask_permissions mode pauses for approval and resumes correctly
-every message and status change streams live and is saved
+the user can choose one provider/model and one project folder
+chat/build/plan modes behave differently and predictably
+the agent can read/write workspace files through tools
+all filesystem access stays inside the selected workspace
+dangerous tools pause for approval and resume correctly
+messages, status changes, permissions, and plans stream live and persist
 runs can be reopened after restart
-no provider secrets ever reach the browser
+provider secrets never reach the browser
 ```

@@ -49,7 +49,7 @@ apps/
       context.ts               Shared dependencies (registry, repos, orchestrator)
       routes/
         index.ts               Registers all route groups + /ping
-        providers.ts           GET /api/providers, POST /api/providers/test
+        providers.ts           Provider metadata/config/test/model-fetch routes
         projects.ts            CRUD + macOS folder picker
         runs.ts                Create/continue/cancel/permission/list/SSE
         permissions.ts         List/revoke standing tool permissions
@@ -78,7 +78,7 @@ apps/
         useChatSession.ts      Runs/messages/SSE/send/continue/cancel/permission
         useProjects.ts         Project list + active project + add/remove flow
         usePermissions.ts      Standing-permissions list + settings modal
-        useComposerSettings.ts Mode / model / bypass (persisted to localStorage)
+        useComposerSettings.ts Mode / model settings (persisted to localStorage)
         useChatAutoScroll.ts   Scroll-to-bottom watchers
       lib/                     Pure helpers (no state)
         markdown.ts            Marked setup + renderMarkdown + cleanMessageContent
@@ -93,7 +93,7 @@ apps/
         ConfirmationCard.vue   Inline yes/no quick reply
         PermissionCard.vue     Inline tool permission request (diff + options)
         AddProjectModal.vue
-        SettingsModal.vue      View/revoke saved tool permissions
+        settings/              Provider and permission settings screens
 
 packages/
   shared/src/index.ts          Shared TS contracts (Run, RunMessage, events, ...)
@@ -205,10 +205,11 @@ also resolves any pending permission request so the loop can unwind.
 The run's `mode` shapes the system prompt and tool gating:
 
 ```txt
+chat             Lightweight conversation; no proactive workspace work.
 plan             Discuss/plan only; do not write files.
-accept_edits     May call tools; edits applied directly (default).
+accept_edits     May call tools; edits applied directly.
 ask_permissions  Each tool call requires explicit user approval first.
-auto             Autonomous; calls tools freely.
+auto             Autonomous build mode; still gates dangerous tools.
 ```
 
 The web UI exposes three modes: **Chat**, **Build** (the `accept_edits` backend
@@ -230,15 +231,17 @@ the text `<task_list>` block the model re-emits in each message (all modes),
 which the web UI pins above the composer. So the panel = the fixed plan; the
 pinned bar = the live, per-message checklist. They are independent.
 
-Only `ask_permissions` currently pauses for approval. The approval flow emits
-`permission_requested`, sets status `awaiting_permission`, and waits for a
-decision: `allow_once`, `allow_project`, `allow_always`, or `deny`.
-`allow_project` / `allow_always` are persisted in the `permissions` table.
+`run_command` and `fetch_url` always pause for approval unless a matching
+standing grant exists. In `ask_permissions` mode every tool call is gated the
+same way. The approval flow emits `permission_requested`, sets status
+`awaiting_permission`, and waits for a decision: `allow_once`, `allow_project`,
+`allow_always`, or `deny`. `allow_project` / `allow_always` are persisted in
+the `permissions` table.
 
 The `permission_requested` event carries a `PermissionPreview` (built by
-`buildPermissionPreview`): the tool, action (create/edit/delete/read/list),
-path, and the current on-disk content so the UI can render a red/green diff
-(Claude Code-style) in the inline permission card before the tool runs.
+`buildPermissionPreview`): the tool, action
+(create/edit/delete/read/list/mkdir/move/search/command/fetch), path, and any
+available old/new content so the UI can render a preview before the tool runs.
 
 Standing `allow_project` / `allow_always` grants are silent until revoked.
 The Settings modal (sidebar → Settings) lists them and can revoke individual
@@ -331,7 +334,7 @@ SQLite via `node:sqlite`. Tables (created/migrated in `db.ts`):
 runs         id, title, task, project_path/name, status, provider, model, mode, ...
 messages     id, run_id, role, agent_role?, provider/model?, content, raw_response?, ...
 projects     path (pk), name, created_at
-permissions  scope ('global'|'project'), project_path, status; UNIQUE(scope, project_path)
+permissions  scope, project_path, tool, command, status; UNIQUE(scope, project_path, tool, command)
 plans        id, run_id, title, body?, tasks (JSON), status ('active'|'completed'), version
 ```
 
@@ -349,8 +352,8 @@ Use SSE (`GET /api/runs/:id/events`). The backend fans events out through
 ```txt
 run_started
 status_changed
-round_started
 message_created
+message_updated
 model_snapshot_locked
 permission_requested
 plan_updated
@@ -413,8 +416,8 @@ Not implemented today; do not build without an explicit request:
 
 ```txt
 two-model planner -> coder -> review bridge (the original Agent Bridge concept)
-terminal execution / git integration
-manual approval checkpoints beyond ask_permissions
+direct git integration
+manual approval checkpoints beyond the existing permission flow
 token cost tracking
 agent presets
 multi-user auth / cloud deployment
