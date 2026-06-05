@@ -30,6 +30,7 @@ const emit = defineEmits<{
   (e: 'update:bypassPermissions', value: boolean): void;
   (e: 'update:selectedModel', value: string): void;
   (e: 'send'): void;
+  (e: 'cancel'): void;
   (e: 'quick-reply', option: string): void;
   (e: 'permission-decision', decision: PermissionDecision): void;
   (e: 'select-project', path: string): void;
@@ -37,22 +38,28 @@ const emit = defineEmits<{
 
 const textarea = ref<HTMLTextAreaElement | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
-const attachedFiles = ref<{ name: string; content: string; extension: string }[]>([]);
+const attachedFiles = ref<{ name: string; content: string; extension: string; isImage: boolean }[]>([]);
 
 function estimateTokens(text: string): number {
   if (!text) return 0;
-  const charCount = text.length;
-  const wordCount = text.trim().split(/\s+/).length;
+  const cleanText = text.replace(/!\[([^\]]*)\]\(data:image\/[^)]+\)/g, '[Image]');
+  const charCount = cleanText.length;
+  const wordCount = cleanText.trim().split(/\s+/).length;
   return Math.round(Math.max(charCount / 3.7, wordCount * 1.3));
 }
 
 const draftTokens = computed(() => {
   let text = props.taskInput || '';
+  let imageTokens = 0;
   for (const file of attachedFiles.value) {
-    const syntaxLang = file.extension ? file.extension.toLowerCase() : '';
-    text += `\n\n### File: ${file.name}\n\`\`\`${syntaxLang}\n${file.content}\n\`\`\``;
+    if (file.isImage) {
+      imageTokens += 300;
+    } else {
+      const syntaxLang = file.extension ? file.extension.toLowerCase() : '';
+      text += `\n\n### File: ${file.name}\n\`\`\`${syntaxLang}\n${file.content}\n\`\`\``;
+    }
   }
-  return estimateTokens(text);
+  return estimateTokens(text) + imageTokens;
 });
 
 const contextTokens = computed(() => {
@@ -66,10 +73,22 @@ const contextTokens = computed(() => {
   return total;
 });
 
-
 const canSend = computed(() => {
   return !props.isRunning && props.selectedModel && (props.taskInput.trim() || attachedFiles.value.length > 0);
 });
+
+const isButtonDisabled = computed(() => {
+  if (props.isRunning) return false;
+  return !props.selectedModel || (!props.taskInput.trim() && attachedFiles.value.length === 0);
+});
+
+function handleButtonClick() {
+  if (props.isRunning) {
+    emit('cancel');
+  } else {
+    handleSend();
+  }
+}
 
 function triggerFileSelect() {
   fileInput.value?.click();
@@ -85,12 +104,14 @@ async function handleFileChange(event: Event) {
       continue;
     }
     try {
-      const content = await readFileAsText(file);
       const extension = file.name.split('.').pop() || '';
+      const isImage = file.type.startsWith('image/') || ['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(extension.toLowerCase());
+      const content = isImage ? await readFileAsDataURL(file) : await readFileAsText(file);
       attachedFiles.value.push({
         name: file.name,
         content,
-        extension
+        extension,
+        isImage
       });
     } catch (err) {
       console.error(`Error reading file ${file.name}:`, err);
@@ -109,6 +130,15 @@ function readFileAsText(file: File): Promise<string> {
   });
 }
 
+function readFileAsDataURL(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
 function removeAttachment(idx: number) {
   attachedFiles.value.splice(idx, 1);
 }
@@ -119,8 +149,12 @@ function handleSend() {
   if (attachedFiles.value.length > 0) {
     let finalTask = props.taskInput;
     for (const file of attachedFiles.value) {
-      const syntaxLang = file.extension ? file.extension.toLowerCase() : '';
-      finalTask += `\n\n### File: ${file.name}\n\`\`\`${syntaxLang}\n${file.content}\n\`\`\``;
+      if (file.isImage) {
+        finalTask += `\n\n![${file.name}](${file.content})`;
+      } else {
+        const syntaxLang = file.extension ? file.extension.toLowerCase() : '';
+        finalTask += `\n\n### File: ${file.name}\n\`\`\`${syntaxLang}\n${file.content}\n\`\`\``;
+      }
     }
     emit('update:taskInput', finalTask);
     attachedFiles.value = [];
@@ -270,11 +304,18 @@ onBeforeUnmount(() => {
         />
         <button
           class="composer-send-btn"
-          :disabled="!canSend"
-          title="Send message"
-          @click="handleSend"
+          :class="{ 'stop-mode': isRunning }"
+          :disabled="isButtonDisabled"
+          :title="isRunning ? 'Cancel generation' : 'Send message'"
+          @click="handleButtonClick"
         >
-          Send
+          <svg v-if="isRunning" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <rect x="5" y="5" width="14" height="14" rx="1.5" />
+          </svg>
+          <svg v-else xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="19" x2="12" y2="5"></line>
+            <polyline points="5 12 12 5 19 12"></polyline>
+          </svg>
         </button>
       </div>
 
@@ -488,24 +529,36 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--surface-strong);
-  color: var(--text);
-  border: 1px solid var(--border);
+  width: 30px;
+  height: 30px;
+  background: var(--text);
+  color: var(--bg);
+  border: none;
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s ease;
-  padding: 6px 14px;
-  font-size: 0.82rem;
-  font-weight: 500;
 }
 
 .composer-send-btn:hover:not(:disabled) {
-  background: var(--sidebar-active);
+  opacity: 0.95;
 }
 
 .composer-send-btn:disabled {
-  opacity: 0.4;
+  opacity: 0.35;
   cursor: not-allowed;
+  background: var(--surface-strong);
+  color: var(--faint);
+  border: 1px solid var(--border);
+}
+
+.composer-send-btn.stop-mode {
+  background: rgba(255, 138, 128, 0.15);
+  color: #ffd1ce;
+  border: 1px solid rgba(255, 138, 128, 0.45);
+}
+
+.composer-send-btn.stop-mode:hover {
+  background: rgba(255, 138, 128, 0.25);
 }
 
 .composer-menu-row {

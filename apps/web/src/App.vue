@@ -86,7 +86,6 @@ const currentProjectName = computed(() => {
             
           </div>
           <div class="header-actions">
-            <button v-if="isRunning" class="danger-button" @click="chat.cancelActiveRun">Cancel</button>
           </div>
         </div>
       </header>
@@ -116,6 +115,7 @@ const currentProjectName = computed(() => {
           @send="chat.handleSendTask"
           @quick-reply="chat.sendQuickReply"
           @permission-decision="chat.handlePermissionDecision"
+          @cancel="chat.cancelActiveRun"
         />
       </template>
 
@@ -141,6 +141,7 @@ const currentProjectName = computed(() => {
             @quick-reply="chat.sendQuickReply"
             @permission-decision="chat.handlePermissionDecision"
             @select-project="selectProject"
+            @cancel="chat.cancelActiveRun"
           />
         </div>
       </template>

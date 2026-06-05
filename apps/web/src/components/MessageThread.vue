@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue';
+import { ref, watch, nextTick, onUnmounted } from 'vue';
 import type { Run } from '@bridgemind/shared';
 import type { MessageGroup } from '../lib/messageGroups';
 import { renderMarkdown, cleanMessageContent } from '../lib/markdown';
@@ -76,19 +76,47 @@ watch(() => props.groupedMessages, () => {
     }
   });
 }, { deep: true });
+
+// Lightbox state
+const activeLightboxImage = ref<string | null>(null);
+
+function handleImageClick(e: MouseEvent) {
+  const target = e.target as HTMLElement;
+  if (target && target.tagName === 'IMG' && target.closest('.user-markdown-body')) {
+    activeLightboxImage.value = (target as HTMLImageElement).src;
+  }
+}
+
+function handleKeyDown(e: KeyboardEvent) {
+  if (e.key === 'Escape') {
+    activeLightboxImage.value = null;
+  }
+}
+
+watch(activeLightboxImage, (newVal) => {
+  if (newVal) {
+    window.addEventListener('keydown', handleKeyDown);
+  } else {
+    window.removeEventListener('keydown', handleKeyDown);
+  }
+});
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeyDown);
+});
 </script>
 
 <template>
   <div v-if="!activeRun" class="empty-chat"></div>
 
-  <div v-else class="messages-inner">
+  <div v-else class="messages-inner" @click="handleImageClick">
     <article class="user-bubble">
-      <pre>{{ activeRun.task }}</pre>
+      <div class="user-markdown-body" v-html="renderMarkdown(activeRun.task)"></div>
     </article>
 
     <template v-for="group in groupedMessages" :key="group.id">
       <article v-if="group.type === 'user'" class="user-bubble">
-        <pre>{{ group.message.content }}</pre>
+        <div class="user-markdown-body" v-html="renderMarkdown(group.message.content)"></div>
       </article>
 
       <ToolGroup
@@ -215,6 +243,21 @@ watch(() => props.groupedMessages, () => {
     <div v-if="isRunning && !hasActiveMessage" class="system-line active pulsing-loader">
       Thinking...
     </div>
+
+    <!-- Lightbox Modal -->
+    <Transition name="fade">
+      <div v-if="activeLightboxImage" class="lightbox-overlay" @click="activeLightboxImage = null">
+        <div class="lightbox-content" @click.stop>
+          <img :src="activeLightboxImage" class="lightbox-img" alt="Enlarged screenshot" />
+          <button class="lightbox-close-btn" @click="activeLightboxImage = null">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -416,5 +459,123 @@ watch(() => props.groupedMessages, () => {
 .copy-button-icon:hover {
   color: var(--text);
   background: rgba(255, 255, 255, 0.05);
+}
+
+.user-markdown-body :deep(p) {
+  margin: 0;
+}
+.user-markdown-body :deep(p + p) {
+  margin-top: 8px;
+}
+.user-markdown-body :deep(img) {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 8px;
+  margin-top: 8px;
+  display: block;
+  border: 1px solid var(--border);
+  cursor: zoom-in;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.user-markdown-body :deep(img):hover {
+  transform: scale(1.05);
+  border-color: var(--planner);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* Lightbox Modal */
+.lightbox-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(10, 10, 12, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  cursor: zoom-out;
+}
+
+.lightbox-content {
+  position: relative;
+  max-width: 90%;
+  max-height: 90%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lightbox-img {
+  max-width: 100%;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 12px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: default;
+  user-select: none;
+}
+
+.lightbox-close-btn {
+  position: absolute;
+  top: -40px;
+  right: -40px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--text);
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.lightbox-close-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(1.1);
+}
+
+/* Close button responsiveness for small screens */
+@media (max-width: 768px) {
+  .lightbox-close-btn {
+    top: 10px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+  }
+}
+
+/* Transition Animations */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.25s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.fade-enter-active .lightbox-img {
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.fade-leave-active .lightbox-img {
+  transition: transform 0.2s ease;
+}
+
+.fade-enter-from .lightbox-img {
+  transform: scale(0.92);
+}
+.fade-leave-to .lightbox-img {
+  transform: scale(0.95);
 }
 </style>

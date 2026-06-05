@@ -21,6 +21,43 @@ function toAnthropicTools(tools?: any[]) {
  * turn. Consecutive tool results are merged into a single user message so the
  * conversation keeps alternating user/assistant turns.
  */
+function parseAnthropicMessageContent(content: string): any {
+  if (!content) return "";
+  const regex = /!\[([^\]]*)\]\((data:image\/([a-zA-Z+.-]+);base64,([^)]+))\)/g;
+  const matches = [...content.matchAll(regex)];
+  if (matches.length === 0) {
+    return content;
+  }
+
+  const parts: any[] = [];
+  let lastIndex = 0;
+
+  for (const match of matches) {
+    const textPart = content.slice(lastIndex, match.index).trim();
+    if (textPart) {
+      parts.push({ type: "text", text: textPart });
+    }
+    const mediaType = `image/${match[3]}`;
+    const base64Data = match[4];
+    parts.push({
+      type: "image",
+      source: {
+        type: "base64",
+        media_type: mediaType,
+        data: base64Data
+      }
+    });
+    lastIndex = (match.index ?? 0) + match[0].length;
+  }
+
+  const remainingText = content.slice(lastIndex).trim();
+  if (remainingText) {
+    parts.push({ type: "text", text: remainingText });
+  }
+
+  return parts;
+}
+
 function toAnthropicMessages(messages: ChatMessage[]): any[] {
   const out: any[] = [];
   let i = 0;
@@ -32,7 +69,7 @@ function toAnthropicMessages(messages: ChatMessage[]): any[] {
       // System content is sent via the top-level `system` field instead.
       i++;
     } else if (m.role === "user") {
-      out.push({ role: "user", content: m.content });
+      out.push({ role: "user", content: parseAnthropicMessageContent(m.content) });
       i++;
     } else if (m.role === "assistant") {
       if (m.toolCalls && m.toolCalls.length > 0) {
@@ -51,7 +88,7 @@ function toAnthropicMessages(messages: ChatMessage[]): any[] {
         }
         out.push({ role: "assistant", content: blocks });
       } else {
-        out.push({ role: "assistant", content: m.content });
+        out.push({ role: "assistant", content: parseAnthropicMessageContent(m.content) });
       }
       i++;
     } else if (m.role === "tool") {

@@ -1,6 +1,38 @@
 import type { CompletionRequest, CompletionResponse } from "@bridgemind/shared";
 import type { ModelProvider } from "./ModelProvider.js";
 
+function parseOpenAIMessageContent(content: string): any {
+  if (!content) return "";
+  const regex = /!\[([^\]]*)\]\((data:image\/[a-zA-Z+.-]+;base64,[^)]+)\)/g;
+  const matches = [...content.matchAll(regex)];
+  if (matches.length === 0) {
+    return content;
+  }
+
+  const parts: any[] = [];
+  let lastIndex = 0;
+
+  for (const match of matches) {
+    const textPart = content.slice(lastIndex, match.index).trim();
+    if (textPart) {
+      parts.push({ type: "text", text: textPart });
+    }
+    const dataUrl = match[2];
+    parts.push({
+      type: "image_url",
+      image_url: { url: dataUrl }
+    });
+    lastIndex = (match.index ?? 0) + match[0].length;
+  }
+
+  const remainingText = content.slice(lastIndex).trim();
+  if (remainingText) {
+    parts.push({ type: "text", text: remainingText });
+  }
+
+  return parts;
+}
+
 export class OpenAICompatibleProvider implements ModelProvider {
   private baseUrl: string;
   private apiKey: string;
@@ -24,7 +56,7 @@ export class OpenAICompatibleProvider implements ModelProvider {
     messages.push(...request.messages.map(msg => {
       const formatted: any = {
         role: msg.role,
-        content: msg.content
+        content: msg.role === "user" ? parseOpenAIMessageContent(msg.content) : msg.content
       };
       if (msg.role === "tool") {
         formatted.tool_call_id = msg.tool_call_id;
