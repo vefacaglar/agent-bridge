@@ -2,111 +2,148 @@
 
 ## Project
 
-BridgeMind is a local-first AI orchestration tool for connecting two AI models in a structured workflow.
+BridgeMind is a local-first AI orchestration tool. The user picks one provider
+and model, gives it a task, and the assistant works inside a selected project
+folder on the local machine.
 
-The main workflow is:
+The current implementation is a **single-model workspace assistant** with
+filesystem tools and explicit permission modes:
 
 ```txt
 User Task
-  -> Planner Model
-  -> Coder Model
-  -> Planner Review
-  -> Coder Fix
-  -> Final Output
+  -> Orchestrator creates a run
+  -> Model generates a response (optionally calling workspace tools)
+  -> Tool calls are gated by the active mode / permissions
+  -> Tool results are fed back to the model
+  -> Loop until the model returns a final answer with no tool calls
+  -> Run is marked done; messages are streamed live and saved
 ```
 
-The application should reduce manual copy-paste between different AI tools. One model should reason, plan, or review. The other model should implement the requested output.
-
-This project is not a full autonomous coding agent in the first phase. The MVP must focus on provider adapters, orchestration, run history, and a clean Vue-based interface.
+> The original BridgeMind vision was a two-model planner → coder → review
+> bridge. That is **not** what the code does today; it is a possible future
+> direction (see "Future Features"). Document and build against the
+> single-model reality described here.
 
 ---
 
 ## Tech Stack
 
-Preferred stack:
-
 ```txt
-Frontend: Vue 3 + Vite + TypeScript
-Backend: Node.js + TypeScript + Fastify
-Database: SQLite
-Realtime: SSE first, WebSocket later if needed
-Package manager: pnpm
+Frontend: Vue 3 + Vite + TypeScript (Composition API, <script setup>)
+Backend:  Node.js + TypeScript + Fastify
+Database: SQLite via the built-in node:sqlite module
+Realtime: SSE (Server-Sent Events)
+Package manager: pnpm (workspaces)
 Repository style: monorepo
 ```
 
-Suggested structure:
+---
+
+## Repository Structure
 
 ```txt
 apps/
-  web/
-  api/
+  api/                         Fastify backend
+    src/
+      server.ts                Bootstrap only: Fastify + CORS + listen
+      context.ts               Shared dependencies (registry, repos, orchestrator)
+      routes/
+        index.ts               Registers all route groups + /ping
+        providers.ts           GET /api/providers, POST /api/providers/test
+        projects.ts            CRUD + macOS folder picker
+        runs.ts                Create/continue/cancel/permission/list/SSE
+      orchestrator/
+        Orchestrator.ts        Run lifecycle + shared generation loop (drive)
+        workspaceTools.ts      Tool schemas + executeWorkspaceTool (fs access)
+        systemPrompt.ts        buildSystemPrompt (mode-aware)
+        eventBus.ts            EventEmitter used for SSE fan-out
+      providers/
+        ModelProvider.ts       complete() interface
+        OpenAICompatibleProvider.ts
+        AnthropicProvider.ts
+        ProviderFactory.ts     type -> adapter
+        ProviderRegistry.ts    loads providers.local.json, exposes safe metadata
+      database/
+        db.ts                  Connection + schema + migrations + startup cleanup
+        repositories.ts        RunRepository, MessageRepository, ProjectRepository
+
+  web/                         Vue frontend
+    src/
+      App.vue                  Thin shell: wires useAppShell to components
+      main.ts
+      api/client.ts            Typed fetch wrappers for every endpoint
+      composables/
+        useAppShell.ts         Composes the other composables + lifecycle
+        useChatSession.ts      Runs/messages/SSE/send/continue/cancel/permission
+        useProjects.ts         Project list + active project + add/remove flow
+        useComposerSettings.ts Mode / model / bypass (persisted to localStorage)
+        useChatAutoScroll.ts   Scroll-to-bottom watchers
+      lib/                     Pure helpers (no state)
+        markdown.ts            Marked setup + renderMarkdown + cleanMessageContent
+        format.ts              Time/status/json formatting, splitCombined, constants
+        messageGroups.ts       Groups flat messages into renderable blocks
+        confirmation.ts        Yes/no detection + permission path helpers
+      components/
+        AppSidebar.vue         Projects accordion + chat history
+        MessageThread.vue      Message list (user / assistant / tool groups)
+        ToolGroup.vue          Collapsible tool-call/response block
+        ChatComposer.vue       Input + mode menu + model menu + cards
+        ConfirmationCard.vue   Inline yes/no quick reply
+        PermissionCard.vue     Inline tool permission request
+        AddProjectModal.vue
 
 packages/
-  shared/
+  shared/src/index.ts          Shared TS contracts (Run, RunMessage, events, ...)
 
-providers.example.json
-providers.local.json
-DEVELOPMENT_PLAN.md
-AGENTS.md
-Claude.md
+providers.example.json         Template (committed)
+providers.local.json           Real credentials (git-ignored, never committed)
+bridgemind.db                  Local SQLite file (git-ignored)
 ```
 
 ---
 
 ## Core Principles
 
-Keep the architecture simple.
+Keep the architecture simple. No heavy agent frameworks.
 
-Do not introduce heavy agent frameworks unless there is a clear need. The first version should use a direct orchestrator service, provider adapters, and explicit run states.
+Prefer readable code over clever abstractions. Keep functions small and
+purpose-driven. Avoid premature abstraction.
 
-Prefer readable code over clever abstractions.
+Backend layering: `routes` (HTTP) -> `orchestrator` / `repositories` /
+`registry` (logic) -> `database` / `providers` (I/O). Routes never contain
+provider-specific or SQL-heavy logic directly.
 
-Do not add cloud deployment, auth, repository editing, terminal execution, or automatic patching during MVP unless explicitly requested.
+Frontend layering: `App.vue` (view) -> `useAppShell` (coordination) ->
+domain composables -> `api/` + `lib/` (pure infrastructure). Components are
+presentational and communicate via props/emits.
 
 ---
 
 ## Provider Configuration
 
-Provider credentials must be read from local ignored configuration files.
-
-Use:
+Provider credentials are read from local, git-ignored config:
 
 ```txt
-providers.example.json
-providers.local.json
+providers.example.json   (template, committed)
+providers.local.json     (real keys, never committed)
 ```
 
-`providers.local.json` must never be committed.
+The backend may read API keys. The frontend must never receive them.
 
-The backend may read API keys. The frontend must never receive API keys.
-
-The `/api/providers` endpoint should return only safe metadata:
+`GET /api/providers` returns only safe metadata:
 
 ```txt
-provider id
-display name
-provider type
-available models
+id, displayName, type, models
 ```
 
-Do not expose:
-
-```txt
-apiKey
-authorization headers
-raw secrets
-local credentials
-```
+Never expose `apiKey`, authorization headers, or raw secrets to the browser.
 
 ---
 
 ## Provider Adapter Rules
 
-Use an adapter pattern.
-
-The orchestrator must not know provider-specific request formats.
-
-Common interface:
+Use the adapter pattern. The orchestrator must not know provider-specific
+request formats — it only calls `complete(request)`.
 
 ```ts
 export interface ModelProvider {
@@ -114,257 +151,197 @@ export interface ModelProvider {
 }
 ```
 
-Required adapters for MVP:
+Adapters:
 
 ```txt
-OpenAICompatibleProvider
-AnthropicProvider
+OpenAICompatibleProvider   /chat/completions, supports tools/tool_calls
+AnthropicProvider          /v1/messages, separate request/response shape
 ```
 
-OpenAI, OpenCode, and CommandCode should use `OpenAICompatibleProvider` when they expose an OpenAI-compatible `/chat/completions` API.
+OpenAI-compatible providers (OpenAI, OpenCode, CommandCode, etc.) share
+`OpenAICompatibleProvider`. Anthropic uses its own adapter because the
+Messages API differs.
 
-Anthropic should use a separate adapter because its Messages API differs from OpenAI-compatible APIs.
+> Known gap: `AnthropicProvider` does not yet forward `tools` or tool/assistant
+> tool-call messages, so workspace tools are inert when an Anthropic model is
+> selected. Treat adding tool support there as a real backend task, not a
+> formatting tweak.
 
 ---
 
 ## Orchestrator Rules
 
-The orchestrator controls the conversation between agents.
+The orchestrator (`Orchestrator.ts`) owns a single-model conversation loop.
 
 It should:
 
 ```txt
-create a run
-save the user task
-call the planner model
-send planner output to coder model
-send coder output back to planner model
-continue until accepted or maxRounds is reached
-save every message
-stream events to the UI
+load the run
+build a mode-aware system prompt (systemPrompt.ts)
+call the model with WORKSPACE_TOOLS available
+if the model returns tool calls:
+  gate each call by mode/permissions, execute it, feed the result back
+otherwise:
+  save the final assistant message and finish
+stream every state change and message over SSE
 ```
 
-The orchestrator must enforce loop limits.
+`run()` starts a fresh run; `continueRun()` replays persisted history and
+continues the same thread. Both share one private `drive()` loop — do not
+re-introduce duplicated tool-execution code across the two paths.
 
-Default:
+The loop terminates when the model responds with no tool calls, on
+cancellation, or on error. Cancellation is cooperative (`checkCancelled`) and
+also resolves any pending permission request so the loop can unwind.
+
+---
+
+## Operational Modes
+
+The run's `mode` shapes the system prompt and tool gating:
 
 ```txt
-maxRounds = 3
+plan             Discuss/plan only; do not write files.
+accept_edits     May call tools; edits applied directly (default).
+ask_permissions  Each tool call requires explicit user approval first.
+auto             Autonomous; calls tools freely.
 ```
 
-Allowed range:
+Only `ask_permissions` currently pauses for approval. The approval flow emits
+`permission_requested`, sets status `awaiting_permission`, and waits for a
+decision: `allow_once`, `allow_project`, `allow_always`, or `deny`.
+`allow_project` / `allow_always` are persisted in the `permissions` table.
+
+---
+
+## Workspace Tools
+
+Tools are defined and executed in `workspaceTools.ts`:
 
 ```txt
-minimum = 1
-maximum = 10
+write_file(path, content)
+delete_file(path)
+read_file(path)
+list_directory(path)
 ```
 
-The planner review must use one of these markers:
+Safety: every path resolves against the run's project directory and must stay
+inside it. Access outside the workspace is denied. Tool failures are returned
+to the model as JSON `{ success: false, error }` rather than thrown.
 
-```txt
-FINAL_ACCEPTED
-CHANGES_REQUIRED
-```
-
-If no clear marker is provided, treat the review as `CHANGES_REQUIRED` until max rounds is reached.
+Do not add terminal execution, git operations, or network tools without an
+explicit request.
 
 ---
 
 ## Run States
 
-Use explicit run states.
+Use explicit run states (`RunStatus` in shared):
 
 ```ts
 export type RunStatus =
   | "created"
-  | "planning"
-  | "implementing"
-  | "reviewing"
-  | "fixing"
+  | "generating"
+  | "awaiting_permission"
   | "done"
   | "failed"
   | "cancelled";
 ```
 
-Do not use vague states like `processing` for the core workflow.
-
 ---
 
 ## Persistence
 
-Use SQLite for MVP.
-
-Minimum tables:
+SQLite via `node:sqlite`. Tables (created/migrated in `db.ts`):
 
 ```txt
-runs
-messages
+runs         id, title, task, project_path/name, status, provider, model, mode, ...
+messages     id, run_id, role, agent_role?, provider/model?, content, raw_response?, ...
+projects     path (pk), name, created_at
+permissions  scope ('global'|'project'), project_path, status; UNIQUE(scope, project_path)
 ```
 
-Provider config can stay in JSON for MVP. Do not move provider credentials into the database in the first phase.
-
-All agent messages should be stored. A run should be reopenable after app restart.
-
----
-
-## Frontend Rules
-
-The UI should be a single-screen workflow.
-
-Suggested layout:
-
-```txt
-Left Panel:
-- task input
-- planner provider select
-- planner model select
-- coder provider select
-- coder model select
-- max rounds
-- start button
-
-Center Panel:
-- planner messages
-
-Right Panel:
-- coder messages
-
-Bottom Panel:
-- final output
-```
-
-The user should be able to see what each model said without switching screens.
-
-Do not hide important agent decisions in logs.
+All agent messages are stored. A run must be reopenable after restart. On
+startup, runs stuck in active states are marked `failed`. Provider credentials
+stay in JSON, never in the database.
 
 ---
 
 ## Realtime Rules
 
-Use SSE for MVP unless bidirectional control is needed.
-
-Stream structured events:
+Use SSE (`GET /api/runs/:id/events`). The backend fans events out through
+`eventBus`. Structured event types (see `RunEvent` in shared):
 
 ```txt
 run_started
 status_changed
 round_started
 message_created
+model_snapshot_locked
+permission_requested
 run_completed
 run_failed
 ```
 
-The frontend should update live while the run is active.
+The stream closes on `run_completed`, `run_failed`, or a terminal
+`status_changed` (done/failed/cancelled). The frontend updates live.
 
 ---
 
 ## Error Handling
 
-Handle these cases clearly:
+Handle clearly and save to the run record without losing prior messages:
 
 ```txt
-missing provider config
-invalid API key
-provider timeout
-rate limit
-empty model response
-invalid model name
-network error
-cancelled run
-max rounds reached
+missing provider config        invalid/empty model response
+invalid API key                invalid model name
+provider timeout (60s)         network error
+rate limit                     cancelled run
+permission denied
 ```
 
-Errors should be saved to the run record.
-
-Do not lose previous messages when a run fails.
+Failed runs keep their messages; the error is stored in `error_message`.
 
 ---
 
 ## Security Rules
 
-Never commit real API keys.
-
+```txt
+Never commit real API keys (providers.local.json is ignored).
 Never return provider secrets to the browser.
-
 Never log secrets.
-
-Avoid committing local database files.
-
-Keep local config files ignored by Git.
-
-Do not add telemetry or external tracking unless explicitly requested.
+Keep the local SQLite file out of git.
+Constrain all file access to the active project workspace.
+No telemetry or external tracking unless explicitly requested.
+```
 
 ---
 
 ## Coding Style
 
-Use TypeScript types for shared contracts.
+Use shared TypeScript types for cross-boundary contracts (`packages/shared`).
 
-Prefer explicit names.
-
-Avoid vague names like:
+Prefer specific names:
 
 ```txt
-helper
-manager
-processor
-data
-stuff
+ProviderRegistry  Orchestrator  RunRepository  OpenAICompatibleProvider
+useChatSession    useProjects   buildSystemPrompt  executeWorkspaceTool
 ```
 
-Prefer specific names like:
-
-```txt
-ProviderRegistry
-RunOrchestrator
-RunEventStream
-OpenAICompatibleProvider
-AnthropicProvider
-```
-
-Keep functions small and purpose-driven.
-
-Avoid premature abstraction.
-
----
-
-## MVP Boundary
-
-The MVP is complete when:
-
-```txt
-the app starts locally
-providers.local.json is loaded
-providers are listed in the UI
-the user can select planner and coder models
-the user can start a run
-planner output is passed to coder
-coder output is passed to planner review
-messages are streamed live
-runs and messages are saved in SQLite
-previous runs can be opened
-API keys are not exposed to the frontend
-```
-
-Do not expand scope before this works.
+Avoid vague names like `helper`, `manager`, `processor`, `data`, `stuff`.
 
 ---
 
 ## Future Features
 
-Do not implement these during MVP unless explicitly requested:
+Not implemented today; do not build without an explicit request:
 
 ```txt
-repository workspace
-file patching
-terminal execution
-git integration
-manual approval checkpoints
+two-model planner -> coder -> review bridge (the original BridgeMind concept)
+Anthropic tool/function calling
+terminal execution / git integration
+manual approval checkpoints beyond ask_permissions
 token cost tracking
 agent presets
-file uploads
-multi-user auth
-cloud deployment
+multi-user auth / cloud deployment
 ```
-
-These are valid future phases, not MVP requirements.

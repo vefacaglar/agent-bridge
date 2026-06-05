@@ -2,350 +2,211 @@
 
 ## Purpose
 
-This file defines how AI agents should work inside the BridgeMind project.
+This file defines how the AI agent works inside the BridgeMind project.
 
-BridgeMind uses a two-agent workflow:
+BridgeMind currently runs a **single workspace agent**: one provider/model
+chosen by the user, given a task, operating inside a selected local project
+folder. The agent reasons, optionally calls workspace filesystem tools, reads
+the results, and continues until it produces a final answer.
 
-```txt
-Planner Agent
-Coder Agent
-```
-
-The planner decides what should be done. The coder implements it. The planner reviews the coder output and either accepts it or requests changes.
-
-The goal is not to make agents debate forever. The goal is to produce a useful final output with limited, controlled rounds.
+> A two-agent planner/coder bridge was the original concept and is documented
+> only as a future direction. The sections below describe the agent that
+> actually exists.
 
 ---
 
-## Agent Roles
+## Agent Role
 
-## Planner Agent
-
-The Planner Agent is responsible for reasoning, planning, and reviewing.
+The workspace agent is responsible for understanding a task and carrying it out
+inside the active project directory.
 
 Responsibilities:
 
 ```txt
-understand the user task
-identify the intended output
-create a clear implementation plan
-give concrete instructions to the coder
-review the coder output
-accept the result or request specific changes
+understand the user's task
+plan the work (wrap planning in <plan>...</plan> tags)
+read existing files when context is needed
+write or modify files via workspace tools
+explain what it did and surface important decisions
 ```
 
-The Planner Agent must not:
+The agent must not:
 
 ```txt
-write the full implementation unless explicitly asked
-take over the coder role
-expand the scope unnecessarily
-request vague improvements
-start a new architecture without reason
+touch files outside the active project workspace
+run terminal commands or git operations (not available)
+invent provider behavior or tool capabilities it does not have
+expand scope beyond the user's request without saying so
+silently perform destructive actions
 ```
-
-Planner review output must include one of these markers:
-
-```txt
-FINAL_ACCEPTED
-CHANGES_REQUIRED
-```
-
-Use `FINAL_ACCEPTED` only when the coder output is good enough.
-
-Use `CHANGES_REQUIRED` when the coder must revise the output.
 
 ---
 
-## Coder Agent
+## System Prompt
 
-The Coder Agent is responsible for implementation.
+The system prompt is built per-run by `buildSystemPrompt(projectName,
+projectPath, mode)` in `apps/api/src/orchestrator/systemPrompt.ts`.
 
-Responsibilities:
-
-```txt
-follow the planner instructions
-produce concrete output
-keep the solution scoped
-avoid unnecessary redesign
-state assumptions briefly when needed
-return complete and usable results
-```
-
-The Coder Agent must not:
+It always instructs the agent to:
 
 ```txt
-ignore planner constraints
-replace the task with a different task
-debate architecture unless required
-ask unnecessary questions
-invent unsupported provider behavior
+- outline a plan first, wrapped in <plan>...</plan> tags
+- wrap code changes in fenced markdown code blocks
+- treat the given project folder as its workspace
 ```
 
-If something is ambiguous, the coder should make a reasonable assumption and continue.
+It then appends mode-specific guidance and the active project context.
 
 ---
 
-## Default Workflow
+## Operational Modes
 
-The default workflow is:
-
-```txt
-1. User submits task.
-2. Planner creates a plan.
-3. Coder implements the plan.
-4. Planner reviews the implementation.
-5. If accepted, the run ends.
-6. If changes are required, coder revises.
-7. The loop stops at maxRounds.
-```
-
-Default max rounds:
+The run's `mode` decides how freely the agent may act:
 
 ```txt
-3
+plan             Planning and explanation only. Do NOT write/delete files.
+accept_edits     May call tools; edits are applied directly. (default)
+ask_permissions  Each tool call must be approved by the user first.
+auto             Autonomous; calls tools freely to finish the task.
 ```
 
-A run must never continue indefinitely.
+In `plan` mode the agent should describe needed changes in text and ask the
+user to switch to a build mode instead of calling write/delete tools.
 
 ---
 
-## Planner System Prompt
+## Workspace Tools
 
-Use this as the default planner prompt:
+The agent is offered these tools (defined in `workspaceTools.ts`):
 
 ```txt
-You are the planner and reviewer agent.
-
-Your responsibilities:
-- Understand the user's task.
-- Create a clear implementation plan.
-- Give concrete instructions to the coder model.
-- Review the coder model's output.
-- Decide whether the output is acceptable.
+write_file(path, content)    create or overwrite a file
+delete_file(path)            delete a file
+read_file(path)              read a file's contents
+list_directory(path)         list a directory ('' or '.' = workspace root)
+```
 
 Rules:
-- Do not implement the task yourself unless explicitly asked.
-- Do not rewrite the coder's output.
-- Give specific, actionable feedback.
-- Keep the scope limited to the user's original request.
-- If the coder output is acceptable, respond with: FINAL_ACCEPTED.
-- If changes are needed, respond with: CHANGES_REQUIRED and list the required fixes.
+
+```txt
+all paths are relative to the active project folder
+paths that resolve outside the workspace are rejected
+tool failures come back as JSON { success: false, error } — react to them
+prefer read_file / list_directory to understand context before editing
 ```
 
 ---
 
-## Coder System Prompt
+## Permission Flow (ask_permissions mode)
 
-Use this as the default coder prompt:
+When a tool call is attempted in `ask_permissions` mode and no standing
+permission exists, the orchestrator pauses:
 
 ```txt
-You are the coder and implementation agent.
-
-Your responsibilities:
-- Follow the planner's instructions.
-- Produce concrete implementation output.
-- Keep the solution scoped.
-- Avoid redesigning the architecture unless the planner explicitly asks for it.
-- Do not ignore planner constraints.
-- If something is ambiguous, make a reasonable assumption and state it briefly.
+1. status becomes "awaiting_permission"
+2. a permission_requested event is emitted to the UI
+3. the user responds with one decision:
+     allow_once | allow_project | allow_always | deny
+4. allow_project / allow_always are persisted in the permissions table
+5. deny returns a permission error to the agent (the run continues)
 ```
+
+A standing project/global permission skips the prompt on later calls.
 
 ---
 
-## Review Contract
+## Generation Loop
 
-The planner review should follow this structure:
-
-```txt
-FINAL_ACCEPTED
-
-Reason:
-<short reason>
-```
-
-or:
+The orchestrator drives one shared loop (`drive()` in `Orchestrator.ts`):
 
 ```txt
-CHANGES_REQUIRED
-
-Required fixes:
-1. <specific fix>
-2. <specific fix>
-3. <specific fix>
+1. build the mode-aware system prompt
+2. call the model with the workspace tools available
+3. if the model returns tool calls:
+     - save the assistant message (with raw tool calls)
+     - for each call: gate by mode/permissions, execute, save the tool result
+     - loop again with the tool results appended
+4. if the model returns no tool calls:
+     - save the final assistant message and finish (status "done")
 ```
 
-The orchestrator should parse the marker from the planner response.
-
-If the marker is missing, the orchestrator should treat it as:
-
-```txt
-CHANGES_REQUIRED
-```
-
-until max rounds is reached.
+`run()` starts a fresh thread; `continueRun()` replays stored history and
+continues it. There is no fixed round limit — the loop ends when the model
+stops calling tools, the user cancels, or an error occurs.
 
 ---
 
-## Message Passing Rules
+## Loop Control & Safety
 
-The coder should receive:
-
-```txt
-original user task
-planner instructions
-relevant previous messages
-latest planner review if this is a fix round
-```
-
-The planner should receive:
+The orchestrator enforces:
 
 ```txt
-original user task
-planner's own previous plan
-coder output
-current round number
-max round count
+cooperative cancellation (checkCancelled between steps)
+provider timeout (60s per request)
+permission gating in ask_permissions mode
+workspace path containment for every tool call
+failure handling that preserves prior messages
 ```
 
-Do not pass unrelated or excessive history if the context becomes too large.
-
-If history becomes large, summarize older messages before sending them to the next model.
+Cancelling a run also resolves any pending permission request so the loop can
+unwind cleanly. Errors are saved to the run's `error_message`; previous
+messages are never discarded.
 
 ---
 
-## Context Management
+## Message Passing
 
-The orchestrator should keep the context focused.
-
-Preferred context order:
+Every message is persisted and streamed over SSE. The model receives, in order:
 
 ```txt
-system prompt
-original user task
-current run summary if needed
-latest planner instruction
-latest coder output
-latest review
+system prompt (mode + project context)
+the original user task
+the full prior conversation (assistant text, tool calls, tool results)
+any new user follow-up (on continueRun)
 ```
 
-Avoid sending the entire raw history forever.
-
-For MVP, full history is acceptable. Later, add summarization.
-
----
-
-## Loop Control
-
-The orchestrator must enforce:
-
-```txt
-maxRounds
-provider timeout
-cancel support
-failure handling
-```
-
-If `maxRounds` is reached without `FINAL_ACCEPTED`, the latest coder output should be shown as the final candidate.
-
-The run status should make this clear.
+For MVP the full history is sent each turn. Summarization of long histories is
+a future improvement, not a current requirement.
 
 ---
 
 ## Agent Output Guidelines
 
-Agents should produce practical output.
+Prefer:
+
+```txt
+a short <plan> before doing work
+concrete file edits via tools
+clear explanations of what changed and why
+complete, copy-pasteable code blocks when code is requested
+```
 
 Avoid:
 
 ```txt
-long generic explanations
-unnecessary theory
+long generic theory
 scope expansion
-fake certainty
-unsupported assumptions
-```
-
-Prefer:
-
-```txt
-direct plans
-concrete implementation steps
-specific review notes
-complete code blocks when code is requested
-clear final output
+fake certainty about tools or provider behavior
+editing files the user did not ask about
 ```
 
 ---
 
-## Provider Usage
+## Provider Notes
 
-Supported provider categories:
-
-```txt
-openai-compatible
-anthropic
-```
-
-Initial provider targets:
+Supported provider types:
 
 ```txt
-OpenAI
-Anthropic
-OpenCode
-CommandCode
+openai-compatible   (OpenAI, OpenCode, CommandCode, ... — full tool support)
+anthropic           (Messages API)
 ```
 
-OpenCode and CommandCode should be treated as OpenAI-compatible only if they expose compatible endpoints.
+Provider-specific request/response details live inside the adapters, never in
+the orchestrator.
 
-Provider-specific quirks must stay inside provider adapters, not inside the orchestrator.
-
----
-
-## Safety and Control
-
-BridgeMind should not automatically modify local files in MVP.
-
-BridgeMind should not run terminal commands in MVP.
-
-Future versions may support repository editing and terminal execution, but only with explicit user approval.
-
-No agent should silently execute destructive actions.
-
----
-
-## Human Override
-
-Future versions may support manual checkpoints.
-
-Possible checkpoints:
-
-```txt
-approve planner plan
-approve coder implementation
-approve fix request
-approve final output
-```
-
-For MVP, the workflow can run automatically within the configured max rounds.
-
----
-
-## Agent Presets
-
-Possible future presets:
-
-```txt
-Architect + Coder
-Reviewer + Fixer
-Planner + Documentation Writer
-Backend Architect + Frontend Implementer
-Strict Reviewer + Fast Implementer
-```
-
-Presets should be stored as editable prompt templates later.
-
-For MVP, hardcoded planner and coder prompts are enough.
+> The Anthropic adapter does not yet send tool definitions, so the agent's
+> workspace tools currently work only with OpenAI-compatible providers. Adding
+> Anthropic tool support is a known, real task.
 
 ---
 
@@ -354,12 +215,11 @@ For MVP, hardcoded planner and coder prompts are enough.
 The agent system is working when:
 
 ```txt
-planner and coder roles remain separate
-planner output is passed to coder
-coder output is passed to planner
-review markers are detected
-the loop stops correctly
-all messages are saved
-the UI clearly shows both agents
-the final output is easy to copy
+the user can pick one provider/model and a project folder
+the agent plans, then reads/writes files via workspace tools
+all file access stays inside the active workspace
+ask_permissions mode pauses for approval and resumes correctly
+every message and status change streams live and is saved
+runs can be reopened after restart
+no provider secrets ever reach the browser
 ```
