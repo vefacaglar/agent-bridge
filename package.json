@@ -1,0 +1,19 @@
+{
+  "name": "bridgemind",
+  "private": true,
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "scripts": {
+    "dev:shared": "pnpm --filter @bridgemind/shared dev",
+    "dev:api": "pnpm --filter @bridgemind/api dev",
+    "dev:web": "pnpm --filter @bridgemind/web dev",
+    "dev": "pnpm --recursive --parallel dev",
+    "build": "pnpm --recursive build",
+    "clean": "pnpm --recursive exec rm -rf dist node_modules"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
+}

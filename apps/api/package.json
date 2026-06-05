@@ -1,0 +1,21 @@
+{
+  "name": "@bridgemind/api",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./dist/server.js",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@bridgemind/shared": "workspace:*",
+    "fastify": "^4.26.2",
+    "@fastify/cors": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.24",
+    "tsx": "^4.7.1",
+    "typescript": "^5.4.5"
+  }
+}
