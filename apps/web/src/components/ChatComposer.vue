@@ -180,7 +180,7 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .composer-container {
-  width: min(880px, 100%);
+  width: min(1080px, 100%);
   margin: 0 auto;
   display: flex;
   flex-direction: column;

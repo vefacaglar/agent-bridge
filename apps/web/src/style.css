@@ -277,7 +277,7 @@ pre {
 
 .messages-inner {
   display: flex;
-  width: min(880px, 100%);
+  width: min(1080px, 100%);
   margin: 0 auto;
   flex-direction: column;
   gap: 28px;
@@ -411,7 +411,7 @@ pre {
 }
 
 .composer {
-  width: min(880px, 100%);
+  width: min(1080px, 100%);
   margin: 0 auto;
   border: 1px solid #3a3a3a;
   border-radius: 18px;
