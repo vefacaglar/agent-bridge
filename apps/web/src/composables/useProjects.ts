@@ -41,7 +41,7 @@ export function useProjects(runs: Ref<Run[]>) {
       newProjectPath.value = data.path;
       newProjectName.value = data.name;
     } catch (err: any) {
-      window.alert(err.message || 'Mac klasor secme penceresi acilamadi.');
+      window.alert(err.message || 'Failed to open folder selection dialog.');
     }
   }
 
@@ -55,7 +55,7 @@ export function useProjects(runs: Ref<Run[]>) {
       closeAddProjectModal();
       return added.path;
     } catch (err: any) {
-      window.alert(err.message || 'Proje kaydedilirken hata olustu.');
+      window.alert(err.message || 'An error occurred while saving the project.');
       return null;
     } finally {
       isSubmittingProject.value = false;
@@ -65,10 +65,10 @@ export function useProjects(runs: Ref<Run[]>) {
   /** Removes a project; returns the fallback path to select if the active one was deleted. */
   async function deleteProject(projectPath: string): Promise<string | null> {
     if (projectOptions.value.length <= 1) {
-      window.alert('En az bir proje tanimli olmalidir.');
+      window.alert('At least one project must be defined.');
       return null;
     }
-    if (!window.confirm('Bu projeyi listeden kaldirmak istediginize emin misiniz? (Mevcut sohbet gecmisi silinmeyecektir)')) {
+    if (!window.confirm('Are you sure you want to remove this project from the list? (Existing chat history will not be deleted)')) {
       return null;
     }
 

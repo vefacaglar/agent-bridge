@@ -39,21 +39,21 @@ function getToolLabel(name: string, args: string): string {
   const path = getToolPath(args);
   switch (name) {
     case 'read_file':
-      return `Dosya okundu: ${path}`;
+      return `File read: ${path}`;
     case 'write_file':
-      return `Dosya güncellendi/yazıldı: ${path}`;
+      return `File written/updated: ${path}`;
     case 'delete_file':
-      return `Dosya silindi: ${path}`;
+      return `File deleted: ${path}`;
     case 'list_directory':
-      return `Dizin listelendi: ${path || 'root'}`;
+      return `Directory listed: ${path || 'root'}`;
     default:
-      return `${name} aracı çalıştırıldı`;
+      return `Tool ${name} executed`;
   }
 }
 
 function getToolStatusLabel(response?: RunMessage): string {
-  if (!response) return 'Çalışıyor...';
-  return isToolSuccess(response.content) ? 'Başarılı' : 'Hata';
+  if (!response) return 'Running...';
+  return isToolSuccess(response.content) ? 'Success' : 'Error';
 }
 </script>
 
@@ -70,7 +70,7 @@ function getToolStatusLabel(response?: RunMessage): string {
           <circle cx="19" cy="12" r="1"></circle>
           <path d="M12 8v3M12 13v3M8 12h3M13 12h3"></path>
         </svg>
-        <span class="tool-group-title">Derin Düşünüyor</span>
+        <span class="tool-group-title">Reasoning</span>
       </div>
       <div class="tool-group-summary-right">
         <!-- Chevron arrow -->
@@ -127,7 +127,7 @@ function getToolStatusLabel(response?: RunMessage): string {
           </div>
 
           <button class="step-details-toggle" @click="toggleDetails(idx)">
-            <span>{{ detailsExpanded[idx] ? 'Detayları Gizle' : 'Detayları Göster' }}</span>
+            <span>{{ detailsExpanded[idx] ? 'Hide Details' : 'Show Details' }}</span>
             <svg class="toggle-arrow" :class="{ rotated: detailsExpanded[idx] }" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <path d="m6 9 6 6 6-6"></path>
             </svg>
@@ -135,11 +135,11 @@ function getToolStatusLabel(response?: RunMessage): string {
 
           <div v-if="detailsExpanded[idx]" class="step-details-box">
             <div class="detail-section">
-              <div class="detail-label">Parametreler:</div>
+              <div class="detail-label">Parameters:</div>
               <pre class="faint-code">{{ formatToolArgs(tc.function?.arguments) }}</pre>
             </div>
             <div class="detail-section response-section">
-              <div class="detail-label">Sonuç:</div>
+              <div class="detail-label">Result:</div>
               <pre v-if="toolResponses[idx]" class="faint-code">{{ formatJson(toolResponses[idx].content) }}</pre>
               <div v-else class="tool-running-shimmer">
                 <div class="shimmer-bar"></div>

@@ -23,8 +23,8 @@ const yesLabel = computed(() => (options.value.includes('Evet') ? 'Evet' : 'Yes'
         <strong>Confirm prompt action?</strong>
       </div>
       <div class="confirm-card-footer">
-        <button class="composer-confirm-btn no" @click="emit('reply', noLabel)">{{ noLabel }}</button>
-        <button class="composer-confirm-btn yes" @click="emit('reply', yesLabel)">{{ yesLabel }}</button>
+        <button class="composer-confirm-btn no" @click="emit('reply', noLabel)">No</button>
+        <button class="composer-confirm-btn yes" @click="emit('reply', yesLabel)">Yes</button>
       </div>
     </div>
   </transition>

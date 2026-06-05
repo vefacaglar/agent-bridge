@@ -29,7 +29,8 @@ const {
   pendingPermissionRequest,
   groupedMessages,
   visibleTitle,
-  activeConfirmationGroup
+  activeConfirmationGroup,
+  messages
 } = chat;
 
 import { ref, computed } from 'vue';
@@ -111,6 +112,7 @@ const currentProjectName = computed(() => {
           :confirmation-group="activeConfirmationGroup"
           :show-permission="showPermissionModal"
           :permission-request="pendingPermissionRequest"
+          :messages="messages"
           @send="chat.handleSendTask"
           @quick-reply="chat.sendQuickReply"
           @permission-decision="chat.handlePermissionDecision"
@@ -134,6 +136,7 @@ const currentProjectName = computed(() => {
             :is-landing="true"
             :project-options="projects.projectOptions.value"
             :active-project-path="projects.activeProjectPath.value"
+            :messages="messages"
             @send="chat.handleSendTask"
             @quick-reply="chat.sendQuickReply"
             @permission-decision="chat.handlePermissionDecision"

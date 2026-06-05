@@ -79,7 +79,7 @@ async function handleDeleteProvider() {
     isEditing.value = false;
     window.location.reload();
   } catch (err: any) {
-    window.alert(err.message || 'Hata oluştu.');
+    window.alert(err.message || 'An error occurred.');
   }
 }
 
@@ -124,7 +124,7 @@ async function handleSave() {
     isEditing.value = false;
     window.location.reload();
   } catch (err: any) {
-    window.alert(err.message || 'Hata oluştu.');
+    window.alert(err.message || 'An error occurred.');
   }
 }
 

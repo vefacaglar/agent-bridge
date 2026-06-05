@@ -12,8 +12,28 @@ const props = defineProps<{
   isRunning: boolean;
 }>();
 
-function copyText(value: string) {
+const copiedMessageId = ref<string | null>(null);
+
+function copyTextWithStatus(value: string, messageId: string) {
   navigator.clipboard.writeText(value);
+  copiedMessageId.value = messageId;
+  setTimeout(() => {
+    if (copiedMessageId.value === messageId) {
+      copiedMessageId.value = null;
+    }
+  }, 2000);
+}
+
+function estimateTokens(text: string): number {
+  if (!text) return 0;
+  const charCount = text.length;
+  const wordCount = text.trim().split(/\s+/).length;
+  return Math.round(Math.max(charCount / 3.7, wordCount * 1.3));
+}
+
+function getMessageTokens(msg: any): number {
+  if (!msg) return 0;
+  return estimateTokens((msg.content || '') + (msg.reasoningContent || ''));
 }
 
 // Plan Accordion State
@@ -124,7 +144,7 @@ watch(() => props.groupedMessages, () => {
                 <circle cx="19" cy="12" r="1"></circle>
                 <path d="M12 8v3M12 13v3M8 12h3M13 12h3"></path>
               </svg>
-              <span class="terminal-title">Düşünme Süreci (Reasoning)</span>
+              <span class="terminal-title">Reasoning</span>
             </div>
             <button class="terminal-toggle-btn">
               {{ isPlanExpanded(group.message.id + '-reasoning') ? 'Collapse' : 'Expand' }}
@@ -136,7 +156,24 @@ watch(() => props.groupedMessages, () => {
         </div>
 
         <div class="markdown-body" v-html="renderMarkdown(cleanMessageContent(group.message.content))"></div>
-        <button class="copy-button" @click="copyText(group.message.content)">Copy entire response</button>
+        <div class="assistant-response-footer" style="display: flex; align-items: center; gap: 8px; margin-top: 10px;">
+          <button 
+            class="copy-button-icon" 
+            title="Copy entire response"
+            @click="copyTextWithStatus(group.message.content, group.message.id)"
+          >
+            <svg v-if="copiedMessageId === group.message.id" class="check-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7bd88f" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 6 9 17l-5-5"/>
+            </svg>
+            <svg v-else class="copy-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+              <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+            </svg>
+          </button>
+          <span class="response-tokens-badge" style="font-size: 0.72rem; color: var(--faint); font-family: monospace; user-select: none;">
+            {{ getMessageTokens(group.message) }} tokens
+          </span>
+        </div>
       </article>
 
       <article v-else-if="group.type === 'system'" class="assistant-message system-error-message">
@@ -180,7 +217,7 @@ watch(() => props.groupedMessages, () => {
 
     <!-- Subtle loader before message starts streaming -->
     <div v-if="isRunning && !hasActiveMessage" class="system-line active pulsing-loader">
-      AI Düşünüyor...
+      AI is thinking...
     </div>
   </div>
 </template>
@@ -364,5 +401,23 @@ watch(() => props.groupedMessages, () => {
 
 .reasoning-terminal-container:hover {
   border-color: rgba(138, 180, 248, 0.45);
+}
+
+.copy-button-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  padding: 4px;
+  cursor: pointer;
+  color: var(--faint);
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.copy-button-icon:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.05);
 }
 </style>

@@ -43,7 +43,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(configs)
     });
-    if (!response.ok) throw new Error(await errorMessage(response, 'Provider ayarları kaydedilemedi.'));
+    if (!response.ok) throw new Error(await errorMessage(response, 'Failed to save provider settings.'));
   },
   getRuns: () => getJson<Run[]>('/api/runs'),
   getMessages: (runId: string) => getJson<RunMessage[]>(`/api/runs/${runId}/messages`),
@@ -66,7 +66,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    if (!response.ok) throw new Error(await errorMessage(response, 'Sohbet baslatilamadi.'));
+    if (!response.ok) throw new Error(await errorMessage(response, 'Failed to start chat.'));
     return response.json() as Promise<Run>;
   },
 
@@ -76,7 +76,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    if (!response.ok) throw new Error(await errorMessage(response, 'Mesaj gonderilemedi.'));
+    if (!response.ok) throw new Error(await errorMessage(response, 'Failed to send message.'));
   },
 
   async cancelRun(runId: string): Promise<Response> {
@@ -98,7 +98,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path, name })
     });
-    if (!response.ok) throw new Error(await errorMessage(response, 'Proje eklenemedi.'));
+    if (!response.ok) throw new Error(await errorMessage(response, 'Failed to add project.'));
     return response.json() as Promise<Project>;
   },
 
@@ -108,7 +108,7 @@ export const api = {
 
   async browseFolder(): Promise<{ path: string; name: string }> {
     const response = await fetch(`${API_BASE}/api/projects/select-dir`, { method: 'POST' });
-    if (!response.ok) throw new Error(await errorMessage(response, 'Klasor secilemedi.'));
+    if (!response.ok) throw new Error(await errorMessage(response, 'Failed to select folder.'));
     return response.json() as Promise<{ path: string; name: string }>;
   },
 
@@ -119,7 +119,7 @@ export const api = {
       body: JSON.stringify(payload)
     });
     if (!response.ok) {
-      const err = await errorMessage(response, 'Modeller alinamadi.');
+      const err = await errorMessage(response, 'Failed to fetch models.');
       return { success: false, error: err };
     }
     return response.json() as Promise<{ success: boolean; models?: string[]; error?: string }>;

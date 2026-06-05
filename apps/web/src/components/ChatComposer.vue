@@ -21,6 +21,7 @@ const props = defineProps<{
   isLanding?: boolean;
   projectOptions?: { path: string; name: string }[];
   activeProjectPath?: string;
+  messages?: any[];
 }>();
 
 const emit = defineEmits<{
@@ -38,6 +39,63 @@ const textarea = ref<HTMLTextAreaElement | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
 const attachedFiles = ref<{ name: string; content: string; extension: string }[]>([]);
 
+function estimateTokens(text: string): number {
+  if (!text) return 0;
+  const charCount = text.length;
+  const wordCount = text.trim().split(/\s+/).length;
+  return Math.round(Math.max(charCount / 3.7, wordCount * 1.3));
+}
+
+const draftTokens = computed(() => {
+  let text = props.taskInput || '';
+  for (const file of attachedFiles.value) {
+    const syntaxLang = file.extension ? file.extension.toLowerCase() : '';
+    text += `\n\n### File: ${file.name}\n\`\`\`${syntaxLang}\n${file.content}\n\`\`\``;
+  }
+  return estimateTokens(text);
+});
+
+const contextTokens = computed(() => {
+  let total = 250; // system prompt estimate
+  if (props.messages) {
+    for (const msg of props.messages) {
+      if (msg.content) total += estimateTokens(msg.content);
+      if (msg.reasoningContent) total += estimateTokens(msg.reasoningContent);
+    }
+  }
+  return total;
+});
+
+const activeMessageStats = computed(() => {
+  if (!props.messages || props.messages.length === 0) {
+    return { status: 'idle', tokens: 0 };
+  }
+  
+  const lastMsg = props.messages[props.messages.length - 1];
+  
+  if (props.isRunning) {
+    if (lastMsg && lastMsg.role === 'assistant') {
+      const tokens = estimateTokens((lastMsg.content || '') + (lastMsg.reasoningContent || ''));
+      const isThinking = lastMsg.reasoningContent && !lastMsg.content;
+      return {
+        status: isThinking ? 'thinking' : 'generating',
+        tokens
+      };
+    }
+    return { status: 'running', tokens: 0 };
+  }
+  
+  // Idle: find last assistant message in the conversation
+  const assistantMessages = props.messages.filter(m => m.role === 'assistant');
+  if (assistantMessages.length > 0) {
+    const lastAssistant = assistantMessages[assistantMessages.length - 1];
+    const tokens = estimateTokens((lastAssistant.content || '') + (lastAssistant.reasoningContent || ''));
+    return { status: 'last_response', tokens };
+  }
+  
+  return { status: 'idle', tokens: 0 };
+});
+
 const canSend = computed(() => {
   return !props.isRunning && props.selectedModel && (props.taskInput.trim() || attachedFiles.value.length > 0);
 });
@@ -52,7 +110,7 @@ async function handleFileChange(event: Event) {
 
   for (const file of Array.from(target.files)) {
     if (file.size > 2 * 1024 * 1024) {
-      window.alert(`Dosya çok büyük (maksimum 2MB): ${file.name}`);
+      window.alert(`File too large (max 2MB): ${file.name}`);
       continue;
     }
     try {
@@ -65,7 +123,7 @@ async function handleFileChange(event: Event) {
       });
     } catch (err) {
       console.error(`Error reading file ${file.name}:`, err);
-      window.alert(`Dosya okunamadı: ${file.name}`);
+      window.alert(`Failed to read file: ${file.name}`);
     }
   }
   target.value = '';
@@ -91,7 +149,7 @@ function handleSend() {
     let finalTask = props.taskInput;
     for (const file of attachedFiles.value) {
       const syntaxLang = file.extension ? file.extension.toLowerCase() : '';
-      finalTask += `\n\n### Dosya: ${file.name}\n\`\`\`${syntaxLang}\n${file.content}\n\`\`\``;
+      finalTask += `\n\n### File: ${file.name}\n\`\`\`${syntaxLang}\n${file.content}\n\`\`\``;
     }
     emit('update:taskInput', finalTask);
     attachedFiles.value = [];
@@ -201,6 +259,24 @@ onBeforeUnmount(() => {
         :request="showPermission ? permissionRequest : null"
         @decide="emit('permission-decision', $event)"
       />
+
+      <!-- Token info bar (placed outside the input box) -->
+      <div class="composer-token-info">
+        <span class="draft-tokens">
+          <template v-if="activeMessageStats.status === 'thinking'">
+            <span class="token-dot active thinking"></span>
+            Thinking: {{ activeMessageStats.tokens }} tokens
+          </template>
+          <template v-else-if="activeMessageStats.status === 'generating'">
+            <span class="token-dot active generating"></span>
+            Generating: {{ activeMessageStats.tokens }} tokens
+          </template>
+
+        </span>
+        <span class="context-tokens" title="Total context (system prompt + history + draft) sent to model">
+          Context: {{ contextTokens + draftTokens }} tokens
+        </span>
+      </div>
 
       <div class="composer-input-box" style="position: relative; z-index: 2;">
         <!-- Attached Files List -->
@@ -375,6 +451,57 @@ onBeforeUnmount(() => {
 .composer-input-box:focus-within {
   border-color: #444;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+}
+
+.composer-token-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  font-size: 0.72rem;
+  color: var(--faint);
+  user-select: none;
+  padding: 0 4px;
+}
+
+.draft-tokens {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.token-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #3a3a3c;
+  transition: all 0.2s ease;
+}
+
+.token-dot.active.thinking {
+  background: #ffb74d;
+  box-shadow: 0 0 6px #ffb74d;
+  animation: pulseDot 1.2s infinite alternate;
+}
+
+.token-dot.active.generating {
+  background: var(--success);
+  box-shadow: 0 0 6px var(--success);
+  animation: pulseDot 1.2s infinite alternate;
+}
+
+.token-dot.last-response {
+  background: var(--muted);
+}
+
+.context-tokens {
+  color: var(--faint);
+  font-weight: 500;
+}
+
+@keyframes pulseDot {
+  0% { opacity: 0.4; }
+  100% { opacity: 1; }
 }
 
 .composer-input-box textarea {

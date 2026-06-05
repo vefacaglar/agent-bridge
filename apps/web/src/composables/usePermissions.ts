@@ -37,7 +37,7 @@ export function usePermissions() {
 
   async function clearPermissions() {
     if (permissions.value.length === 0) return;
-    if (!window.confirm('Tüm kayıtlı izinleri kaldırmak istediğine emin misin?')) return;
+    if (!window.confirm('Are you sure you want to remove all saved permissions?')) return;
     await api.clearPermissions();
     permissions.value = [];
   }
