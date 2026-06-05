@@ -296,11 +296,12 @@ export class Orchestrator {
               }
 
               // Resolve absolute path safely
-              const baseDir = run.projectPath || process.cwd();
+              const baseDir = path.resolve(run.projectPath || process.cwd());
               const absolutePath = path.resolve(baseDir, relativePath);
 
               // Safety check: ensure file path is inside workspace
-              if (!absolutePath.startsWith(baseDir)) {
+              const isInside = absolutePath === baseDir || absolutePath.startsWith(baseDir + path.sep);
+              if (!isInside) {
                 throw new Error(`Access denied: path '${relativePath}' is outside of the workspace directory.`);
               }
 
@@ -539,10 +540,11 @@ export class Orchestrator {
                 throw new Error("Missing parameter: path");
               }
 
-              const baseDir = run.projectPath || process.cwd();
+              const baseDir = path.resolve(run.projectPath || process.cwd());
               const absolutePath = path.resolve(baseDir, relativePath);
 
-              if (!absolutePath.startsWith(baseDir)) {
+              const isInside = absolutePath === baseDir || absolutePath.startsWith(baseDir + path.sep);
+              if (!isInside) {
                 throw new Error(`Access denied: path '${relativePath}' is outside of the workspace directory.`);
               }
 
