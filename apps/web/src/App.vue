@@ -190,10 +190,14 @@ const currentProjectName = computed(() => {
   align-items: center;
   justify-content: space-between;
   min-height: 58px;
-  width: min(1080px, 100%);
-  margin: 0 auto;
+  width: 100%;
   padding: 0 24px;
   box-sizing: border-box;
+}
+
+.thread-title {
+  flex: 1;
+  min-width: 0;
 }
 
 .project-breadcrumb {
@@ -203,6 +207,7 @@ const currentProjectName = computed(() => {
   font-weight: 500;
   color: var(--text);
   min-width: 0;
+  flex: 1;
 }
 
 .project-breadcrumb .folder-icon {
@@ -217,12 +222,15 @@ const currentProjectName = computed(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  max-width: 180px;
+  flex-shrink: 0;
 }
 
 .breadcrumb-separator {
   margin: 0 8px;
   color: var(--faint);
   user-select: none;
+  flex-shrink: 0;
 }
 
 .breadcrumb-chat-title {
@@ -230,5 +238,7 @@ const currentProjectName = computed(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
+  min-width: 0;
 }
 </style>
