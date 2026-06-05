@@ -183,12 +183,12 @@ function getToolStatusLabel(response?: RunMessage): string {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #c0d1ff;
+  color: var(--text);
 }
 
 .brain-icon {
   animation: float 3s infinite ease-in-out;
-  color: #8ab4f8;
+  color: var(--planner);
 }
 
 @keyframes float {
@@ -254,8 +254,8 @@ function getToolStatusLabel(response?: RunMessage): string {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #8ab4f8;
-  box-shadow: 0 0 8px rgba(138, 180, 248, 0.6);
+  background: var(--planner);
+  box-shadow: 0 0 8px rgba(207, 162, 147, 0.6);
   margin-top: 5px;
 }
 
@@ -275,7 +275,7 @@ function getToolStatusLabel(response?: RunMessage): string {
 .step-text {
   font-size: 0.92rem;
   line-height: 1.6;
-  color: #deded8;
+  color: var(--text);
 }
 
 .step-title-row {
@@ -284,7 +284,7 @@ function getToolStatusLabel(response?: RunMessage): string {
   gap: 10px;
   font-size: 0.85rem;
   font-weight: 500;
-  color: #e0e0e0;
+  color: var(--text);
 }
 
 .step-label-text {
@@ -379,7 +379,7 @@ function getToolStatusLabel(response?: RunMessage): string {
 .faint-code {
   font-family: monospace;
   font-size: 0.75rem;
-  color: #a6a6a0;
+  color: var(--muted);
   white-space: pre-wrap;
   word-break: break-all;
   margin: 0;

@@ -257,8 +257,8 @@ watch(() => props.groupedMessages, () => {
 .plan-terminal-container,
 .thinking-terminal-container {
   margin: 12px 0 18px;
-  background: #0f0f11;
-  border: 1px solid #2d2d34;
+  background: var(--bg);
+  border: 1px solid var(--border);
   border-radius: 8px;
   overflow: hidden;
   font-family: 'Fira Code', 'Courier New', monospace;
@@ -275,11 +275,11 @@ watch(() => props.groupedMessages, () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #18181c;
+  background: var(--surface);
   padding: 8px 14px;
   cursor: pointer;
   user-select: none;
-  border-bottom: 1px solid #212126;
+  border-bottom: 1px solid var(--border);
 }
 
 .terminal-header-left {
@@ -289,7 +289,7 @@ watch(() => props.groupedMessages, () => {
 }
 
 .header-icon {
-  color: #8ab4f8;
+  color: var(--planner);
   flex-shrink: 0;
 }
 
@@ -301,8 +301,8 @@ watch(() => props.groupedMessages, () => {
 
 .terminal-toggle-btn {
   background: transparent;
-  color: #74746f;
-  border: 1px solid #2d2d34;
+  color: var(--faint);
+  border: 1px solid var(--border);
   border-radius: 4px;
   padding: 2px 8px;
   font-size: 0.72rem;
@@ -311,9 +311,9 @@ watch(() => props.groupedMessages, () => {
 }
 
 .terminal-toggle-btn:hover {
-  color: #e8e8e3;
+  color: var(--text);
   background: rgba(255, 255, 255, 0.04);
-  border-color: #3f3f4a;
+  border-color: var(--border);
 }
 
 .terminal-body {
@@ -336,7 +336,7 @@ watch(() => props.groupedMessages, () => {
   margin: 0;
   white-space: pre-wrap;
   word-break: break-word;
-  color: #a6a6a0;
+  color: var(--muted);
   font-family: inherit;
   font-size: inherit;
 }
@@ -396,11 +396,11 @@ watch(() => props.groupedMessages, () => {
 }
 
 .reasoning-terminal-container {
-  border-color: rgba(138, 180, 248, 0.25);
+  border-color: rgba(207, 162, 147, 0.25);
 }
 
 .reasoning-terminal-container:hover {
-  border-color: rgba(138, 180, 248, 0.45);
+  border-color: rgba(207, 162, 147, 0.45);
 }
 
 .copy-button-icon {
