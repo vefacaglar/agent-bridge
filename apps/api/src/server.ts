@@ -45,6 +45,7 @@ server.get("/ping", async (request, reply) => {
 
 // Get safe provider metadata (no keys exposed)
 server.get("/api/providers", async (request, reply) => {
+  registry.reload();
   return registry.getSafeMetadata();
 });
 
@@ -345,7 +346,8 @@ server.get("/api/runs/:id/events", async (request, reply) => {
   reply.raw.writeHead(200, {
     "Content-Type": "text/event-stream",
     "Cache-Control": "no-cache",
-    "Connection": "keep-alive"
+    "Connection": "keep-alive",
+    "Access-Control-Allow-Origin": "*"
   });
 
   // Write initial connection success event

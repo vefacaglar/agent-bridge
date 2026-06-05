@@ -270,6 +270,7 @@ async function handleSendTask() {
   }
 
   const run = await response.json() as Run;
+  taskInput.value = '';
   activeRunId.value = run.id;
   activeRun.value = run;
   runs.value.unshift(run);
