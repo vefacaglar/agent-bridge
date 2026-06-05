@@ -64,6 +64,13 @@ const messages = ref<RunMessage[]>([]);
 const selectedModelCombined = ref(localStorage.getItem('bm_selected_model') || '');
 const taskInput = ref('');
 const activeProjectPath = ref('/Users/vefa/Projects/agent-bridge');
+const composerTextarea = ref<HTMLTextAreaElement | null>(null);
+
+function focusComposer() {
+  nextTick(() => {
+    composerTextarea.value?.focus();
+  });
+}
 
 const isRunning = ref(false);
 
@@ -289,6 +296,7 @@ async function selectRun(run: Run) {
   } else {
     isRunning.value = false;
   }
+  focusComposer();
 }
 
 function startNewRunSetup() {
@@ -297,6 +305,7 @@ function startNewRunSetup() {
   activeRun.value = null;
   messages.value = [];
   taskInput.value = '';
+  focusComposer();
 }
 
 function selectProject(projectPath: string) {
@@ -578,8 +587,11 @@ watch(
   { deep: true }
 );
 
-watch(isRunning, () => {
+watch(isRunning, (newVal) => {
   nextTick(scrollToBottom);
+  if (!newVal) {
+    focusComposer();
+  }
 });
 
 watch(activeRunId, () => {
@@ -595,6 +607,7 @@ onMounted(async () => {
   } else if (projectOptions.value.length > 0) {
     activeProjectPath.value = projectOptions.value[0].path;
   }
+  focusComposer();
 
   // Close menus when clicked outside
   const handleDocumentClick = (e: MouseEvent) => {
@@ -795,6 +808,7 @@ onBeforeUnmount(() => {
           <!-- Text Input Box -->
           <div class="composer-input-box">
             <textarea
+              ref="composerTextarea"
               v-model="taskInput"
               :disabled="isRunning"
               placeholder="Type a message..."
