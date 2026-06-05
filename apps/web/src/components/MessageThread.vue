@@ -42,6 +42,20 @@ const hasActiveMessage = computed(() => {
   const last = props.groupedMessages[props.groupedMessages.length - 1];
   return last && (last.type === 'assistant' || last.type === 'tool_group');
 });
+
+watch(() => props.groupedMessages, () => {
+  if (!props.isRunning) return;
+  nextTick(() => {
+    const activeReasoningBody = document.querySelector('.assistant-message:last-of-type .reasoning-terminal-container .plan-body');
+    if (activeReasoningBody) {
+      activeReasoningBody.scrollTop = activeReasoningBody.scrollHeight;
+    }
+    const activeTimelineBody = document.querySelector('.tool-group-block:last-of-type .timeline-container');
+    if (activeTimelineBody) {
+      activeTimelineBody.scrollTop = activeTimelineBody.scrollHeight;
+    }
+  });
+}, { deep: true });
 </script>
 
 <template>
@@ -73,36 +87,46 @@ const hasActiveMessage = computed(() => {
 
         <!-- AI Plan Accordion -->
         <div v-if="extractPlan(group.message.content)" class="plan-terminal-container">
-          <header class="terminal-header" @click="togglePlan(group.message.id)">
+          <header class="terminal-header" @click="togglePlan(group.message.id + '-plan')">
             <div class="terminal-header-left">
-              <span class="terminal-dot red"></span>
-              <span class="terminal-dot yellow"></span>
-              <span class="terminal-dot green"></span>
+              <svg class="header-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3"></circle>
+                <circle cx="12" cy="5" r="1"></circle>
+                <circle cx="12" cy="19" r="1"></circle>
+                <circle cx="5" cy="12" r="1"></circle>
+                <circle cx="19" cy="12" r="1"></circle>
+                <path d="M12 8v3M12 13v3M8 12h3M13 12h3"></path>
+              </svg>
               <span class="terminal-title">AI Plan / Reasoning</span>
             </div>
             <button class="terminal-toggle-btn">
-              {{ isPlanExpanded(group.message.id) ? 'Collapse' : 'Expand' }}
+              {{ isPlanExpanded(group.message.id + '-plan') ? 'Collapse' : 'Expand' }}
             </button>
           </header>
-          <div v-if="isPlanExpanded(group.message.id)" class="terminal-body plan-body">
+          <div v-if="isPlanExpanded(group.message.id + '-plan')" class="terminal-body plan-body">
             <pre class="plan-text">{{ extractPlan(group.message.content) }}</pre>
           </div>
         </div>
 
         <!-- AI Reasoning (Inner Monologue) Accordion -->
         <div v-if="group.message.reasoningContent" class="plan-terminal-container reasoning-terminal-container">
-          <header class="terminal-header" @click="togglePlan(group.message.id)">
+          <header class="terminal-header" @click="togglePlan(group.message.id + '-reasoning')">
             <div class="terminal-header-left">
-              <span class="terminal-dot red"></span>
-              <span class="terminal-dot yellow"></span>
-              <span class="terminal-dot green"></span>
+              <svg class="header-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3"></circle>
+                <circle cx="12" cy="5" r="1"></circle>
+                <circle cx="12" cy="19" r="1"></circle>
+                <circle cx="5" cy="12" r="1"></circle>
+                <circle cx="19" cy="12" r="1"></circle>
+                <path d="M12 8v3M12 13v3M8 12h3M13 12h3"></path>
+              </svg>
               <span class="terminal-title">Düşünme Süreci (Reasoning)</span>
             </div>
             <button class="terminal-toggle-btn">
-              {{ isPlanExpanded(group.message.id) ? 'Collapse' : 'Expand' }}
+              {{ isPlanExpanded(group.message.id + '-reasoning') ? 'Collapse' : 'Expand' }}
             </button>
           </header>
-          <div v-if="isPlanExpanded(group.message.id)" class="terminal-body plan-body">
+          <div v-if="isPlanExpanded(group.message.id + '-reasoning')" class="terminal-body plan-body">
             <pre class="plan-text">{{ group.message.reasoningContent }}</pre>
           </div>
         </div>
@@ -189,22 +213,15 @@ const hasActiveMessage = computed(() => {
   gap: 6px;
 }
 
-.terminal-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  display: inline-block;
+.header-icon {
+  color: #8ab4f8;
+  flex-shrink: 0;
 }
-
-.terminal-dot.red { background-color: #ff5f56; }
-.terminal-dot.yellow { background-color: #ffbd2e; }
-.terminal-dot.green { background-color: #27c93f; }
 
 .terminal-title {
   color: #a6a6a0;
   font-size: 0.8rem;
   font-weight: 500;
-  margin-left: 6px;
 }
 
 .terminal-toggle-btn {
@@ -237,7 +254,7 @@ const hasActiveMessage = computed(() => {
 }
 
 .plan-body {
-  max-height: 350px;
+  max-height: 200px;
 }
 
 .plan-text {

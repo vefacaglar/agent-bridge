@@ -219,6 +219,8 @@ function getToolStatusLabel(response?: RunMessage): string {
   gap: 20px;
   background: rgba(0, 0, 0, 0.12);
   border-top: 1px solid rgba(255, 255, 255, 0.04);
+  max-height: 240px;
+  overflow-y: auto;
 }
 
 .timeline-line {
