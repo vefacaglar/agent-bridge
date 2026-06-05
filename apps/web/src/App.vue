@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { ProviderMetadata, Run, RunMessage, RunStatus, Project } from '@bridgemind/shared';
 
 const API_BASE = 'http://localhost:3000';
 
 const providers = ref<ProviderMetadata[]>([]);
 const runs = ref<Run[]>([]);
+const messagesContainer = ref<HTMLElement | null>(null);
+
 const activeRunId = ref<string | null>(null);
 const activeRun = ref<Run | null>(null);
 const messages = ref<RunMessage[]>([]);
@@ -25,6 +27,59 @@ const isSubmittingProject = ref(false);
 
 watch(selectedModelCombined, (newVal) => {
   if (newVal) localStorage.setItem('bm_selected_model', newVal);
+});
+
+const currentMode = ref<'ask_permissions' | 'accept_edits' | 'plan' | 'auto'>(
+  (localStorage.getItem('bm_current_mode') as any) || 'accept_edits'
+);
+const bypassPermissions = ref<boolean>(
+  localStorage.getItem('bm_bypass_permissions') === 'true'
+);
+
+watch(currentMode, (newVal) => {
+  localStorage.setItem('bm_current_mode', newVal);
+});
+
+watch(bypassPermissions, (newVal) => {
+  localStorage.setItem('bm_bypass_permissions', String(newVal));
+});
+
+const showModeMenu = ref(false);
+const showModelMenu = ref(false);
+
+const modesList = [
+  { id: 'ask_permissions', label: 'Ask permissions', shortcut: '1' },
+  { id: 'accept_edits', label: 'Accept edits', shortcut: '2' },
+  { id: 'plan', label: 'Plan mode', shortcut: '3' },
+  { id: 'auto', label: 'Auto mode', shortcut: '4' }
+] as const;
+
+function getModeLabel(modeId: string): string {
+  const mode = modesList.find(m => m.id === modeId);
+  return mode ? mode.label : 'Accept edits';
+}
+
+function selectMode(modeId: 'ask_permissions' | 'accept_edits' | 'plan' | 'auto') {
+  currentMode.value = modeId;
+  showModeMenu.value = false;
+}
+
+function toggleBypassPermissions() {
+  bypassPermissions.value = !bypassPermissions.value;
+}
+
+function handlePlusClick() {
+  console.log('Plus clicked');
+}
+
+function handleMicClick() {
+  console.log('Mic clicked');
+}
+
+const activeModelDisplayName = computed(() => {
+  const opt = modelOptions.value.find(o => o.value === selectedModelCombined.value);
+  if (!opt) return 'Select Model';
+  return opt.label.split(' / ').pop() || opt.label;
 });
 
 const isMac = computed(() => {
@@ -51,20 +106,46 @@ const modelOptions = computed(() => {
 
 const visibleTitle = computed(() => activeRun.value?.title || 'New chat');
 
-const visibleMessages = computed(() => {
-  return messages.value.filter(message => {
-    if (message.role === 'tool') return false;
-    if (message.role === 'assistant' && message.rawResponse) {
-      try {
-        const parsed = JSON.parse(message.rawResponse);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return false;
-        }
-      } catch (e) {}
-    }
+const expandedMessageIds = ref<Record<string, boolean>>({});
+
+function toggleMessageExpansion(messageId: string) {
+  expandedMessageIds.value[messageId] = !expandedMessageIds.value[messageId];
+}
+
+function hasToolCalls(message: RunMessage): boolean {
+  if (!message.rawResponse) return false;
+  try {
+    const parsed = JSON.parse(message.rawResponse);
+    return Array.isArray(parsed) && parsed.length > 0;
+  } catch (e) {
+    return false;
+  }
+}
+
+function isToolSuccess(content: string): boolean {
+  try {
+    const parsed = JSON.parse(content);
+    return parsed.success !== false;
+  } catch (e) {
     return true;
-  });
-});
+  }
+}
+
+function formatJson(content: string): string {
+  try {
+    const parsed = JSON.parse(content);
+    return JSON.stringify(parsed, null, 2);
+  } catch (e) {
+    return content;
+  }
+}
+
+
+
+function cleanMessageContent(content: string): string {
+  return content.replace(/<plan>[\s\S]*?<\/plan>/g, '').trim();
+}
+
 
 const projectOptions = computed(() => {
   return projects.value.map(p => {
@@ -247,7 +328,9 @@ async function handleSendTask() {
       body: JSON.stringify({
         task: currentTask,
         providerId: modelInfo.providerId,
-        model: modelInfo.model
+        model: modelInfo.model,
+        mode: currentMode.value,
+        bypassPermissions: bypassPermissions.value
       })
     });
 
@@ -273,7 +356,9 @@ async function handleSendTask() {
         projectPath: activeProject.value?.path,
         projectName: activeProject.value?.name,
         providerId: modelInfo.providerId,
-        model: modelInfo.model
+        model: modelInfo.model,
+        mode: currentMode.value,
+        bypassPermissions: bypassPermissions.value
       })
     });
 
@@ -396,6 +481,28 @@ function closeAddProjectModal() {
   showAddProjectModal.value = false;
 }
 
+function scrollToBottom() {
+  if (messagesContainer.value) {
+    messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
+  }
+}
+
+watch(
+  messages,
+  () => {
+    nextTick(scrollToBottom);
+  },
+  { deep: true }
+);
+
+watch(isRunning, () => {
+  nextTick(scrollToBottom);
+});
+
+watch(activeRunId, () => {
+  nextTick(scrollToBottom);
+});
+
 onMounted(async () => {
   await loadProviders();
   await loadProjects();
@@ -405,10 +512,48 @@ onMounted(async () => {
   } else if (projectOptions.value.length > 0) {
     activeProjectPath.value = projectOptions.value[0].path;
   }
+
+  // Close menus when clicked outside
+  const handleDocumentClick = (e: MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (!target.closest('.mode-selector-wrap')) {
+      showModeMenu.value = false;
+    }
+    if (!target.closest('.model-dropdown-wrap')) {
+      showModelMenu.value = false;
+    }
+  };
+  document.addEventListener('click', handleDocumentClick);
+
+  // Keydown shortcuts when mode menu is open
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (showModeMenu.value) {
+      if (['1', '2', '3', '4'].includes(e.key)) {
+        e.preventDefault();
+        const modeKeys: Record<string, 'ask_permissions' | 'accept_edits' | 'plan' | 'auto'> = {
+          '1': 'ask_permissions',
+          '2': 'accept_edits',
+          '3': 'plan',
+          '4': 'auto'
+        };
+        selectMode(modeKeys[e.key]);
+      }
+    }
+  };
+  window.addEventListener('keydown', handleKeyDown);
+
+  // Store cleanup references
+  (window as any)._bmCleanup = () => {
+    document.removeEventListener('click', handleDocumentClick);
+    window.removeEventListener('keydown', handleKeyDown);
+  };
 });
 
 onBeforeUnmount(() => {
   eventSource?.close();
+  if (typeof (window as any)._bmCleanup === 'function') {
+    (window as any)._bmCleanup();
+  }
 });
 </script>
 
@@ -483,7 +628,7 @@ onBeforeUnmount(() => {
         </div>
       </header>
 
-      <section class="messages-scroll">
+      <section ref="messagesContainer" class="messages-scroll">
         <div v-if="!activeRun" class="empty-chat">
           <div class="welcome-gradient-logo">BM</div>
           <h1>BridgeMind</h1>
@@ -495,15 +640,51 @@ onBeforeUnmount(() => {
             <pre>{{ activeRun.task }}</pre>
           </article>
 
-          <template v-for="message in visibleMessages" :key="message.id">
+          <template v-for="message in messages" :key="message.id">
             <!-- User message (continuation) -->
             <article v-if="message.role === 'user'" class="user-bubble">
               <pre>{{ message.content }}</pre>
             </article>
 
+            <!-- Tool Invocation Block -->
+            <article
+              v-else-if="message.role === 'assistant' && message.rawResponse && hasToolCalls(message)"
+              class="tool-log-block"
+            >
+              <header class="tool-log-header" @click="toggleMessageExpansion(message.id)">
+                <span class="tool-log-title">
+                  <i>🔧 Calling workspace tools...</i>
+                </span>
+                <span class="tool-log-toggle">
+                  {{ expandedMessageIds[message.id] ? '▼' : '▶' }}
+                </span>
+              </header>
+              <div v-if="expandedMessageIds[message.id]" class="tool-log-details">
+                <pre class="faint-code">{{ formatJson(message.rawResponse) }}</pre>
+              </div>
+            </article>
+
+            <!-- Tool Execution Result Block -->
+            <article
+              v-else-if="message.role === 'tool'"
+              class="tool-log-block"
+            >
+              <header class="tool-log-header" @click="toggleMessageExpansion(message.id)">
+                <span class="tool-log-title">
+                  <i>{{ isToolSuccess(message.content) ? '✅' : '❌' }} Tool response</i>
+                </span>
+                <span class="tool-log-toggle">
+                  {{ expandedMessageIds[message.id] ? '▼' : '▶' }}
+                </span>
+              </header>
+              <div v-if="expandedMessageIds[message.id]" class="tool-log-details">
+                <pre class="faint-code">{{ formatJson(message.content) }}</pre>
+              </div>
+            </article>
+
             <!-- Assistant message -->
             <article
-              v-else
+              v-else-if="message.role === 'assistant'"
               class="assistant-message"
             >
               <div class="assistant-meta">
@@ -511,7 +692,7 @@ onBeforeUnmount(() => {
                 <span>{{ message.providerDisplayName }} / {{ message.model }}</span>
                 <span>{{ formatTime(message.createdAt) }}</span>
               </div>
-              <pre>{{ message.content }}</pre>
+              <pre>{{ cleanMessageContent(message.content) }}</pre>
               <button class="copy-button" @click="copyText(message.content)">Copy</button>
             </article>
           </template>
@@ -527,34 +708,103 @@ onBeforeUnmount(() => {
       </section>
 
       <footer class="composer-wrap">
-        <div class="composer">
-          <textarea
-            v-model="taskInput"
-            :disabled="isRunning"
-            placeholder="Type a message..."
-            @keydown.enter.exact.prevent="handleSendTask"
-          />
-
-          <div class="composer-footer">
-            <div class="model-picks">
-              <label class="model-pill">
-                <span>Model</span>
-                <select v-model="selectedModelCombined" :disabled="isRunning">
-                  <option v-for="option in modelOptions" :key="option.value" :value="option.value">
-                    {{ option.label }}
-                  </option>
-                </select>
-              </label>
-            </div>
-
-            <button
-              class="send-button"
+        <div class="composer-container">
+          <!-- Text Input Box -->
+          <div class="composer-input-box">
+            <textarea
+              v-model="taskInput"
+              :disabled="isRunning"
+              placeholder="Type a message..."
+              @keydown.enter.exact.prevent="handleSendTask"
+            />
+            <button 
+              class="composer-send-icon-btn" 
               :disabled="isRunning || !taskInput.trim() || !selectedModelCombined"
               @click="handleSendTask"
-              aria-label="Send message"
+              title="Send message"
             >
-              ↑
+              <span class="send-arrow-icon">↩</span>
             </button>
+          </div>
+
+          <!-- Bottom Menu Row -->
+          <div class="composer-menu-row">
+            <!-- Left Side: Mode Pill with Popup Menu -->
+            <div class="mode-selector-wrap">
+              <button class="mode-pill-btn" @click.stop="showModeMenu = !showModeMenu">
+                <span class="mode-pill-text">{{ getModeLabel(currentMode) }}</span>
+                <span class="mode-pill-divider">|</span>
+                <span class="mode-pill-icon-btn" @click.stop="handlePlusClick" title="Add">+</span>
+                <span class="mode-pill-divider">|</span>
+                <span class="mode-pill-icon-btn" @click.stop="handleMicClick" title="Voice Input">🎙️</span>
+                <span class="mode-pill-divider">|</span>
+                <span class="mode-pill-chevron">▼</span>
+              </button>
+
+              <!-- Mode Popup Menu -->
+              <div v-if="showModeMenu" class="mode-popup-menu">
+                <header class="mode-popup-header">
+                  <span class="mode-popup-title">Mode</span>
+                  <div class="mode-popup-icons">
+                    <span>↕</span>
+                    <span>⌘</span>
+                    <span>M</span>
+                  </div>
+                </header>
+                <ul class="mode-popup-list">
+                  <li 
+                    v-for="modeItem in modesList" 
+                    :key="modeItem.id"
+                    :class="{ active: currentMode === modeItem.id }"
+                    @click.stop="selectMode(modeItem.id)"
+                  >
+                    <span class="mode-item-name">
+                      <span class="checkmark-placeholder">
+                        <span v-if="currentMode === modeItem.id">✓</span>
+                      </span>
+                      {{ modeItem.label }}
+                    </span>
+                    <span class="mode-item-shortcut">{{ modeItem.shortcut }}</span>
+                  </li>
+                  <li class="mode-popup-divider"></li>
+                  <li @click.stop="toggleBypassPermissions">
+                    <span class="mode-item-name">
+                      <span class="checkmark-placeholder"></span>
+                      Bypass permissions
+                    </span>
+                    <span class="bypass-toggle-badge" :class="{ enabled: bypassPermissions }">
+                      {{ bypassPermissions ? 'Disable' : 'Enable' }}
+                    </span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <!-- Right Side: Model Name, Parameter, and Status Ring -->
+            <div class="composer-status-section">
+              <div class="model-dropdown-wrap">
+                <button class="model-select-display-btn" @click.stop="showModelMenu = !showModelMenu">
+                  {{ activeModelDisplayName }}
+                </button>
+                <div v-if="showModelMenu" class="model-dropdown-list">
+                  <div 
+                    v-for="option in modelOptions" 
+                    :key="option.value"
+                    class="model-dropdown-item"
+                    :class="{ active: selectedModelCombined === option.value }"
+                    @click.stop="selectedModelCombined = option.value; showModelMenu = false"
+                  >
+                    {{ option.label }}
+                  </div>
+                </div>
+              </div>
+
+              <span class="status-divider">/</span>
+              <span class="parameter-pill">Medium</span>
+              <span class="status-indicator-ring" :class="{ active: isRunning }">
+                <span class="ring-dot"></span>
+              </span>
+            </div>
           </div>
         </div>
       </footer>
@@ -720,5 +970,663 @@ onBeforeUnmount(() => {
 .project-header .delete-project-btn:hover {
   color: var(--danger);
   background: rgba(255, 138, 128, 0.15);
+}
+
+.tool-log-block {
+  margin: 6px 0;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed rgba(255, 255, 255, 0.05);
+  font-size: 0.8rem;
+  width: 100%;
+}
+
+.tool-log-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  cursor: pointer;
+  user-select: none;
+  color: var(--muted);
+  transition: background 0.2s ease;
+}
+
+.tool-log-header:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.tool-log-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.tool-log-toggle {
+  font-size: 0.65rem;
+  color: var(--faint);
+}
+
+.tool-log-details {
+  padding: 10px 12px;
+  background: #141414;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  overflow-x: auto;
+}
+
+.faint-code {
+  font-family: monospace;
+  font-size: 0.75rem;
+  color: var(--muted);
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0;
+}
+
+/* Bottom Panel and Split Content Styling */
+.main-content-split {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+.bottom-panel {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  transition: height 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
+  height: 320px;
+}
+
+.bottom-panel.collapsed {
+  height: 41px;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 40px;
+  padding: 0 16px;
+  background: var(--surface-strong);
+  border-bottom: 1px solid var(--border);
+  user-select: none;
+}
+
+.bottom-panel.collapsed .panel-header {
+  border-bottom: none;
+}
+
+.panel-tabs {
+  display: flex;
+  gap: 4px;
+  height: 100%;
+  align-items: center;
+}
+
+.tab-btn {
+  background: transparent;
+  color: var(--muted);
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tab-btn:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.tab-btn.active {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.1);
+  font-weight: 600;
+}
+
+.panel-collapse-btn {
+  background: transparent;
+  color: var(--faint);
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.panel-collapse-btn:hover {
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.tab-content {
+  height: 100%;
+  overflow: hidden;
+  padding: 16px;
+}
+
+.plan-content {
+  color: #deded8;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.formatted-text {
+  font-family: inherit;
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding-right: 8px;
+  margin: 0;
+}
+
+.panel-empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--faint);
+  font-style: italic;
+  font-size: 0.9rem;
+}
+
+.build-content {
+  overflow-y: auto;
+}
+
+.build-split {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  height: 100%;
+}
+
+@media (min-width: 768px) {
+  .build-split {
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  }
+}
+
+.files-list-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  max-height: 100%;
+  overflow-y: auto;
+}
+
+.files-list-section h4 {
+  margin: 0 0 4px 0;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  color: var(--muted);
+  letter-spacing: 0.5px;
+}
+
+.files-log {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.files-log li {
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: var(--success);
+  word-break: break-all;
+  padding: 4px 8px;
+  background: rgba(123, 216, 143, 0.05);
+  border-left: 3px solid var(--success);
+  border-radius: 2px 4px 4px 2px;
+}
+
+.code-blocks-section {
+  max-height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.extracted-code-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #141414;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.code-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 12px;
+  background: var(--surface-strong);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.copy-code-btn {
+  background: transparent;
+  color: var(--faint);
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.copy-code-btn:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.code-card-body {
+  padding: 12px;
+  margin: 0;
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: #e8e8e3;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+/* Premium Composer Styling */
+.composer-container {
+  width: min(880px, 100%);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.composer-input-box {
+  position: relative;
+  background: #1a1a1c;
+  border: 1px solid #2d2d30;
+  border-radius: 12px;
+  padding: 10px 48px 10px 14px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.composer-input-box:focus-within {
+  border-color: #444;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+}
+
+.composer-input-box textarea {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  max-height: 180px;
+  resize: vertical;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  padding: 0;
+  margin: 0;
+}
+
+.composer-send-icon-btn {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--faint);
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 0;
+}
+
+.composer-send-icon-btn:hover:not(:disabled) {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.send-arrow-icon {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.composer-menu-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+  padding: 0 4px;
+}
+
+/* Mode Selector & Pill */
+.mode-selector-wrap {
+  position: relative;
+}
+
+.mode-pill-btn {
+  display: flex;
+  align-items: center;
+  background: #1a1a1c;
+  border: 1px solid #2d2d30;
+  border-radius: 8px;
+  padding: 6px 12px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+  gap: 8px;
+}
+
+.mode-pill-btn:hover {
+  border-color: #444;
+  color: var(--text);
+  background: #202022;
+}
+
+.mode-pill-text {
+  font-weight: 500;
+}
+
+.mode-pill-divider {
+  color: #2d2d30;
+  font-weight: 300;
+  user-select: none;
+}
+
+.mode-pill-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  transition: background 0.2s, color 0.2s;
+  color: var(--faint);
+}
+
+.mode-pill-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+}
+
+.mode-pill-chevron {
+  font-size: 0.55rem;
+  color: var(--faint);
+  margin-left: 2px;
+}
+
+/* Mode Popup Menu Card */
+.mode-popup-menu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  width: 230px;
+  background: #161618;
+  border: 1px solid #2d2d30;
+  border-radius: 10px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
+  z-index: 1000;
+  overflow: hidden;
+  padding: 6px;
+  animation: menuAppear 0.15s ease-out;
+}
+
+@keyframes menuAppear {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.mode-popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px 4px;
+  border-bottom: 1px solid #222;
+}
+
+.mode-popup-title {
+  color: var(--faint);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.mode-popup-icons {
+  display: flex;
+  gap: 6px;
+  color: var(--faint);
+  font-size: 0.72rem;
+}
+
+.mode-popup-list {
+  list-style: none;
+  padding: 4px 0 0 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mode-popup-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 7px 10px;
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.mode-popup-list li:hover {
+  background: #252528;
+  color: var(--text);
+}
+
+.mode-popup-list li.active {
+  color: var(--text);
+  background: #1e1e21;
+}
+
+.mode-item-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.checkmark-placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  font-size: 0.8rem;
+  color: var(--success);
+  font-weight: bold;
+}
+
+.mode-item-shortcut {
+  font-family: monospace;
+  font-size: 0.75rem;
+  color: var(--faint);
+  background: #202022;
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid #2d2d30;
+}
+
+.mode-popup-divider {
+  height: 1px;
+  background: #222;
+  margin: 4px 0;
+  padding: 0 !important;
+  pointer-events: none;
+}
+
+.bypass-toggle-badge {
+  font-size: 0.72rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #252528;
+  color: var(--muted);
+  transition: all 0.2s ease;
+  font-weight: 500;
+}
+
+.bypass-toggle-badge.enabled {
+  background: rgba(123, 216, 143, 0.15);
+  color: var(--success);
+}
+
+/* Status & Model Selection Row */
+.composer-status-section {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--faint);
+  font-size: 0.8rem;
+}
+
+.model-dropdown-wrap {
+  position: relative;
+}
+
+.model-select-display-btn {
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: color 0.2s ease;
+  padding: 4px 6px;
+  border-radius: 4px;
+  border: 0;
+}
+
+.model-select-display-btn:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.model-dropdown-list {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  width: 260px;
+  max-height: 220px;
+  overflow-y: auto;
+  background: #161618;
+  border: 1px solid #2d2d30;
+  border-radius: 10px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
+  z-index: 1000;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.model-dropdown-item {
+  padding: 8px 12px;
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.model-dropdown-item:hover {
+  background: #252528;
+  color: var(--text);
+}
+
+.model-dropdown-item.active {
+  color: var(--text);
+  background: #1e1e21;
+  font-weight: 600;
+}
+
+.status-divider {
+  color: #2d2d30;
+  user-select: none;
+}
+
+.parameter-pill {
+  color: var(--muted);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.status-indicator-ring {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.5px solid #333;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.3s ease;
+}
+
+.status-indicator-ring.active {
+  border-color: var(--success);
+}
+
+.ring-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #444;
+  transition: background 0.3s ease;
+}
+
+.status-indicator-ring.active .ring-dot {
+  background: var(--success);
+  animation: pulseDot 1.2s infinite alternate;
+}
+
+@keyframes pulseDot {
+  0% { transform: scale(0.85); opacity: 0.6; }
+  100% { transform: scale(1.15); opacity: 1; }
 }
 </style>
