@@ -1,12 +1,12 @@
-# BridgeMind Development Plan
+# BridgeMind Plan
 
-## 1. Project Overview
+## 1. Project Summary
 
-BridgeMind is a local-first AI orchestration tool that connects two AI models in a single workflow.
+BridgeMind is a local-first AI orchestration tool that connects two AI models in one controlled workflow.
 
-The main goal is to let one model act as the planner, architect, or reviewer, while another model acts as the implementation model. The user should not manually copy messages between different AI tools. Instead, BridgeMind manages the conversation flow, passes outputs between models, stores the full run history, and shows everything in one interface.
+The main purpose is to remove the manual copy-paste bridge between different AI tools. One model acts as the planner, architect, or reviewer. The other model acts as the coder or implementation agent.
 
-The first version should focus on a clean planner-to-coder workflow:
+The first version should focus on this workflow:
 
 ```txt
 User Task
@@ -17,109 +17,97 @@ User Task
   -> Final Output
 ```
 
-BridgeMind is not a full coding agent in the first phase. It should not edit repositories, run terminal commands, or apply patches automatically at the beginning. The initial goal is to build the orchestration core and the single-screen user interface.
+BridgeMind should not try to become a full autonomous coding agent in the MVP. The first milestone is a clean two-model orchestration system with a simple Vue interface, provider adapters, local configuration, run history, and live message streaming.
 
 ---
 
-## 2. Core Goals
+## 2. Core Product Idea
 
-* Provide a single UI for working with two AI models.
-* Allow the user to select different providers and models for each agent.
-* Support planner/coder style workflows.
-* Store provider settings in a local ignored JSON file.
-* Use adapter pattern for different provider APIs.
-* Support OpenAI, Anthropic, OpenCode, and CommandCode.
-* Show both agents' messages in real time.
-* Save runs and messages locally.
-* Keep the architecture simple and extensible.
+The user opens one screen, writes a task, selects two models, and starts a run.
+
+Example:
+
+```txt
+Planner:
+  Provider: Anthropic
+  Model: claude-opus-4.5
+
+Coder:
+  Provider: OpenCode
+  Model: qwen / glm / deepseek
+```
+
+The user should be able to see both models' messages in the same screen.
+
+BridgeMind owns the message flow. The user should not manually copy messages from one model to another.
 
 ---
 
-## 3. Initial Scope
+## 3. MVP Goals
 
-The MVP should include:
+The MVP should provide:
 
-* Vue-based frontend.
-* Backend orchestrator API.
-* Local provider configuration via JSON.
-* Provider adapter abstraction.
-* OpenAI-compatible provider adapter.
-* Anthropic provider adapter.
-* Planner and coder model selection.
-* Run creation.
-* Planner -> Coder -> Planner Review loop.
-* Max round limit.
-* SQLite persistence.
-* Real-time message streaming via SSE or WebSocket.
-* Final output panel.
-
-The MVP should not include:
-
-* Repository editing.
-* Terminal execution.
-* Automatic file patching.
-* Git integration.
-* Long-term memory.
-* Multi-user authentication.
-* Cloud deployment.
-* Complex agent framework integration.
-
-Those can be added later after the orchestration flow is stable.
+```txt
+Vue-based frontend
+Backend orchestrator API
+Local provider configuration through providers.local.json
+Provider adapter abstraction
+OpenAI-compatible adapter
+Anthropic adapter
+OpenAI support
+Anthropic support
+OpenCode support
+CommandCode support
+Planner/coder model selection
+Run creation
+Planner -> Coder -> Planner Review loop
+Max round control
+SQLite persistence
+Run/message history
+Live updates through SSE or WebSocket
+Final output panel
+```
 
 ---
 
-## 4. Suggested Tech Stack
+## 4. Out of Scope for MVP
 
-### Frontend
-
-```txt
-Vue 3
-Vite
-TypeScript
-Pinia
-CSS Modules or plain CSS
-```
-
-### Backend
-
-Either of these is acceptable:
+Do not implement these in the first version:
 
 ```txt
-Node.js + Fastify
+Repository editing
+Terminal execution
+Automatic patching
+Git integration
+Cloud deployment
+Multi-user auth
+Long-term memory
+Complex agent framework integration
+File upload/context system
+Token cost tracking
+Agent marketplace/presets
 ```
 
-or:
-
-```txt
-Go + Fiber/Echo
-```
-
-For the first version, Node.js with TypeScript may be faster because the frontend and backend can share types more easily.
-
-### Database
-
-```txt
-SQLite
-```
-
-SQLite is enough for local-first usage. It keeps the project simple and avoids external dependencies.
-
-### Real-time Communication
-
-Use one of these:
-
-```txt
-SSE
-WebSocket
-```
-
-SSE is enough for one-way live streaming from backend to frontend. WebSocket is better if the UI later needs pause/resume, manual intervention, or interactive agent control.
-
-For MVP, SSE is simpler.
+These are valid future features, but they should not block the first usable version.
 
 ---
 
-## 5. Project Structure
+## 5. Recommended Tech Stack
+
+```txt
+Frontend: Vue 3 + Vite + TypeScript
+Backend: Node.js + TypeScript + Fastify
+Database: SQLite
+Realtime: SSE first, WebSocket later if needed
+Package manager: pnpm
+Repository style: monorepo
+```
+
+SSE is enough for the first version because the backend mainly streams run events to the UI. WebSocket can be added later if the app needs bidirectional controls like pause, resume, manual approval, or live interventions.
+
+---
+
+## 6. Suggested Project Structure
 
 ```txt
 bridgemind/
@@ -131,7 +119,6 @@ bridgemind/
         stores/
         api/
         styles/
-      package.json
 
     api/
       src/
@@ -142,29 +129,26 @@ bridgemind/
         routes/
         prompts/
         shared/
-      package.json
 
   packages/
     shared/
       src/
         types/
         contracts/
-      package.json
 
   providers.example.json
   providers.local.json
-  .gitignore
-  package.json
-  pnpm-workspace.yaml
   README.md
-  DEVELOPMENT_PLAN.md
+  PLAN.md
+  Claude.md
+  Agents.md
 ```
 
 ---
 
-## 6. Local Provider Configuration
+## 7. Provider Configuration
 
-Provider credentials should not be committed to the repository.
+Provider credentials should be stored in a local ignored JSON file.
 
 The repository should include:
 
@@ -180,20 +164,7 @@ providers.local.json
 
 `providers.local.json` must be ignored by Git.
 
-### .gitignore
-
-```gitignore
-providers.local.json
-*.local.json
-.env
-.env.*
-node_modules
-dist
-.vite
-.DS_Store
-```
-
-### providers.example.json
+Example:
 
 ```json
 {
@@ -242,15 +213,32 @@ dist
 }
 ```
 
+The backend can read API keys. The frontend must never receive API keys.
+
+`GET /api/providers` should return only safe metadata:
+
+```txt
+provider id
+display name
+provider type
+available models
+```
+
+It must not return:
+
+```txt
+apiKey
+authorization headers
+raw provider secrets
+```
+
 ---
 
-## 7. Provider Adapter Design
+## 8. Provider Adapter Pattern
 
-Different providers use different request and response formats.
+Different providers use different request/response formats. BridgeMind should hide those differences behind adapters.
 
-BridgeMind should hide those differences behind a common interface.
-
-### Common Interface
+The orchestrator should depend only on this interface:
 
 ```ts
 export interface ModelProvider {
@@ -258,7 +246,7 @@ export interface ModelProvider {
 }
 ```
 
-### CompletionRequest
+Common request type:
 
 ```ts
 export type CompletionRequest = {
@@ -270,7 +258,7 @@ export type CompletionRequest = {
 };
 ```
 
-### ChatMessage
+Common message type:
 
 ```ts
 export type ChatMessage = {
@@ -279,7 +267,7 @@ export type ChatMessage = {
 };
 ```
 
-### CompletionResponse
+Common response type:
 
 ```ts
 export type CompletionResponse = {
@@ -293,22 +281,18 @@ export type CompletionResponse = {
 };
 ```
 
----
-
-## 8. Provider Implementations
-
-### Required Providers
+Required MVP adapters:
 
 ```txt
 OpenAICompatibleProvider
 AnthropicProvider
 ```
 
-OpenAI, OpenCode, and CommandCode should use `OpenAICompatibleProvider` if they expose an OpenAI-compatible API.
+OpenAI, OpenCode, and CommandCode should use `OpenAICompatibleProvider` if they expose an OpenAI-compatible `/chat/completions` API.
 
-Anthropic should use a separate adapter because its messages API has a different structure.
+Anthropic should use a separate adapter because its Messages API uses a different format.
 
-### Provider Folder Structure
+Suggested provider folder:
 
 ```txt
 apps/api/src/providers/
@@ -319,57 +303,201 @@ apps/api/src/providers/
   ProviderRegistry.ts
 ```
 
-### ProviderFactory
+---
 
-```ts
-export function createProvider(config: ProviderConfig): ModelProvider {
-  if (config.type === "anthropic") {
-    return new AnthropicProvider(config);
-  }
+## 9. Agent Roles
 
-  if (config.type === "openai-compatible") {
-    return new OpenAICompatibleProvider(config);
-  }
+BridgeMind has two main agent roles.
 
-  throw new Error(`Unsupported provider type: ${config.type}`);
-}
+## Planner Agent
+
+The Planner Agent is responsible for:
+
+```txt
+understanding the task
+creating a concrete implementation plan
+giving instructions to the coder
+reviewing coder output
+accepting the result or requesting changes
+```
+
+The Planner Agent should not:
+
+```txt
+write the full implementation unless explicitly asked
+take over the coder role
+expand the scope unnecessarily
+give vague review comments
+```
+
+## Coder Agent
+
+The Coder Agent is responsible for:
+
+```txt
+following planner instructions
+producing the implementation output
+keeping the solution scoped
+making reasonable assumptions when needed
+returning complete and usable results
+```
+
+The Coder Agent should not:
+
+```txt
+ignore planner constraints
+redesign the whole solution without being asked
+debate architecture unnecessarily
+ask avoidable follow-up questions
 ```
 
 ---
 
-## 9. Orchestrator Design
-
-The orchestrator is the core of the application.
-
-It should not know provider-specific API details. It should only work with the `ModelProvider` interface.
-
-### Main Responsibilities
-
-* Create a new run.
-* Load selected planner and coder providers.
-* Build prompts.
-* Call planner model.
-* Send planner output to coder model.
-* Send coder output back to planner for review.
-* Continue until accepted or max rounds is reached.
-* Save every message.
-* Stream messages to the frontend.
-
-### Run Flow
+## 10. Default Workflow
 
 ```txt
-1. User creates a task.
-2. Backend creates a run.
-3. Planner model creates an implementation plan.
-4. Coder model implements the plan.
-5. Planner model reviews the implementation.
-6. If accepted, the run is marked as done.
-7. If rejected, planner sends fix instructions.
-8. Coder applies the fix.
-9. Loop continues until accepted or maxRounds is reached.
+1. User writes a task.
+2. User selects planner provider/model.
+3. User selects coder provider/model.
+4. User starts the run.
+5. Planner creates an implementation plan.
+6. Coder implements the plan.
+7. Planner reviews the coder output.
+8. If accepted, the run ends.
+9. If changes are required, coder revises.
+10. The loop stops when accepted, cancelled, failed, or maxRounds is reached.
 ```
 
-### Run States
+Default max rounds:
+
+```txt
+3
+```
+
+Allowed max rounds:
+
+```txt
+1-10
+```
+
+---
+
+## 11. Model Selection and Run Locking
+
+Model selection is part of the run setup.
+
+Before a run starts, the user can freely change:
+
+```txt
+planner provider
+planner model
+coder provider
+coder model
+max rounds
+```
+
+After a run starts, the selected planner/coder configuration must be locked for that run.
+
+Each run must store an immutable snapshot of the selected model configuration:
+
+```txt
+planner_provider_id
+planner_provider_display_name
+planner_model
+coder_provider_id
+coder_provider_display_name
+coder_model
+max_rounds
+```
+
+Changing global provider/model selections must not modify previous runs.
+
+Active runs should not allow direct model switching because it makes the context and output quality hard to track.
+
+The UI should make this clear:
+
+```txt
+Run setup: editable
+Active run: locked
+Finished run: can be duplicated or retried with different models
+```
+
+---
+
+## 12. Retry With Different Model
+
+After a run finishes, the user should be able to retry or continue with a different model.
+
+Recommended actions:
+
+```txt
+Retry run with different planner
+Retry run with different coder
+Retry coder from same planner plan
+Continue from this message with different model
+Duplicate run with new model selection
+```
+
+MVP can include only:
+
+```txt
+Duplicate run with new model selection
+Retry coder with different model
+```
+
+The copied/retried run should become a new run with its own model snapshot. The original run must stay unchanged.
+
+This allows workflows like:
+
+```txt
+Planner: Claude Opus
+Coder: OpenCode Qwen
+
+If the output is weak:
+Retry Coder With Different Model
+Coder: CommandCode GLM
+```
+
+---
+
+## 13. Review Markers
+
+The planner review must include one of these markers:
+
+```txt
+FINAL_ACCEPTED
+CHANGES_REQUIRED
+```
+
+Accepted format:
+
+```txt
+FINAL_ACCEPTED
+
+Reason:
+<short reason>
+```
+
+Change request format:
+
+```txt
+CHANGES_REQUIRED
+
+Required fixes:
+1. <specific fix>
+2. <specific fix>
+3. <specific fix>
+```
+
+If the marker is missing, the orchestrator should treat it as `CHANGES_REQUIRED` until max rounds is reached.
+
+If max rounds is reached without `FINAL_ACCEPTED`, the latest coder output should be shown as the final candidate.
+
+---
+
+## 14. Run States
+
+Use explicit run states:
 
 ```ts
 export type RunStatus =
@@ -380,34 +508,51 @@ export type RunStatus =
   | "fixing"
   | "done"
   | "failed"
-  | "cancelled";
+  | "cancelled"
+  | "max_rounds_reached";
 ```
 
-### Run Config
+Avoid vague states like:
 
-```ts
-export type RunConfig = {
-  planner: {
-    providerId: string;
-    model: string;
-  };
-  coder: {
-    providerId: string;
-    model: string;
-  };
-  maxRounds: number;
-  temperature?: number;
-  maxTokens?: number;
-};
+```txt
+processing
+working
+pending
 ```
 
 ---
 
-## 10. Prompt Design
+## 15. Orchestrator Responsibilities
 
-Prompting should be strict and role-based.
+The orchestrator is the core of BridgeMind.
 
-### Planner System Prompt
+It should:
+
+```txt
+create a run
+store the selected model snapshot
+load selected providers
+build role-specific prompts
+call planner model
+save planner message
+call coder model with planner output
+save coder message
+call planner review
+save review message
+parse review marker
+continue or stop according to the result
+stream all events to the UI
+save final output
+handle errors
+```
+
+The orchestrator should not contain provider-specific HTTP request logic. That belongs inside provider adapters.
+
+---
+
+## 16. Prompt Design
+
+## Planner System Prompt
 
 ```txt
 You are the planner and reviewer agent.
@@ -428,7 +573,7 @@ Rules:
 - If changes are needed, respond with: CHANGES_REQUIRED and list the required fixes.
 ```
 
-### Coder System Prompt
+## Coder System Prompt
 
 ```txt
 You are the coder and implementation agent.
@@ -444,11 +589,11 @@ Your responsibilities:
 
 ---
 
-## 11. Database Schema
+## 17. Database Schema
 
-Use SQLite for local persistence.
+Use SQLite for MVP.
 
-### runs
+## runs
 
 ```sql
 CREATE TABLE runs (
@@ -456,20 +601,30 @@ CREATE TABLE runs (
   title TEXT NOT NULL,
   task TEXT NOT NULL,
   status TEXT NOT NULL,
+
   planner_provider_id TEXT NOT NULL,
+  planner_provider_display_name TEXT NOT NULL,
   planner_model TEXT NOT NULL,
+
   coder_provider_id TEXT NOT NULL,
+  coder_provider_display_name TEXT NOT NULL,
   coder_model TEXT NOT NULL,
+
   max_rounds INTEGER NOT NULL,
   current_round INTEGER NOT NULL DEFAULT 0,
+
+  source_run_id TEXT,
+  retry_type TEXT,
+
   final_output TEXT,
   error_message TEXT,
+
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
 ```
 
-### messages
+## messages
 
 ```sql
 CREATE TABLE messages (
@@ -478,6 +633,7 @@ CREATE TABLE messages (
   role TEXT NOT NULL,
   agent_role TEXT,
   provider_id TEXT,
+  provider_display_name TEXT,
   model TEXT,
   content TEXT NOT NULL,
   raw_response TEXT,
@@ -486,120 +642,51 @@ CREATE TABLE messages (
 );
 ```
 
-### providers
-
-Provider config can stay in JSON for MVP. A database table is not required at first.
-
-Later, provider metadata can be moved into the database if UI-based provider management is needed.
+Provider config can stay in JSON for MVP. A provider database table is not required in the first version.
 
 ---
 
-## 12. API Endpoints
+## 18. API Endpoints
 
-### Providers
+## Providers
 
 ```txt
 GET /api/providers
 ```
 
-Returns configured providers and available models.
+Returns safe provider metadata and model lists.
 
-The response must not expose API keys.
+Must not expose API keys.
 
-### Runs
+## Runs
 
 ```txt
 POST /api/runs
+GET /api/runs
+GET /api/runs/:id
+GET /api/runs/:id/events
+POST /api/runs/:id/cancel
+POST /api/runs/:id/duplicate
+POST /api/runs/:id/retry-coder
 ```
+
+## POST /api/runs
 
 Creates and starts a new run.
 
-```txt
-GET /api/runs
-```
+## POST /api/runs/:id/duplicate
 
-Lists previous runs.
+Creates a new run from an existing run with selectable planner/coder configuration.
 
-```txt
-GET /api/runs/:id
-```
+## POST /api/runs/:id/retry-coder
 
-Returns run details and messages.
+Creates a new run using the same task and planner plan, but with a different coder model.
 
-```txt
-GET /api/runs/:id/events
-```
-
-Streams live run events to the frontend via SSE.
-
-```txt
-POST /api/runs/:id/cancel
-```
-
-Cancels an active run.
+This can be implemented after the basic run flow works.
 
 ---
 
-## 13. Frontend UI
-
-The UI should be simple and focused.
-
-### Main Screen
-
-```txt
-Left Panel:
-- Task input
-- Planner provider select
-- Planner model select
-- Coder provider select
-- Coder model select
-- Max rounds
-- Start button
-
-Center Panel:
-- Planner messages
-
-Right Panel:
-- Coder messages
-
-Bottom or Separate Panel:
-- Final output
-```
-
-### Run History
-
-A small sidebar can show previous runs:
-
-```txt
-Run title
-Status
-Created date
-Planner model
-Coder model
-```
-
-### Message Display
-
-Each message should show:
-
-```txt
-Agent role
-Provider
-Model
-Timestamp
-Content
-```
-
-Example:
-
-```txt
-Planner / Anthropic / claude-opus-4.5
-Coder / OpenCode / qwen
-```
-
----
-
-## 14. Real-time Event Types
+## 19. Realtime Events
 
 The backend should stream structured events.
 
@@ -614,12 +701,16 @@ export type RunEvent =
       status: RunStatus;
     }
   | {
+      type: "round_started";
+      round: number;
+    }
+  | {
       type: "message_created";
       message: RunMessage;
     }
   | {
-      type: "round_started";
-      round: number;
+      type: "model_snapshot_locked";
+      snapshot: RunModelSnapshot;
     }
   | {
       type: "run_completed";
@@ -633,354 +724,257 @@ export type RunEvent =
 
 ---
 
-## 15. Loop Control Rules
+## 20. Frontend UI
 
-The orchestrator must prevent endless loops.
+The UI should be one main screen.
 
-Rules:
-
-```txt
-maxRounds default: 3
-maxRounds minimum: 1
-maxRounds maximum: 10
-```
-
-The planner must produce one of these review markers:
+Suggested layout:
 
 ```txt
-FINAL_ACCEPTED
-CHANGES_REQUIRED
+Left Panel:
+- task input
+- planner provider select
+- planner model select
+- coder provider select
+- coder model select
+- max rounds
+- start button
+- run status
+
+Center Panel:
+- planner messages
+
+Right Panel:
+- coder messages
+
+Bottom Panel:
+- final output
 ```
 
-If the planner does not provide a clear marker, the orchestrator should treat it as `CHANGES_REQUIRED` until max rounds is reached.
+Run history sidebar:
 
-If max rounds is reached without acceptance, the run should stop and show the latest coder output as the final candidate.
+```txt
+run title
+status
+created date
+planner model
+coder model
+retry/duplicate indicator
+```
+
+During an active run, model selectors should be disabled.
+
+For completed runs, show actions:
+
+```txt
+Duplicate with different models
+Retry coder with different model
+Copy final output
+```
 
 ---
 
-## 16. Error Handling
+## 21. Error Handling
 
-The system should handle:
+Handle these clearly:
 
-* Missing provider config.
-* Invalid API key.
-* Provider timeout.
-* Provider rate limit.
-* Empty model response.
-* Invalid model name.
-* Network errors.
-* Cancelled run.
-* Max round limit reached.
+```txt
+missing providers.local.json
+missing provider
+missing model
+invalid API key
+provider timeout
+provider rate limit
+empty model response
+invalid model name
+network error
+cancelled run
+max rounds reached
+unexpected adapter response
+```
 
 Errors should be saved into the run record.
 
-The frontend should show the error clearly without losing previous messages.
+The frontend should show the error without losing previous messages.
 
 ---
 
-## 17. Security Notes
+## 22. Security Rules
 
-* Never commit real provider API keys.
-* Never expose API keys through frontend endpoints.
-* Provider config should be read only by the backend.
-* `GET /api/providers` should return display names, provider ids, types, and models only.
-* Do not return `apiKey` to the browser.
-* Avoid logging full raw provider responses if they may contain sensitive data.
-* Keep local config files ignored by Git.
+```txt
+Never commit providers.local.json
+Never commit real API keys
+Never expose API keys to the frontend
+Never log secrets
+Never commit local SQLite databases
+Never add telemetry without explicit approval
+```
+
+The frontend should only receive safe provider metadata.
 
 ---
 
-## 18. Development Phases
+## 23. Recommended Development Phases
 
 ## Phase 1 — Project Setup
 
-Goals:
+```txt
+Create monorepo
+Create Vue app
+Create backend app
+Create shared package
+Add pnpm workspace
+Add TypeScript configs
+Add .gitignore
+Add README.md, PLAN.md, Claude.md, Agents.md
+```
 
-* Create monorepo.
-* Add Vue frontend.
-* Add backend API.
-* Add shared package.
-* Add TypeScript config.
-* Add linting and formatting.
-* Add local provider config loading.
-* Add `.gitignore`.
-
-Deliverables:
+## Phase 2 — Provider Config and Adapters
 
 ```txt
-Working monorepo
-Frontend starts locally
-Backend starts locally
-Provider config can be loaded
+Load providers.local.json
+Expose safe providers endpoint
+Define ModelProvider interface
+Implement OpenAICompatibleProvider
+Implement AnthropicProvider
+Implement ProviderFactory
+Implement ProviderRegistry
+Test provider calls from backend
+```
+
+## Phase 3 — SQLite Persistence
+
+```txt
+Create SQLite database
+Create runs table
+Create messages table
+Add run repository
+Add message repository
+Save and read runs
+Save and read messages
+```
+
+## Phase 4 — Orchestrator Loop
+
+```txt
+Create run state machine
+Lock model snapshot at run start
+Call planner
+Call coder
+Call planner review
+Parse FINAL_ACCEPTED / CHANGES_REQUIRED
+Enforce maxRounds
+Save final output
+Handle failures
+```
+
+## Phase 5 — Vue Interface
+
+```txt
+Create single-screen layout
+Add task input
+Add planner provider/model selectors
+Add coder provider/model selectors
+Add max round input
+Add start button
+Add planner panel
+Add coder panel
+Add final output panel
+Add run history sidebar
+Disable model selectors during active run
+```
+
+## Phase 6 — Realtime Streaming
+
+```txt
+Add SSE endpoint
+Stream run events
+Update UI live
+Show run status changes
+Show new messages live
+Show final output live
+```
+
+## Phase 7 — Retry and Duplicate
+
+```txt
+Duplicate run with different models
+Retry coder with different model
+Store source_run_id
+Store retry_type
+Keep original run immutable
+```
+
+## Phase 8 — Stabilization
+
+```txt
+Improve error messages
+Add cancellation
+Add provider timeouts
+Add empty response handling
+Add basic tests
+Clean up UI states
+Improve local setup docs
 ```
 
 ---
 
-## Phase 2 — Provider Adapter Layer
-
-Goals:
-
-* Define `ModelProvider` interface.
-* Implement `OpenAICompatibleProvider`.
-* Implement `AnthropicProvider`.
-* Implement `ProviderFactory`.
-* Implement `ProviderRegistry`.
-* Add provider health check endpoint.
-
-Deliverables:
-
-```txt
-OpenAI-compatible models can be called
-Anthropic models can be called
-OpenCode can be called if it exposes OpenAI-compatible API
-CommandCode can be called if it exposes OpenAI-compatible API
-```
-
----
-
-## Phase 3 — Run Orchestrator
-
-Goals:
-
-* Create run state machine.
-* Implement planner call.
-* Implement coder call.
-* Implement planner review call.
-* Add max round control.
-* Save messages.
-* Save final output.
-
-Deliverables:
-
-```txt
-User can start a run
-Planner creates a plan
-Coder responds to planner
-Planner reviews coder output
-Run completes or stops at maxRounds
-```
-
----
-
-## Phase 4 — SQLite Persistence
-
-Goals:
-
-* Add SQLite database.
-* Create `runs` table.
-* Create `messages` table.
-* Store all runs and messages.
-* Add run history endpoints.
-
-Deliverables:
-
-```txt
-Runs persist after restart
-Messages persist after restart
-Previous runs can be opened from UI
-```
-
----
-
-## Phase 5 — Vue User Interface
-
-Goals:
-
-* Build task input screen.
-* Add provider/model selectors.
-* Add start run button.
-* Add planner message panel.
-* Add coder message panel.
-* Add final output panel.
-* Add run history sidebar.
-
-Deliverables:
-
-```txt
-Single-screen workflow UI
-User can select planner and coder models
-User can see both agents' outputs
-User can view final output
-```
-
----
-
-## Phase 6 — Real-time Streaming
-
-Goals:
-
-* Add SSE or WebSocket endpoint.
-* Stream status changes.
-* Stream new messages.
-* Stream final result.
-* Update UI live.
-
-Deliverables:
-
-```txt
-Messages appear in UI while the run is active
-User does not need to refresh
-Run status updates live
-```
-
----
-
-## Phase 7 — Stabilization
-
-Goals:
-
-* Improve error handling.
-* Add cancellation.
-* Add provider timeout settings.
-* Add better empty-response handling.
-* Add UI loading states.
-* Add run failure display.
-* Add basic tests for provider adapters and orchestrator.
-
-Deliverables:
-
-```txt
-Stable local MVP
-Clear errors
-Cancelable runs
-Basic test coverage
-```
-
----
-
-## 19. Future Features
-
-After the MVP is stable, these features can be added.
-
-### Manual Control Mode
-
-Allow the user to approve each step manually.
-
-```txt
-Planner creates plan
-User approves
-Coder implements
-User approves
-Planner reviews
-```
-
-### File Context Upload
-
-Allow the user to attach files as context.
-
-```txt
-Markdown files
-Text files
-Code snippets
-JSON files
-```
-
-### Repository Workspace
-
-Allow BridgeMind to work with a local repository.
-
-Possible features:
-
-```txt
-Read project files
-Generate patches
-Show diffs
-Apply patches manually
-```
-
-### Terminal Execution
-
-Allow the coder agent to request terminal commands.
-
-This should require explicit user approval.
-
-```txt
-npm install
-npm test
-pnpm build
-go test
-dotnet test
-```
-
-### Cost Tracking
-
-Track token usage and estimated cost per run.
-
-```txt
-Input tokens
-Output tokens
-Total tokens
-Estimated cost
-Provider
-Model
-```
-
-### Agent Presets
-
-Add reusable workflows.
-
-Examples:
-
-```txt
-Architect + Coder
-Reviewer + Fixer
-Planner + Documentation Writer
-Senior Backend + Frontend Implementer
-```
-
----
-
-## 20. MVP Acceptance Criteria
+## 24. MVP Acceptance Criteria
 
 The MVP is complete when:
 
-* The app starts locally.
-* The backend can read `providers.local.json`.
-* The frontend can list configured providers and models.
-* The user can enter a task.
-* The user can choose a planner provider/model.
-* The user can choose a coder provider/model.
-* The user can start a run.
-* Planner output is sent to coder.
-* Coder output is sent back to planner.
-* The loop stops when accepted or when max rounds is reached.
-* All messages are visible in the UI.
-* Runs are saved in SQLite.
-* Previous runs can be reopened.
-* No API keys are exposed to the frontend.
-
----
-
-## 21. Recommended First Implementation Order
-
 ```txt
-1. Create monorepo
-2. Create backend API
-3. Load providers.local.json
-4. Implement provider adapters
-5. Test provider calls from backend
-6. Create SQLite schema
-7. Implement run creation
-8. Implement orchestrator loop
-9. Save messages
-10. Create Vue UI
-11. Add provider/model selectors
-12. Add run screen
-13. Add SSE/WebSocket streaming
-14. Add run history
-15. Stabilize errors and cancellation
+The app starts locally
+The backend loads providers.local.json
+The UI lists configured providers and models
+The user can write a task
+The user can select planner and coder models
+The user can start a run
+The selected model config is locked for the run
+Planner output is sent to coder
+Coder output is sent back to planner
+Planner review marker is parsed
+The loop stops correctly
+Messages are streamed live
+Runs and messages are saved in SQLite
+Previous runs can be reopened
+Active run model selectors are disabled
+Completed runs can be duplicated with different models
+API keys are not exposed to the frontend
 ```
 
 ---
 
-## 22. Design Principle
+## 25. Future Features
 
-BridgeMind should stay simple.
+After MVP:
 
-The first version should not try to become a full autonomous coding agent. It should solve one clear problem:
+```txt
+Manual approval checkpoints
+File/context upload
+Repository workspace
+Patch generation
+Diff viewer
+Terminal command requests
+Explicit user approval for terminal execution
+Token usage and cost tracking
+Prompt template editor
+Agent presets
+Local model support
+Cloud sync
+Multi-user mode
+```
+
+---
+
+## 26. Design Principle
+
+BridgeMind should stay focused.
+
+The first version should solve one problem well:
 
 ```txt
 Stop manually copying messages between two AI models.
 ```
 
-Everything else should be built after that core flow works reliably.
+Everything else should be added after the core two-model orchestration flow works reliably.
