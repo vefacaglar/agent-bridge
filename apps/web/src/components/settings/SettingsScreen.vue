@@ -101,7 +101,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
 }
 
 .settings-container-wrap {
-  width: min(1080px, 100%);
+  width: min(800px, 100%);
   margin: 0 auto;
 }
 
