@@ -1,17 +1,14 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import type { RunMessage } from '@bridgemind/shared';
-import { formatJson } from '../lib/format';
-import { isToolSuccess, getToolStatusClass, formatToolArgs } from '../lib/messageGroups';
-import { cleanMessageContent } from '../lib/markdown';
+import { isToolSuccess, getToolStatusClass } from '../lib/messageGroups';
+import { cleanMessageContent, renderMarkdown } from '../lib/markdown';
 
 const props = defineProps<{
   thought?: string;
   toolCalls: any[];
   toolResponses: RunMessage[];
 }>();
-
-const expanded = ref(true); // default to expanded so reasoning is visible immediately
 
 const detailsExpanded = ref<Record<number, boolean>>({});
 
@@ -21,7 +18,6 @@ function toggleDetails(index: number) {
 
 const cleanedThought = computed(() => {
   if (!props.thought) return '';
-  // Clean off plan tags if any
   return cleanMessageContent(props.thought);
 });
 
@@ -75,228 +71,269 @@ function getToolStatusLabel(response?: RunMessage): string {
   if (!response) return 'Running...';
   return isToolSuccess(response.content) ? 'Success' : 'Error';
 }
+
+function truncateText(str: string, maxLen: number = 1000): string {
+  if (!str) return '';
+  if (str.length <= maxLen) return str;
+  return str.slice(0, maxLen) + '\n... [truncated]';
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+function formatToolParams(name: string, argumentsJson: string): string {
+  if (!argumentsJson) return '';
+  try {
+    const args = JSON.parse(argumentsJson);
+    switch (name) {
+      case 'run_command':
+        return args.command || '';
+      case 'read_file':
+      case 'delete_file':
+      case 'list_directory':
+      case 'create_directory':
+        return `Path: ${args.path || '.'}`;
+      case 'write_file':
+        return `Path: ${args.path || '.'}\n\nContent:\n${truncateText(args.content || '', 800)}`;
+      case 'edit_file':
+        return `Path: ${args.path || '.'}\n\nFind:\n${truncateText(args.old_string || '', 300)}\n\nReplace:\n${truncateText(args.new_string || '', 300)}`;
+      case 'move_file':
+        return `Source: ${args.source_path || ''}\nDestination: ${args.destination_path || ''}`;
+      case 'search_files':
+        return `Query: "${args.query || ''}"${args.path ? `\nIn path: ${args.path}` : ''}`;
+      default:
+        return JSON.stringify(args, null, 2);
+    }
+  } catch (e) {
+    return argumentsJson;
+  }
+}
+
+function formatToolResult(name: string, contentJson: string): string {
+  if (!contentJson) return '';
+  try {
+    const res = JSON.parse(contentJson);
+    
+    if (res.success === false) {
+      const codeStr = res.exitCode !== undefined && res.exitCode !== null ? ` (Exit code: ${res.exitCode})` : '';
+      let errStr = `Error: ${res.error || res.message || `Operation failed${codeStr}`}`;
+      if (res.stdout) {
+        errStr += `\n\nstdout:\n${res.stdout}`;
+      }
+      if (res.stderr) {
+        errStr += `\n\nstderr:\n${res.stderr}`;
+      }
+      return errStr;
+    }
+
+    switch (name) {
+      case 'run_command': {
+        const codeStr = res.exitCode !== undefined && res.exitCode !== null ? `Exit code: ${res.exitCode}\n\n` : '';
+        let out = codeStr;
+        if (res.stdout) {
+          out += res.stdout;
+        }
+        if (res.stderr) {
+          if (res.stdout) out += '\n';
+          out += res.stderr;
+        }
+        if (res.error) {
+          if (out) out += '\n\n';
+          out += `Error: ${res.error}`;
+        }
+        return out || 'Command completed successfully with no output.';
+      }
+      case 'read_file':
+        return res.content !== undefined ? res.content : JSON.stringify(res, null, 2);
+      case 'list_directory': {
+        if (Array.isArray(res.files)) {
+          if (res.files.length === 0) return 'Directory is empty.';
+          return res.files
+            .map((f: any) => {
+              const icon = f.isDirectory ? '📁' : '📄';
+              const size = f.isDirectory ? '' : ` (${formatBytes(f.size)})`;
+              return `${icon} ${f.name}${size}`;
+            })
+            .join('\n');
+        }
+        return JSON.stringify(res, null, 2);
+      }
+      case 'search_files': {
+        if (Array.isArray(res.matches)) {
+          const count = res.matchCount ?? res.matches.length;
+          if (count === 0) return 'No matches found.';
+          const list = res.matches
+            .map((m: any) => {
+              const lineInfo = m.line ? `:${m.line}` : '';
+              const previewInfo = m.preview ? ` - ${m.preview}` : '';
+              return `- ${m.path}${lineInfo}${previewInfo}`;
+            })
+            .join('\n');
+          return `Found ${count} match(es):\n${list}`;
+        }
+        return JSON.stringify(res, null, 2);
+      }
+      case 'write_file':
+      case 'edit_file':
+      case 'delete_file':
+      case 'create_directory':
+      case 'move_file':
+        return res.message || 'Success';
+      default:
+        if (res.content !== undefined) return res.content;
+        if (res.message !== undefined) return res.message;
+        return JSON.stringify(res, null, 2);
+    }
+  } catch (e) {
+    return contentJson;
+  }
+}
 </script>
 
 <template>
-  <article class="tool-group-block">
-    <header class="tool-group-header" @click="expanded = !expanded">
-      <div class="tool-group-summary-left">
-        <!-- Atom/Network/Brain style icon -->
-        <svg class="brain-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="3"></circle>
-          <circle cx="12" cy="5" r="1"></circle>
-          <circle cx="12" cy="19" r="1"></circle>
-          <circle cx="5" cy="12" r="1"></circle>
-          <circle cx="19" cy="12" r="1"></circle>
-          <path d="M12 8v3M12 13v3M8 12h3M13 12h3"></path>
-        </svg>
-        <span class="tool-group-title">Reasoning</span>
-      </div>
-      <div class="tool-group-summary-right">
-        <!-- Chevron arrow -->
-        <svg class="chevron-icon" :class="{ rotated: expanded }" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="m6 9 6 6 6-6"></path>
-        </svg>
-      </div>
-    </header>
+  <div class="tool-group-wrap">
+    <!-- Thought Step -->
+    <div 
+      v-if="cleanedThought" 
+      class="tool-thought-body markdown-body" 
+      v-html="renderMarkdown(cleanedThought)"
+    ></div>
 
-    <div v-if="expanded" class="timeline-container">
-      <div class="timeline-line"></div>
-
-      <!-- Thought Step -->
-      <div v-if="cleanedThought" class="timeline-step">
-        <div class="step-icon-wrap">
-          <div class="step-dot"></div>
-        </div>
-        <div class="step-content">
-          <div class="step-text">{{ cleanedThought }}</div>
-        </div>
-      </div>
-
-      <!-- Tool Call Steps -->
-      <div v-for="(tc, idx) in toolCalls" :key="idx" class="timeline-step">
-        <div class="step-icon-wrap">
-          <!-- Render specific icon based on tool type -->
-          <svg v-if="tc.function?.name === 'read_file'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path>
-            <path d="M14 2v4a2 2 0 0 0 2 2h4"></path>
-          </svg>
-          <svg v-else-if="tc.function?.name === 'write_file'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 20h9"></path>
-            <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
-          </svg>
-          <svg v-else-if="tc.function?.name === 'delete_file'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M3 6h18"></path>
-            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
-            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-          </svg>
-          <svg v-else-if="tc.function?.name === 'list_directory'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"></path>
-          </svg>
-          <svg v-else-if="tc.function?.name === 'edit_file'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-            <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z"></path>
-          </svg>
-          <svg v-else-if="tc.function?.name === 'create_directory'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"></path>
-            <path d="M12 10v6M9 13h6"></path>
-          </svg>
-          <svg v-else-if="tc.function?.name === 'move_file'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M5 12h14"></path>
-            <path d="m13 6 6 6-6 6"></path>
-          </svg>
-          <svg v-else-if="tc.function?.name === 'search_files'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="11" cy="11" r="8"></circle>
-            <path d="m21 21-4.3-4.3"></path>
-          </svg>
-          <svg v-else-if="tc.function?.name === 'run_command'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="m4 17 6-6-6-6"></path>
-            <path d="M12 19h8"></path>
-          </svg>
-          <svg v-else class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
-            <circle cx="12" cy="12" r="3"></circle>
-          </svg>
-        </div>
-        <div class="step-content">
-          <div class="step-title-row">
-            <span class="step-label-text">{{ getToolLabel(tc.function?.name, tc.function?.arguments) }}</span>
+    <!-- Tool Call Accordions -->
+    <div class="tool-calls-list">
+      <div 
+        v-for="(tc, idx) in toolCalls" 
+        :key="idx" 
+        class="tool-call-accordion"
+        :class="{ 'is-expanded': detailsExpanded[idx] }"
+      >
+        <header class="tool-call-header" @click="toggleDetails(idx)">
+          <div class="tool-call-header-left">
+            <!-- Icon -->
+            <svg v-if="tc.function?.name === 'read_file'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path>
+              <path d="M14 2v4a2 2 0 0 0 2 2h4"></path>
+            </svg>
+            <svg v-else-if="tc.function?.name === 'write_file'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 20h9"></path>
+              <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
+            </svg>
+            <svg v-else-if="tc.function?.name === 'delete_file'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 6h18"></path>
+              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+            </svg>
+            <svg v-else-if="tc.function?.name === 'list_directory'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"></path>
+            </svg>
+            <svg v-else-if="tc.function?.name === 'edit_file'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+              <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z"></path>
+            </svg>
+            <svg v-else-if="tc.function?.name === 'create_directory'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"></path>
+              <path d="M12 10v6M9 13h6"></path>
+            </svg>
+            <svg v-else-if="tc.function?.name === 'move_file'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 12h14"></path>
+              <path d="m13 6 6 6-6 6"></path>
+            </svg>
+            <svg v-else-if="tc.function?.name === 'search_files'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"></circle>
+              <path d="m21 21-4.3-4.3"></path>
+            </svg>
+            <svg v-else-if="tc.function?.name === 'run_command'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m4 17 6-6-6-6"></path>
+              <path d="M12 19h8"></path>
+            </svg>
+            <svg v-else class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+              <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+            <span class="tool-call-label">{{ getToolLabel(tc.function?.name, tc.function?.arguments) }}</span>
+          </div>
+          <div class="tool-call-header-right">
             <span class="step-badge" :class="getToolStatusClass(toolResponses[idx])">
               {{ getToolStatusLabel(toolResponses[idx]) }}
             </span>
-          </div>
-
-          <button class="step-details-toggle" @click="toggleDetails(idx)">
-            <span>{{ detailsExpanded[idx] ? 'Hide Details' : 'Show Details' }}</span>
-            <svg class="toggle-arrow" :class="{ rotated: detailsExpanded[idx] }" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <svg class="chevron-icon" :class="{ rotated: detailsExpanded[idx] }" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="m6 9 6 6 6-6"></path>
             </svg>
-          </button>
+          </div>
+        </header>
 
-          <div v-if="detailsExpanded[idx]" class="step-details-box">
-            <div class="detail-section">
-              <div class="detail-label">Parameters:</div>
-              <pre class="faint-code">{{ formatToolArgs(tc.function?.arguments) }}</pre>
-            </div>
-            <div class="detail-section response-section">
-              <div class="detail-label">Result:</div>
-              <pre v-if="toolResponses[idx]" class="faint-code">{{ formatJson(toolResponses[idx].content) }}</pre>
-              <div v-else class="tool-running-shimmer">
-                <div class="shimmer-bar"></div>
-              </div>
+        <div v-if="detailsExpanded[idx]" class="tool-call-details">
+          <div class="detail-section">
+            <div class="detail-label">Parameters:</div>
+            <pre class="faint-code">{{ formatToolParams(tc.function?.name, tc.function?.arguments) }}</pre>
+          </div>
+          <div class="detail-section response-section">
+            <div class="detail-label">Result:</div>
+            <pre v-if="toolResponses[idx]" class="faint-code">{{ formatToolResult(tc.function?.name, toolResponses[idx].content) }}</pre>
+            <div v-else class="tool-running-shimmer">
+              <div class="shimmer-bar"></div>
             </div>
           </div>
         </div>
       </div>
     </div>
-  </article>
+  </div>
 </template>
 
 <style scoped>
-.tool-group-block {
+.tool-group-wrap {
   margin: 14px 0;
+  width: 100%;
+}
+
+.tool-thought-body {
+  margin-bottom: 12px;
+  color: #deded8;
+  line-height: 1.6;
+}
+
+.tool-calls-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tool-call-accordion {
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(255, 255, 255, 0.06);
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   width: 100%;
   overflow: hidden;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: border-color 0.2s ease, background-color 0.2s ease;
 }
 
-.tool-group-header {
+.tool-call-accordion:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.tool-call-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 10px 14px;
   cursor: pointer;
   user-select: none;
-  background: rgba(255, 255, 255, 0.01);
-  transition: background 0.2s ease;
 }
 
-.tool-group-header:hover {
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.tool-group-summary-left {
+.tool-call-header-left {
   display: flex;
   align-items: center;
-  gap: 8px;
-  color: var(--text);
-}
-
-.brain-icon {
-  animation: float 3s infinite ease-in-out;
-  color: var(--planner);
-}
-
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-2px); }
-}
-
-.tool-group-title {
-  font-weight: 600;
-  font-size: 0.88rem;
-}
-
-.chevron-icon {
-  color: var(--muted);
-  transition: transform 0.2s ease;
-}
-
-.chevron-icon.rotated {
-  transform: rotate(180deg);
-}
-
-/* Timeline CSS */
-.timeline-container {
-  position: relative;
-  padding: 16px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  background: rgba(0, 0, 0, 0.12);
-  border-top: 1px solid rgba(255, 255, 255, 0.04);
-  max-height: 240px;
-  overflow-y: auto;
-}
-
-.timeline-line {
-  position: absolute;
-  top: 24px;
-  bottom: 24px;
-  left: 27px;
-  width: 1px;
-  background: rgba(255, 255, 255, 0.1);
-  pointer-events: none;
-}
-
-.timeline-step {
-  display: flex;
-  gap: 14px;
-  position: relative;
+  gap: 10px;
   min-width: 0;
-}
-
-.step-icon-wrap {
-  width: 16px;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  padding-top: 3px;
-  z-index: 1;
-  background: transparent;
-}
-
-.step-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--planner);
-  box-shadow: 0 0 8px rgba(207, 162, 147, 0.6);
-  margin-top: 5px;
+  flex: 1;
 }
 
 .step-icon {
@@ -304,33 +341,19 @@ function getToolStatusLabel(response?: RunMessage): string {
   flex-shrink: 0;
 }
 
-.step-content {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.step-text {
-  font-size: 0.92rem;
-  line-height: 1.6;
-  color: var(--text);
-}
-
-.step-title-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 0.85rem;
+.tool-call-label {
   font-weight: 500;
   color: var(--text);
-}
-
-.step-label-text {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.tool-call-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
 }
 
 .step-badge {
@@ -362,38 +385,20 @@ function getToolStatusLabel(response?: RunMessage): string {
   50% { opacity: 1; }
 }
 
-.step-details-toggle {
-  background: transparent;
-  color: var(--faint);
-  border: none;
-  font-size: 0.72rem;
-  cursor: pointer;
-  padding: 0;
-  text-align: left;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  width: fit-content;
-}
-
-.step-details-toggle:hover {
+.chevron-icon {
   color: var(--muted);
-}
-
-.toggle-arrow {
   transition: transform 0.2s ease;
+  flex-shrink: 0;
 }
 
-.toggle-arrow.rotated {
+.chevron-icon.rotated {
   transform: rotate(180deg);
 }
 
-.step-details-box {
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 6px;
-  padding: 10px;
-  margin-top: 4px;
+.tool-call-details {
+  padding: 12px 14px;
+  background: rgba(0, 0, 0, 0.12);
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
   display: flex;
   flex-direction: column;
   gap: 10px;

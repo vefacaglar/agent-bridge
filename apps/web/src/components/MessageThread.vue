@@ -74,10 +74,6 @@ watch(() => props.groupedMessages, () => {
     if (activeReasoningBody) {
       activeReasoningBody.scrollTop = activeReasoningBody.scrollHeight;
     }
-    const activeTimelineBody = document.querySelector('.tool-group-block:last-of-type .timeline-container');
-    if (activeTimelineBody) {
-      activeTimelineBody.scrollTop = activeTimelineBody.scrollHeight;
-    }
   });
 }, { deep: true });
 </script>
