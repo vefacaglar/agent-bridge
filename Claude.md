@@ -211,10 +211,13 @@ ask_permissions  Each tool call requires explicit user approval first.
 auto             Autonomous; calls tools freely.
 ```
 
-In **plan mode** the model maintains a structured, chat-specific plan via the
-`update_plan` tool (see Workspace Tools / Plan Panel below) instead of emitting
-`<plan>` / `<task_list>` text. Other modes keep the lighter text-based
-`<task_list>` block, which the web UI pins above the composer.
+In **plan mode** the model records a structured, chat-specific plan via the
+`update_plan` tool (see Workspace Tools / Plan Panel below). That plan is a
+*stable document* shown in the right-hand panel — it is created once and only
+changes on an explicit revision request. Live progress is tracked separately by
+the text `<task_list>` block the model re-emits in each message (all modes),
+which the web UI pins above the composer. So the panel = the fixed plan; the
+pinned bar = the live, per-message checklist. They are independent.
 
 Only `ask_permissions` currently pauses for approval. The approval flow emits
 `permission_requested`, sets status `awaiting_permission`, and waits for a
@@ -279,14 +282,17 @@ update_plan(title, tasks[{ text, status }], body?, start_new?)
 
 It performs no filesystem/network I/O, so it runs silently (no permission
 prompt). The orchestrator persists the plan to the `plans` table via
-`PlanRepository` and emits a `plan_updated` SSE event. Each call replaces the
-active plan's steps in place; `start_new: true` supersedes a finished plan with
-a new versioned one (so a chat can move through several plans over time).
+`PlanRepository` and emits a `plan_updated` SSE event. The plan is meant to be
+stable: the model creates it once and only calls `update_plan` again to revise
+on request (updating the same plan in place); `start_new: true` supersedes a
+finished plan with a new versioned one. Progress is *not* tracked here — that
+lives in the per-message `<task_list>` (see Operational Modes).
 
 The web client (`useChatSession.currentPlan`, `PlanPanel.vue`) renders the
-active plan in a right-hand side panel that opens automatically in plan mode,
-with an in-thread "Plan: …" link to re-open it once collapsed. The active plan
-is loaded on run select via `GET /api/runs/:id/plan`.
+active plan in a right-hand side panel. The panel opens automatically once a
+plan exists and then stays open across mode switches until the user closes it
+(an in-thread "Plan: …" link re-opens it once collapsed). The active plan is
+loaded on run select via `GET /api/runs/:id/plan`.
 
 ---
 

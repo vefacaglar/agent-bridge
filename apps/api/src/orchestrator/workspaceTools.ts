@@ -214,7 +214,7 @@ export const UPDATE_PLAN_TOOL = {
   type: "function" as const,
   function: {
     name: "update_plan",
-    description: "Create or update the plan for this chat, shown to the user in a side panel. Put the COMPLETE plan write-up in the body field and the checklist in tasks — this tool's output IS the plan the user reads, so do not also paste the full plan into your chat reply. Call it when you first draft a plan and again every time progress changes — mark steps 'in_progress' when you start them and 'completed' when done. Always pass the FULL ordered list of steps (not just the changed ones). When the current plan is fully finished and you are starting a genuinely new plan, set start_new to true.",
+    description: "Record the plan for this chat as a STABLE document shown to the user in a side panel. Put the COMPLETE plan write-up in the body field and the list of steps in tasks — this tool's output IS the plan the user reads, so do not also paste the full plan into your chat reply. Call it once when you first draft the plan. Do NOT call it again to show progress; the panel is meant to stay unchanged. Only call it again when the user explicitly asks you to revise/change the plan (update the same plan), or — when an entirely finished plan is replaced by a genuinely new effort — with start_new set to true.",
     parameters: {
       type: "object",
       properties: {

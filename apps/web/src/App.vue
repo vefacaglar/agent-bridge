@@ -63,9 +63,10 @@ const currentProjectName = computed(() => {
   return current ? current.name : 'Unknown Project';
 });
 
-// The most recent <task_list> the assistant emitted in the active run, shown
-// pinned above the composer (in build modes) so progress stays visible as the
-// thread scrolls. Plan mode instead uses the structured plan panel below.
+// The live task checklist pinned above the composer. It is driven entirely by
+// the latest <task_list> text block the assistant emitted, so it refreshes with
+// every message and stays independent of the right-hand plan panel (which holds
+// the stable plan document and only changes on an explicit revision request).
 const currentTaskList = computed<string | null>(() => {
   const list = messages.value;
   if (!list) return null;
@@ -149,7 +150,7 @@ watch(activeRunId, () => { planPanelCollapsed.value = false; });
         </section>
 
         <AgentTaskList
-          v-if="currentTaskList && !planPanelOpen"
+          v-if="currentTaskList"
           :task-list-text="currentTaskList"
           class="pinned-task-list"
         />
