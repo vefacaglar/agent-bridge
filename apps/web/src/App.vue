@@ -184,11 +184,11 @@ function rejectPlan() {
           />
         </section>
 
-        <AgentTaskList
-          v-if="currentTaskList"
-          :task-list-text="currentTaskList"
-          class="pinned-task-list"
-        />
+        <div v-if="currentTaskList" class="pinned-task-list-wrap">
+          <AgentTaskList
+            :task-list-text="currentTaskList"
+          />
+        </div>
 
         <ChatComposer
           v-model:task-input="taskInput"
@@ -310,7 +310,7 @@ function rejectPlan() {
 
 <style scoped>
 /* Align the pinned task list with the composer below it (same inset). */
-.pinned-task-list {
+.pinned-task-list-wrap {
   flex: 0 0 auto;
   padding: 0 24px;
 }

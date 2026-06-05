@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import type { RunMessage } from '@agent-bridge/shared';
-import { isToolSuccess, getToolStatusClass } from '../lib/messageGroups';
+import { isToolSuccess } from '../lib/messageGroups';
 import { cleanMessageContent, renderMarkdown } from '../lib/markdown';
 
 const props = defineProps<{
@@ -109,11 +109,6 @@ function getToolLabel(name: string, args: string): string {
     default:
       return `Tool ${name} executed`;
   }
-}
-
-function getToolStatusLabel(response?: RunMessage): string {
-  if (!response) return 'Running...';
-  return isToolSuccess(response.content) ? 'Success' : 'Error';
 }
 
 function truncateText(str: string, maxLen: number = 1000): string {
@@ -277,58 +272,64 @@ function formatToolResult(name: string, contentJson: string): string {
         :class="{ 'is-expanded': detailsExpanded[idx] }"
       >
         <header class="tool-call-header" @click="toggleDetails(idx)">
-          <div class="tool-call-header-left">
-            <!-- Icon -->
-            <svg v-if="tc.function?.name === 'read_file'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path>
-              <path d="M14 2v4a2 2 0 0 0 2 2h4"></path>
+          <svg class="chevron-icon" :class="{ rotated: detailsExpanded[idx] }" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m6 9 6 6 6-6"></path>
+          </svg>
+          
+          <!-- Icon -->
+          <svg v-if="tc.function?.name === 'read_file'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path>
+            <path d="M14 2v4a2 2 0 0 0 2 2h4"></path>
+          </svg>
+          <svg v-else-if="tc.function?.name === 'write_file'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 20h9"></path>
+            <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
+          </svg>
+          <svg v-else-if="tc.function?.name === 'delete_file'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 6h18"></path>
+            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+          </svg>
+          <svg v-else-if="tc.function?.name === 'list_directory'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"></path>
+          </svg>
+          <svg v-else-if="tc.function?.name === 'edit_file'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+            <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z"></path>
+          </svg>
+          <svg v-else-if="tc.function?.name === 'create_directory'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"></path>
+            <path d="M12 10v6M9 13h6"></path>
+          </svg>
+          <svg v-else-if="tc.function?.name === 'move_file'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 12h14"></path>
+            <path d="m13 6 6 6-6 6"></path>
+          </svg>
+          <svg v-else-if="tc.function?.name === 'search_files'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <path d="m21 21-4.3-4.3"></path>
+          </svg>
+          <svg v-else-if="tc.function?.name === 'run_command'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m4 17 6-6-6-6"></path>
+            <path d="M12 19h8"></path>
+          </svg>
+          <svg v-else class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+            <circle cx="12" cy="12" r="3"></circle>
+          </svg>
+          
+          <span class="tool-call-label">{{ getToolLabel(tc.function?.name, tc.function?.arguments) }}</span>
+          
+          <template v-if="toolResponses[idx]">
+            <svg v-if="isToolSuccess(toolResponses[idx].content)" class="status-icon success" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" title="Success">
+              <polyline points="20 6 9 17 4 12"></polyline>
             </svg>
-            <svg v-else-if="tc.function?.name === 'write_file'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 20h9"></path>
-              <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
+            <svg v-else class="status-icon error" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" title="Error">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>
-            <svg v-else-if="tc.function?.name === 'delete_file'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M3 6h18"></path>
-              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
-              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-            </svg>
-            <svg v-else-if="tc.function?.name === 'list_directory'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"></path>
-            </svg>
-            <svg v-else-if="tc.function?.name === 'edit_file'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-              <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z"></path>
-            </svg>
-            <svg v-else-if="tc.function?.name === 'create_directory'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"></path>
-              <path d="M12 10v6M9 13h6"></path>
-            </svg>
-            <svg v-else-if="tc.function?.name === 'move_file'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M5 12h14"></path>
-              <path d="m13 6 6 6-6 6"></path>
-            </svg>
-            <svg v-else-if="tc.function?.name === 'search_files'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="11" cy="11" r="8"></circle>
-              <path d="m21 21-4.3-4.3"></path>
-            </svg>
-            <svg v-else-if="tc.function?.name === 'run_command'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="m4 17 6-6-6-6"></path>
-              <path d="M12 19h8"></path>
-            </svg>
-            <svg v-else class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
-              <circle cx="12" cy="12" r="3"></circle>
-            </svg>
-            <span class="tool-call-label">{{ getToolLabel(tc.function?.name, tc.function?.arguments) }}</span>
-          </div>
-          <div class="tool-call-header-right">
-            <span class="step-badge" :class="getToolStatusClass(toolResponses[idx])">
-              {{ getToolStatusLabel(toolResponses[idx]) }}
-            </span>
-            <svg class="chevron-icon" :class="{ rotated: detailsExpanded[idx] }" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="m6 9 6 6 6-6"></path>
-            </svg>
-          </div>
+          </template>
+          <span v-else class="status-dot pending" title="Running..."></span>
         </header>
 
         <div v-if="detailsExpanded[idx]" class="tool-call-details">
@@ -439,79 +440,67 @@ function formatToolResult(name: string, contentJson: string): string {
 
 .tool-call-accordion {
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  font-size: 0.88rem;
+  background: transparent;
+  border: none;
+  font-size: 0.82rem;
   width: 100%;
   overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  transition: border-color 0.2s ease, background-color 0.2s ease;
+  box-shadow: none;
+  font-style: italic;
+  color: var(--faint);
+  transition: color 0.2s ease;
 }
 
 .tool-call-accordion:hover {
-  border-color: rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
+  background: transparent;
+  color: var(--muted);
 }
 
 .tool-call-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 10px 14px;
+  gap: 8px;
+  padding: 6px 0;
   cursor: pointer;
   user-select: none;
 }
 
-.tool-call-header-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  flex: 1;
-}
-
 .step-icon {
-  color: var(--muted);
+  color: inherit;
   flex-shrink: 0;
 }
 
 .tool-call-label {
-  font-weight: 500;
-  color: var(--text);
+  font-weight: 300;
+  color: inherit;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
+  flex-shrink: 1;
 }
 
-.tool-call-header-right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+.status-icon {
   flex-shrink: 0;
+  display: inline-block;
+  vertical-align: middle;
 }
 
-.step-badge {
-  font-size: 0.7rem;
-  padding: 1px 6px;
-  border-radius: 4px;
-  font-weight: 600;
-  text-transform: uppercase;
-}
-
-.step-badge.success {
-  background: rgba(136, 168, 144, 0.12);
+.status-icon.success {
   color: var(--success);
 }
 
-.step-badge.failed {
-  background: rgba(184, 130, 130, 0.12);
+.status-icon.error {
   color: var(--danger);
 }
 
-.step-badge.pending {
-  background: rgba(188, 162, 130, 0.12);
-  color: var(--warning);
+.status-dot.pending {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--warning);
   animation: shimmerPulse 1.5s infinite ease-in-out;
+  flex-shrink: 0;
 }
 
 @keyframes shimmerPulse {
@@ -520,7 +509,7 @@ function formatToolResult(name: string, contentJson: string): string {
 }
 
 .chevron-icon {
-  color: var(--muted);
+  color: inherit;
   transition: transform 0.2s ease;
   flex-shrink: 0;
 }
@@ -530,12 +519,13 @@ function formatToolResult(name: string, contentJson: string): string {
 }
 
 .tool-call-details {
-  padding: 12px 14px;
-  background: rgba(0, 0, 0, 0.12);
-  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  padding: 8px 0 12px;
+  background: transparent;
+  border-top: 1px dashed rgba(255, 255, 255, 0.08);
   display: flex;
   flex-direction: column;
   gap: 10px;
+  font-style: normal;
 }
 
 .detail-section {
