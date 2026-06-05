@@ -11,6 +11,7 @@ import { ProviderRegistry } from "../providers/ProviderRegistry.js";
 import { RunRepository, MessageRepository, PlanRepository } from "../database/repositories.js";
 import { Orchestrator } from "./Orchestrator.js";
 import { eventBus } from "./eventBus.js";
+import { buildSystemPrompt } from "./systemPrompt.js";
 import type { Run, RunStatus } from "@agent-bridge/shared";
 
 // Mock config content
@@ -233,6 +234,17 @@ test("Orchestrator Integration Tests", async (t) => {
     // Verify mode system prompt addition was present
     assert.ok(systemPromptUsed.includes("CURRENT OPERATIONAL MODE: PLAN MODE"));
     assert.ok(systemPromptUsed.includes("DO NOT call any file-mutating tools"));
+    assert.ok(systemPromptUsed.includes("INITIAL PROJECT GUIDANCE"));
+    assert.ok(systemPromptUsed.includes("Agents.md"));
+    assert.ok(systemPromptUsed.includes("Claude.md"));
+  });
+
+  await t.test("System prompt - does not inject project guidance in chat mode", () => {
+    const prompt = buildSystemPrompt("Test Project", "/tmp/test-project", "chat", true);
+
+    assert.ok(prompt.includes("CURRENT OPERATIONAL MODE: CHAT MODE"));
+    assert.ok(!prompt.includes("INITIAL PROJECT GUIDANCE"));
+    assert.ok(!prompt.includes("Before doing substantive planning or implementation"));
   });
 
   await t.test("Orchestrator - pauses for permissions in ask_permissions mode and resumes on approval", async () => {

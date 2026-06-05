@@ -12,7 +12,12 @@ function projectContextSuffix(projectName?: string, projectPath?: string): strin
  * The prompt adapts to the active operational mode and injects the
  * active project workspace context when available.
  */
-export function buildSystemPrompt(projectName?: string, projectPath?: string, mode?: string): string {
+export function buildSystemPrompt(
+  projectName?: string,
+  projectPath?: string,
+  mode?: string,
+  shouldReadProjectGuidance = false
+): string {
   // Chat mode is deliberately lightweight: a short prompt with no tool catalog
   // or planning scaffolding, so casual conversations stay cheap on context and
   // the model does not go scanning the project on its own.
@@ -43,6 +48,12 @@ IMPORTANT INSTRUCTION FOR PLANNING & CODING:
 - CRITICAL — update the task list ONE STEP AT A TIME, as you go: the user watches this checklist fill in live, so do not save all the updates for the end. Work in small turns: complete one step, then in that SAME assistant turn (yes, even the turns where you are calling a tool) emit a short line of text plus the full <task_list> block with that one newly-finished step marked '- [x]'. Then move to the next step in your next turn. Do NOT call several tools across many turns in silence and only reveal a fully-checked list at the very end — that makes the checkboxes look frozen and then jump. One completed checkbox per message is the target rhythm.
 - Whenever you re-output the list, repeat the ENTIRE block verbatim (both done and not-done items), never a partial list and never just the changed lines. The UI shows only the most recent <task_list> you emit. By your final message, every step you actually completed must be '- [x]'.
 - Wrap any code changes inside standard markdown fenced code blocks. Specify the filename as a comment or header if possible.`;
+
+  if (shouldReadProjectGuidance) {
+    prompt += `\n\nINITIAL PROJECT GUIDANCE:
+- This is the first model request for this run. Before doing substantive planning or implementation, inspect the active workspace guidance files by calling read_file for 'Agents.md' and 'Claude.md' when they exist.
+- If either file is missing or unreadable, continue with the available context and do not get stuck.`;
+  }
 
   if (mode === "plan") {
     prompt += `\n\nCURRENT OPERATIONAL MODE: PLAN MODE

@@ -157,7 +157,7 @@ export class Orchestrator {
       }
     });
 
-    await this.drive(runId, run, [{ role: "user", content: run.task }]);
+    await this.drive(runId, run, [{ role: "user", content: run.task }], true);
   }
 
   /** Continues an existing run with new user input, replaying stored history. */
@@ -172,7 +172,7 @@ export class Orchestrator {
     this.activeRuns.add(runId);
 
     const history = this.rebuildHistory(runId, run.task);
-    await this.drive(runId, run, history);
+    await this.drive(runId, run, history, false);
   }
 
   /**
@@ -231,7 +231,12 @@ export class Orchestrator {
    * calls the model, executes any tool calls (gated by permissions), and
    * repeats until the model returns a final answer with no tool calls.
    */
-  private async drive(runId: string, run: Run, initialMessages: ChatMessage[]): Promise<void> {
+  private async drive(
+    runId: string,
+    run: Run,
+    initialMessages: ChatMessage[],
+    shouldReadProjectGuidance: boolean
+  ): Promise<void> {
     const checkCancelled = () => {
       if (!this.activeRuns.has(runId)) {
         throw new Error("ORCHESTRATION_CANCELLED");
@@ -260,7 +265,12 @@ export class Orchestrator {
 
         const response = await provider.complete({
           model: run.model,
-          systemPrompt: buildSystemPrompt(run.projectName, run.projectPath, run.mode),
+          systemPrompt: buildSystemPrompt(
+            run.projectName,
+            run.projectPath,
+            run.mode,
+            run.mode !== "chat" && shouldReadProjectGuidance
+          ),
           messages: currentMessages,
           tools
         }, (chunk) => {
