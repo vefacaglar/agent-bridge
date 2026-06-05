@@ -15,6 +15,7 @@ const props = defineProps<{
   runs: Run[];
   activeRunId: string | null;
   isRunning: boolean;
+  isSidebarCollapsed: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -24,6 +25,7 @@ const emit = defineEmits<{
   (e: 'select-run', run: Run): void;
   (e: 'delete-project', path: string): void;
   (e: 'open-settings'): void;
+  (e: 'toggle-sidebar'): void;
 }>();
 
 const filteredRuns = computed(() =>
@@ -37,11 +39,14 @@ function onDeleteProject(path: string, event: Event) {
 </script>
 
 <template>
-  <aside class="sidebar">
-    <div class="window-dots" aria-hidden="true">
-      <span></span>
-      <span></span>
-      <span></span>
+  <aside class="sidebar" :class="{ collapsed: isSidebarCollapsed }">
+    <div class="sidebar-header">
+      <button class="collapse-btn" @click="emit('toggle-sidebar')" title="Collapse Sidebar">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect width="18" height="18" x="3" y="3" rx="2" />
+          <path d="M9 3v18" />
+        </svg>
+      </button>
     </div>
 
     <button class="nav-action" :disabled="isRunning" @click="emit('new-chat')">New chat</button>
@@ -93,6 +98,34 @@ function onDeleteProject(path: string, event: Event) {
 </template>
 
 <style scoped>
+.sidebar-header {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 0 0 4px 0;
+  background: transparent;
+  border: none;
+}
+
+.collapse-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.collapse-btn:hover {
+  background: var(--sidebar-active);
+  color: var(--text);
+}
+
 .projects-accordion {
   flex: 1;
   overflow-y: auto;

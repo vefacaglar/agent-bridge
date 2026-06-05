@@ -32,27 +32,41 @@ const {
   visibleTitle,
   activeConfirmationGroup
 } = chat;
+
+import { ref } from 'vue';
+const isSidebarCollapsed = ref(false);
+function toggleSidebar() {
+  isSidebarCollapsed.value = !isSidebarCollapsed.value;
+}
 </script>
 
 <template>
-  <div class="app-shell">
+  <div class="app-shell" :class="{ 'sidebar-collapsed': isSidebarCollapsed }">
     <AppSidebar
       :project-options="projects.projectOptions.value"
       :active-project-path="projects.activeProjectPath.value"
       :runs="runs"
       :active-run-id="activeRunId"
       :is-running="isRunning"
+      :is-sidebar-collapsed="isSidebarCollapsed"
       @new-chat="chat.startNewRunSetup"
       @add-project="projects.openAddProjectModal"
       @select-project="selectProject"
       @select-run="chat.selectRun"
       @delete-project="deleteProject"
       @open-settings="permissions.openSettings"
+      @toggle-sidebar="toggleSidebar"
     />
 
     <main class="chat-shell">
       <header class="chat-header">
         <div class="thread-title">
+          <button v-if="isSidebarCollapsed" class="expand-sidebar-btn" @click="toggleSidebar" title="Expand Sidebar">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect width="18" height="18" x="3" y="3" rx="2" />
+              <path d="M9 3v18" />
+            </svg>
+          </button>
           <strong>{{ visibleTitle }}</strong>
           <span v-if="activeRun" class="status-pill" :class="statusClass(activeRun.status)">
             {{ statusLabel(activeRun.status) }}
