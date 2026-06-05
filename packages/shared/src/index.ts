@@ -1,13 +1,9 @@
 export type RunStatus =
   | "created"
-  | "planning"
-  | "implementing"
-  | "reviewing"
-  | "fixing"
+  | "generating"
   | "done"
   | "failed"
-  | "cancelled"
-  | "max_rounds_reached";
+  | "cancelled";
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
@@ -33,13 +29,9 @@ export interface CompletionResponse {
 }
 
 export interface RunModelSnapshot {
-  plannerProviderId: string;
-  plannerProviderDisplayName: string;
-  plannerModel: string;
-  coderProviderId: string;
-  coderProviderDisplayName: string;
-  coderModel: string;
-  maxRounds: number;
+  providerId: string;
+  providerDisplayName: string;
+  model: string;
 }
 
 export interface RunMessage {
@@ -62,17 +54,9 @@ export interface Run {
   projectPath?: string;
   projectName?: string;
   status: RunStatus;
-  plannerProviderId: string;
-  plannerProviderDisplayName: string;
-  plannerModel: string;
-  coderProviderId: string;
-  coderProviderDisplayName: string;
-  coderModel: string;
-  maxRounds: number;
-  currentRound: number;
-  sourceRunId?: string;
-  retryType?: string;
-  finalOutput?: string;
+  providerId: string;
+  providerDisplayName: string;
+  model: string;
   errorMessage?: string;
   createdAt: string;
   updatedAt: string;

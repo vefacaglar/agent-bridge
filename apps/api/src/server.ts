@@ -124,29 +124,21 @@ server.post("/api/projects/select-dir", async (request, reply) => {
 
 // Create and trigger a new orchestration run
 server.post("/api/runs", async (request, reply) => {
-  const { task, projectPath, projectName, plannerProviderId, plannerModel, coderProviderId, coderModel, maxRounds: requestedMaxRounds } = request.body as {
+  const { task, projectPath, projectName, providerId, model } = request.body as {
     task: string;
     projectPath?: string;
     projectName?: string;
-    plannerProviderId: string;
-    plannerModel: string;
-    coderProviderId: string;
-    coderModel: string;
-    maxRounds?: number;
+    providerId: string;
+    model: string;
   };
 
-  if (!task || !plannerProviderId || !plannerModel || !coderProviderId || !coderModel) {
+  if (!task || !providerId || !model) {
     reply.status(400);
-    return { error: "Missing required fields: task, plannerProviderId, plannerModel, coderProviderId, coderModel" };
+    return { error: "Missing required fields: task, providerId, model" };
   }
 
-  const maxRoundsVal = requestedMaxRounds ?? 3;
-
-  const plannerMeta = registry.getSafeMetadata().find(p => p.id === plannerProviderId);
-  const coderMeta = registry.getSafeMetadata().find(p => p.id === coderProviderId);
-
-  const plannerProviderDisplayName = plannerMeta ? plannerMeta.displayName : plannerProviderId;
-  const coderProviderDisplayName = coderMeta ? coderMeta.displayName : coderProviderId;
+  const providerMeta = registry.getSafeMetadata().find(p => p.id === providerId);
+  const providerDisplayName = providerMeta ? providerMeta.displayName : providerId;
 
   const runId = `run-${Date.now()}`;
   const title = task.length > 25 ? task.substring(0, 25) + "..." : task;
@@ -158,14 +150,9 @@ server.post("/api/runs", async (request, reply) => {
     task,
     ...project,
     status: "created" as RunStatus,
-    plannerProviderId,
-    plannerProviderDisplayName,
-    plannerModel,
-    coderProviderId,
-    coderProviderDisplayName,
-    coderModel,
-    maxRounds: maxRoundsVal,
-    currentRound: 0,
+    providerId,
+    providerDisplayName,
+    model,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
@@ -191,125 +178,46 @@ server.post("/api/runs/:id/cancel", async (request, reply) => {
   return { success: true };
 });
 
-// Duplicate a run with selectable planner/coder configuration
-server.post("/api/runs/:id/duplicate", async (request, reply) => {
+// Continue a run with follow-up instructions in the same thread
+server.post("/api/runs/:id/continue", async (request, reply) => {
   const { id } = request.params as { id: string };
-  const sourceRun = runRepo.getById(id);
-  if (!sourceRun) {
-    reply.status(404);
-    return { error: `Source run with id "${id}" not found` };
-  }
+  const { task } = request.body as { task: string };
 
-  const { plannerProviderId, plannerModel, coderProviderId, coderModel, maxRounds: requestedMaxRounds } = request.body as {
-    plannerProviderId: string;
-    plannerModel: string;
-    coderProviderId: string;
-    coderModel: string;
-    maxRounds?: number;
-  };
-
-  if (!plannerProviderId || !plannerModel || !coderProviderId || !coderModel) {
+  if (!task || !task.trim()) {
     reply.status(400);
-    return { error: "Missing required fields: plannerProviderId, plannerModel, coderProviderId, coderModel" };
+    return { error: "Missing required field: task" };
   }
 
-  const maxRoundsVal = requestedMaxRounds ?? sourceRun.maxRounds;
+  const run = runRepo.getById(id);
+  if (!run) {
+    reply.status(404);
+    return { error: `Run with id "${id}" not found` };
+  }
 
-  const plannerMeta = registry.getSafeMetadata().find(p => p.id === plannerProviderId);
-  const coderMeta = registry.getSafeMetadata().find(p => p.id === coderProviderId);
-
-  const plannerProviderDisplayName = plannerMeta ? plannerMeta.displayName : plannerProviderId;
-  const coderProviderDisplayName = coderMeta ? coderMeta.displayName : coderProviderId;
-
-  const runId = `run-${Date.now()}`;
-
-  const run = {
-    id: runId,
-    title: sourceRun.title,
-    task: sourceRun.task,
-    projectPath: sourceRun.projectPath,
-    projectName: sourceRun.projectName,
-    status: "created" as RunStatus,
-    plannerProviderId,
-    plannerProviderDisplayName,
-    plannerModel,
-    coderProviderId,
-    coderProviderDisplayName,
-    coderModel,
-    maxRounds: maxRoundsVal,
-    currentRound: 0,
-    sourceRunId: id,
-    retryType: "duplicate",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+  // Create the user message in the DB
+  const userMsgId = `msg-user-${Date.now()}`;
+  const userMsg = {
+    id: userMsgId,
+    runId: id,
+    role: "user" as const,
+    content: task,
+    createdAt: new Date().toISOString()
   };
+  messageRepo.create(userMsg);
 
-  runRepo.create(run);
+  // Trigger event so frontend shows the user message immediately
+  eventBus.emit(`run:${id}`, { type: "message_created", message: userMsg });
 
-  // Trigger asynchronously in the background
-  orchestrator.run(runId).catch(err => {
-    console.error(`[Orchestrator] Error running duplicated job ${runId}:`, err.message);
+  // Update status to generating for the new turn
+  runRepo.update(id, { status: "generating" });
+  eventBus.emit(`run:${id}`, { type: "status_changed", status: "generating" });
+
+  // Run the orchestration continuation in the background
+  orchestrator.continueRun(id, task).catch(err => {
+    console.error(`[Orchestrator] Error continuing job ${id}:`, err.message);
   });
 
-  return run;
-});
-
-// Retry coder on the same task and planner plan, but with different coder model
-server.post("/api/runs/:id/retry-coder", async (request, reply) => {
-  const { id } = request.params as { id: string };
-  const sourceRun = runRepo.getById(id);
-  if (!sourceRun) {
-    reply.status(404);
-    return { error: `Source run with id "${id}" not found` };
-  }
-
-  const { coderProviderId, coderModel, maxRounds: requestedMaxRounds } = request.body as {
-    coderProviderId: string;
-    coderModel: string;
-    maxRounds?: number;
-  };
-
-  if (!coderProviderId || !coderModel) {
-    reply.status(400);
-    return { error: "Missing required fields: coderProviderId, coderModel" };
-  }
-
-  const maxRoundsVal = requestedMaxRounds ?? sourceRun.maxRounds;
-
-  const coderMeta = registry.getSafeMetadata().find(p => p.id === coderProviderId);
-  const coderProviderDisplayName = coderMeta ? coderMeta.displayName : coderProviderId;
-
-  const runId = `run-${Date.now()}`;
-
-  const run = {
-    id: runId,
-    title: sourceRun.title,
-    task: sourceRun.task,
-    projectPath: sourceRun.projectPath,
-    projectName: sourceRun.projectName,
-    status: "created" as RunStatus,
-    plannerProviderId: sourceRun.plannerProviderId,
-    plannerProviderDisplayName: sourceRun.plannerProviderDisplayName,
-    plannerModel: sourceRun.plannerModel,
-    coderProviderId,
-    coderProviderDisplayName,
-    coderModel,
-    maxRounds: maxRoundsVal,
-    currentRound: 0,
-    sourceRunId: id,
-    retryType: "retry-coder",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  };
-
-  runRepo.create(run);
-
-  // Trigger asynchronously in the background
-  orchestrator.run(runId).catch(err => {
-    console.error(`[Orchestrator] Error running coder-retried job ${runId}:`, err.message);
-  });
-
-  return run;
+  return { success: true };
 });
 
 // Get run history list

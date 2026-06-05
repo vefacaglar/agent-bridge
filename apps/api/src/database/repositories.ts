@@ -11,17 +11,9 @@ function mapRowToRun(row: any): Run {
     projectPath: row.project_path || undefined,
     projectName: row.project_name || undefined,
     status: row.status as RunStatus,
-    plannerProviderId: row.planner_provider_id,
-    plannerProviderDisplayName: row.planner_provider_display_name,
-    plannerModel: row.planner_model,
-    coderProviderId: row.coder_provider_id,
-    coderProviderDisplayName: row.coder_provider_display_name,
-    coderModel: row.coder_model,
-    maxRounds: Number(row.max_rounds),
-    currentRound: Number(row.current_round),
-    sourceRunId: row.source_run_id || undefined,
-    retryType: row.retry_type || undefined,
-    finalOutput: row.final_output || undefined,
+    providerId: row.provider_id,
+    providerDisplayName: row.provider_display_name,
+    model: row.model,
     errorMessage: row.error_message || undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at
@@ -49,11 +41,9 @@ export class RunRepository {
     const stmt = db.prepare(`
       INSERT INTO runs (
         id, title, task, project_path, project_name, status,
-        planner_provider_id, planner_provider_display_name, planner_model,
-        coder_provider_id, coder_provider_display_name, coder_model,
-        max_rounds, current_round, source_run_id, retry_type,
-        final_output, error_message, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        provider_id, provider_display_name, model,
+        error_message, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     
     stmt.run(
@@ -63,17 +53,9 @@ export class RunRepository {
       run.projectPath || process.cwd(),
       run.projectName || "Workspace",
       run.status,
-      run.plannerProviderId,
-      run.plannerProviderDisplayName,
-      run.plannerModel,
-      run.coderProviderId,
-      run.coderProviderDisplayName,
-      run.coderModel,
-      run.maxRounds,
-      run.currentRound,
-      run.sourceRunId || null,
-      run.retryType || null,
-      run.finalOutput || null,
+      run.providerId,
+      run.providerDisplayName,
+      run.model,
       run.errorMessage || null,
       run.createdAt,
       run.updatedAt
@@ -102,17 +84,9 @@ export class RunRepository {
       projectPath: "project_path",
       projectName: "project_name",
       status: "status",
-      plannerProviderId: "planner_provider_id",
-      plannerProviderDisplayName: "planner_provider_display_name",
-      plannerModel: "planner_model",
-      coderProviderId: "coder_provider_id",
-      coderProviderDisplayName: "coder_provider_display_name",
-      coderModel: "coder_model",
-      maxRounds: "max_rounds",
-      currentRound: "current_round",
-      sourceRunId: "source_run_id",
-      retryType: "retry_type",
-      finalOutput: "final_output",
+      providerId: "provider_id",
+      providerDisplayName: "provider_display_name",
+      model: "model",
       errorMessage: "error_message",
       createdAt: "created_at"
     };

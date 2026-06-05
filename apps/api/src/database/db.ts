@@ -32,38 +32,15 @@ db.exec(`
     project_name TEXT NOT NULL DEFAULT '${defaultProjectName.replace(/'/g, "''")}',
     status TEXT NOT NULL,
 
-    planner_provider_id TEXT NOT NULL,
-    planner_provider_display_name TEXT NOT NULL,
-    planner_model TEXT NOT NULL,
+    provider_id TEXT NOT NULL,
+    provider_display_name TEXT NOT NULL,
+    model TEXT NOT NULL,
 
-    coder_provider_id TEXT NOT NULL,
-    coder_provider_display_name TEXT NOT NULL,
-    coder_model TEXT NOT NULL,
-
-    max_rounds INTEGER NOT NULL,
-    current_round INTEGER NOT NULL DEFAULT 0,
-
-    source_run_id TEXT,
-    retry_type TEXT,
-
-    final_output TEXT,
     error_message TEXT,
-
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );
 `);
-
-const runColumns = db.prepare("PRAGMA table_info(runs)").all() as Array<{ name: string }>;
-const runColumnNames = new Set(runColumns.map(column => column.name));
-
-if (!runColumnNames.has("project_path")) {
-  db.exec(`ALTER TABLE runs ADD COLUMN project_path TEXT NOT NULL DEFAULT '${wsRoot.replace(/'/g, "''")}'`);
-}
-
-if (!runColumnNames.has("project_name")) {
-  db.exec(`ALTER TABLE runs ADD COLUMN project_name TEXT NOT NULL DEFAULT '${defaultProjectName.replace(/'/g, "''")}'`);
-}
 
 // Create Messages Table
 db.exec(`

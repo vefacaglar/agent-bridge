@@ -95,3 +95,27 @@ export function compileCoderFixMessages(
     }
   ];
 }
+
+export function compileContinuationMessages(
+  systemPrompt: string,
+  history: any[],
+  newPrompt?: string
+): ChatMessage[] {
+  const messages: ChatMessage[] = [];
+  
+  for (const msg of history) {
+    if (msg.role === "user" || msg.role === "system") {
+      messages.push({ role: msg.role, content: msg.content });
+    } else {
+      const prefix = msg.agentRole ? `[Agent: ${msg.agentRole.toUpperCase()}] ` : "";
+      messages.push({ role: "assistant", content: `${prefix}${msg.content}` });
+    }
+  }
+
+  if (newPrompt) {
+    messages.push({ role: "user", content: newPrompt });
+  }
+
+  return messages;
+}
+

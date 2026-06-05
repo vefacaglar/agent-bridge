@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { ProviderMetadata, Run, RunMessage, RunStatus, Project } from '@bridgemind/shared';
 
 const API_BASE = 'http://localhost:3000';
@@ -10,27 +10,30 @@ const activeRunId = ref<string | null>(null);
 const activeRun = ref<Run | null>(null);
 const messages = ref<RunMessage[]>([]);
 
-const selectedPlannerCombined = ref('');
-const selectedCoderCombined = ref('');
-const maxRounds = ref(3);
+const selectedModelCombined = ref(localStorage.getItem('bm_selected_model') || '');
 const taskInput = ref('');
 const activeProjectPath = ref('/Users/vefa/Projects/agent-bridge');
 
 const isRunning = ref(false);
-const finalOutput = ref('');
 
 const projects = ref<Project[]>([]);
 const showAddProjectModal = ref(false);
 const newProjectName = ref('');
 const newProjectPath = ref('');
+
+const isSubmittingProject = ref(false);
+
+watch(selectedModelCombined, (newVal) => {
+  if (newVal) localStorage.setItem('bm_selected_model', newVal);
+});
+
 const isMac = computed(() => {
   return navigator.userAgent.toLowerCase().includes('mac') || navigator.platform.toLowerCase().includes('mac');
 });
-const isSubmittingProject = ref(false);
 
 let eventSource: EventSource | null = null;
 
-const activeStatuses: RunStatus[] = ['created', 'planning', 'implementing', 'reviewing', 'fixing'];
+const activeStatuses: RunStatus[] = ['created', 'generating'];
 
 const modelOptions = computed(() => {
   const options: { value: string; label: string; providerId: string }[] = [];
@@ -46,7 +49,6 @@ const modelOptions = computed(() => {
   return options;
 });
 
-const plannerMessage = computed(() => messages.value.find(message => message.agentRole === 'planner'));
 const visibleTitle = computed(() => activeRun.value?.title || 'New chat');
 
 const projectOptions = computed(() => {
@@ -76,14 +78,10 @@ function statusLabel(status?: RunStatus): string {
   if (!status) return 'idle';
   const labels: Record<RunStatus, string> = {
     created: 'queued',
-    planning: 'planning',
-    implementing: 'executing',
-    reviewing: 'reviewing',
-    fixing: 'fixing',
-    done: 'accepted',
+    generating: 'generating',
+    done: 'completed',
     failed: 'failed',
-    cancelled: 'cancelled',
-    max_rounds_reached: 'max rounds'
+    cancelled: 'cancelled'
   };
   return labels[status];
 }
@@ -91,28 +89,9 @@ function statusLabel(status?: RunStatus): string {
 function statusClass(status?: RunStatus): string {
   if (!status) return 'idle';
   if (status === 'done') return 'success';
-  if (status === 'failed' || status === 'cancelled' || status === 'max_rounds_reached') return 'danger';
+  if (status === 'failed' || status === 'cancelled') return 'danger';
   if (activeStatuses.includes(status)) return 'active';
   return 'idle';
-}
-
-function roleLabel(message: RunMessage): string {
-  if (message.agentRole === 'planner') return 'Planner';
-  if (message.agentRole === 'reviewer') return 'Planner review';
-  if (message.agentRole === 'coder') return 'Executor';
-  return 'Message';
-}
-
-function roleClass(message: RunMessage): string {
-  if (message.agentRole === 'coder') return 'executor';
-  if (message.agentRole === 'reviewer') return 'reviewer';
-  return 'planner';
-}
-
-function reviewMarker(content: string): string {
-  if (content.includes('FINAL_ACCEPTED')) return 'accepted';
-  if (content.includes('CHANGES_REQUIRED')) return 'changes requested';
-  return 'review';
 }
 
 function splitCombined(value: string): { providerId: string; model: string } {
@@ -127,8 +106,7 @@ async function loadProviders() {
   providers.value = await response.json();
 
   if (modelOptions.value.length === 0) return;
-  selectedPlannerCombined.value ||= modelOptions.value.find(option => option.providerId === 'anthropic')?.value || modelOptions.value[0].value;
-  selectedCoderCombined.value ||= modelOptions.value.find(option => option.providerId === 'opencode')?.value || modelOptions.value[0].value;
+  selectedModelCombined.value ||= modelOptions.value.find(option => option.providerId === 'anthropic')?.value || modelOptions.value[0].value;
 }
 
 async function loadRuns() {
@@ -153,7 +131,6 @@ async function selectRun(run: Run) {
   activeRun.value = { ...run };
   activeProjectPath.value = run.projectPath || activeProjectPath.value;
   taskInput.value = '';
-  finalOutput.value = run.finalOutput || '';
 
   await loadMessages(run.id);
 
@@ -170,7 +147,6 @@ function startNewRunSetup() {
   activeRunId.value = null;
   activeRun.value = null;
   messages.value = [];
-  finalOutput.value = '';
   taskInput.value = '';
 }
 
@@ -199,9 +175,8 @@ function connectEventSource(runId: string) {
     }
 
     if (data.type === 'run_completed') {
-      finalOutput.value = data.finalOutput;
       if (activeRun.value?.id === runId) {
-        activeRun.value.finalOutput = data.finalOutput;
+        updateRunStatus(runId, 'done');
       }
       finishEventStream();
     }
@@ -209,6 +184,7 @@ function connectEventSource(runId: string) {
     if (data.type === 'run_failed') {
       if (activeRun.value?.id === runId) {
         activeRun.value.errorMessage = data.errorMessage;
+        updateRunStatus(runId, 'failed');
       }
       finishEventStream();
     }
@@ -238,43 +214,66 @@ function finishEventStream() {
 }
 
 async function handleSendTask() {
-  if (!taskInput.value.trim() || isRunning.value || !selectedPlannerCombined.value || !selectedCoderCombined.value) return;
+  if (!taskInput.value.trim() || isRunning.value || !selectedModelCombined.value) return;
 
-  const planner = splitCombined(selectedPlannerCombined.value);
-  const coder = splitCombined(selectedCoderCombined.value);
+  const modelInfo = splitCombined(selectedModelCombined.value);
 
   isRunning.value = true;
-  messages.value = [];
-  finalOutput.value = '';
 
-  const response = await fetch(`${API_BASE}/api/runs`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      task: taskInput.value,
-      projectPath: activeProject.value?.path,
-      projectName: activeProject.value?.name,
-      plannerProviderId: planner.providerId,
-      plannerModel: planner.model,
-      coderProviderId: coder.providerId,
-      coderModel: coder.model,
-      maxRounds: maxRounds.value
-    })
-  });
+  if (activeRun.value && !activeStatuses.includes(activeRun.value.status)) {
+    // CONTINUE existing run
+    const runId = activeRun.value.id;
+    const currentTask = taskInput.value;
+    taskInput.value = '';
 
-  if (!response.ok) {
-    isRunning.value = false;
-    const error = await response.json();
-    window.alert(error.error || 'Run baslatilamadi.');
-    return;
+    const response = await fetch(`${API_BASE}/api/runs/${runId}/continue`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        task: currentTask
+      })
+    });
+
+    if (!response.ok) {
+      isRunning.value = false;
+      taskInput.value = currentTask; // Restore input on error
+      const error = await response.json();
+      window.alert(error.error || 'Mesaj gonderilemedi.');
+      return;
+    }
+
+    await loadMessages(runId);
+    connectEventSource(runId);
+  } else {
+    // CREATE new run
+    messages.value = [];
+
+    const response = await fetch(`${API_BASE}/api/runs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        task: taskInput.value,
+        projectPath: activeProject.value?.path,
+        projectName: activeProject.value?.name,
+        providerId: modelInfo.providerId,
+        model: modelInfo.model
+      })
+    });
+
+    if (!response.ok) {
+      isRunning.value = false;
+      const error = await response.json();
+      window.alert(error.error || 'Sohbet baslatilamadi.');
+      return;
+    }
+
+    const run = await response.json() as Run;
+    taskInput.value = '';
+    activeRunId.value = run.id;
+    activeRun.value = run;
+    runs.value.unshift(run);
+    connectEventSource(run.id);
   }
-
-  const run = await response.json() as Run;
-  taskInput.value = '';
-  activeRunId.value = run.id;
-  activeRun.value = run;
-  runs.value.unshift(run);
-  connectEventSource(run.id);
 }
 
 async function cancelActiveRun() {
@@ -284,60 +283,6 @@ async function cancelActiveRun() {
     updateRunStatus(activeRunId.value, 'cancelled');
     finishEventStream();
   }
-}
-
-async function duplicateRun() {
-  if (!activeRun.value || isRunning.value) return;
-
-  const planner = splitCombined(selectedPlannerCombined.value);
-  const coder = splitCombined(selectedCoderCombined.value);
-
-  await startDerivedRun(`/api/runs/${activeRun.value.id}/duplicate`, {
-    plannerProviderId: planner.providerId,
-    plannerModel: planner.model,
-    coderProviderId: coder.providerId,
-    coderModel: coder.model,
-    maxRounds: maxRounds.value
-  });
-}
-
-async function retryCoder() {
-  if (!activeRun.value || isRunning.value) return;
-
-  const coder = splitCombined(selectedCoderCombined.value);
-
-  await startDerivedRun(`/api/runs/${activeRun.value.id}/retry-coder`, {
-    coderProviderId: coder.providerId,
-    coderModel: coder.model,
-    maxRounds: maxRounds.value
-  });
-}
-
-async function startDerivedRun(path: string, payload: Record<string, unknown>) {
-  isRunning.value = true;
-  messages.value = [];
-  finalOutput.value = '';
-
-  const response = await fetch(`${API_BASE}${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  });
-
-  if (!response.ok) {
-    isRunning.value = false;
-    const error = await response.json();
-    window.alert(error.error || 'Run olusturulamadi.');
-    return;
-  }
-
-  const run = await response.json() as Run;
-  activeRunId.value = run.id;
-  activeRun.value = run;
-  activeProjectPath.value = run.projectPath || activeProjectPath.value;
-  taskInput.value = '';
-  runs.value.unshift(run);
-  connectEventSource(run.id);
 }
 
 function copyText(value: string) {
@@ -462,44 +407,48 @@ onBeforeUnmount(() => {
       <button class="nav-action" :disabled="isRunning" @click="startNewRunSetup">New chat</button>
       <button class="nav-action muted">Search</button>
 
-      <div class="sidebar-block">
+      <div class="sidebar-block projects-accordion">
         <div class="sidebar-label flex-between">
           <span>Projects</span>
           <button class="add-project-btn" title="Add Project" @click="openAddProjectModal">+</button>
         </div>
         <div class="project-list">
-          <button
+          <div
             v-for="project in projectOptions"
             :key="project.path"
-            class="project-item"
+            class="project-accordion-item"
             :class="{ active: project.path === activeProjectPath }"
-            @click="selectProject(project.path)"
           >
-            <span class="project-name-text">{{ project.name }}</span>
-            <button 
-              class="delete-project-btn" 
-              title="Remove Project" 
-              @click="deleteProject(project.path, $event)"
+            <div 
+              class="project-header"
+              :class="{ active: project.path === activeProjectPath }"
+              @click="selectProject(project.path)"
             >
-              ×
-            </button>
-          </button>
+              <span class="chevron-icon">{{ project.path === activeProjectPath ? '▼' : '▶' }}</span>
+              <span class="project-name-text">{{ project.name }}</span>
+              <button 
+                class="delete-project-btn" 
+                title="Remove Project" 
+                @click="deleteProject(project.path, $event)"
+              >
+                ×
+              </button>
+            </div>
+
+            <div v-if="project.path === activeProjectPath" class="project-chats-list">
+              <div v-if="filteredRuns.length === 0" class="empty-sidebar">No chats in this project.</div>
+              <button
+                v-for="run in filteredRuns"
+                :key="run.id"
+                class="chat-history-item"
+                :class="{ active: run.id === activeRunId }"
+                @click="selectRun(run)"
+              >
+                <span>{{ run.title }}</span>
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
-
-
-      <div class="sidebar-block runs-block">
-        <div class="sidebar-label">{{ activeProject?.name || 'Project' }} chats</div>
-        <div v-if="filteredRuns.length === 0" class="empty-sidebar">No chats in this project.</div>
-        <button
-          v-for="run in filteredRuns"
-          :key="run.id"
-          class="chat-history-item"
-          :class="{ active: run.id === activeRunId }"
-          @click="selectRun(run)"
-        >
-          <span>{{ run.title }}</span>
-        </button>
       </div>
     </aside>
 
@@ -514,17 +463,14 @@ onBeforeUnmount(() => {
 
         <div class="header-actions">
           <button v-if="isRunning" class="danger-button" @click="cancelActiveRun">Cancel</button>
-          <template v-else-if="activeRun">
-            <button class="ghost-button" @click="duplicateRun">Duplicate</button>
-            <button v-if="plannerMessage" class="ghost-button" @click="retryCoder">Retry executor</button>
-          </template>
         </div>
       </header>
 
       <section class="messages-scroll">
         <div v-if="!activeRun" class="empty-chat">
+          <div class="welcome-gradient-logo">BM</div>
           <h1>BridgeMind</h1>
-          <p>Planner ve executor modellerini sec, tek mesajla kontrollu bir iki-agent run baslat.</p>
+          <p>Select a model below and type a prompt to start a local or cloud chat session.</p>
         </div>
 
         <div v-else class="messages-inner">
@@ -532,34 +478,33 @@ onBeforeUnmount(() => {
             <pre>{{ activeRun.task }}</pre>
           </article>
 
+          <template v-for="message in messages" :key="message.id">
+            <!-- User message (continuation) -->
+            <article v-if="message.role === 'user'" class="user-bubble">
+              <pre>{{ message.content }}</pre>
+            </article>
+
+            <!-- Assistant message -->
+            <article
+              v-else
+              class="assistant-message"
+            >
+              <div class="assistant-meta">
+                <span class="agent-badge">AI Assistant</span>
+                <span>{{ message.providerDisplayName }} / {{ message.model }}</span>
+                <span>{{ formatTime(message.createdAt) }}</span>
+              </div>
+              <pre>{{ message.content }}</pre>
+              <button class="copy-button" @click="copyText(message.content)">Copy</button>
+            </article>
+          </template>
+
           <div v-if="activeRun.status === 'failed'" class="system-line danger">
-            {{ activeRun.errorMessage || 'Run failed.' }}
+            {{ activeRun.errorMessage || 'Chat generation failed.' }}
           </div>
 
-          <article
-            v-for="message in messages"
-            :key="message.id"
-            class="assistant-message"
-            :class="roleClass(message)"
-          >
-            <div class="assistant-meta">
-              <span class="agent-badge">{{ roleLabel(message) }}</span>
-              <span>{{ message.providerDisplayName }} / {{ message.model }}</span>
-              <span>{{ formatTime(message.createdAt) }}</span>
-              <span v-if="message.agentRole === 'reviewer'" class="review-pill">
-                {{ reviewMarker(message.content) }}
-              </span>
-            </div>
-            <pre>{{ message.content }}</pre>
-            <button class="copy-button" @click="copyText(message.content)">Copy</button>
-          </article>
-
-          <div
-            v-if="activeRun.status === 'done' || activeRun.status === 'max_rounds_reached' || activeRun.status === 'cancelled'"
-            class="system-line"
-            :class="statusClass(activeRun.status)"
-          >
-            {{ statusLabel(activeRun.status) }}
+          <div v-if="isRunning" class="system-line active pulsing-loader">
+            AI is thinking...
           </div>
         </div>
       </section>
@@ -569,41 +514,27 @@ onBeforeUnmount(() => {
           <textarea
             v-model="taskInput"
             :disabled="isRunning"
-            placeholder="Planner ve executor'a yaptirmak istedigin isi yaz..."
+            placeholder="Type a message..."
             @keydown.enter.exact.prevent="handleSendTask"
           />
 
           <div class="composer-footer">
             <div class="model-picks">
               <label class="model-pill">
-                <span>Planner</span>
-                <select v-model="selectedPlannerCombined" :disabled="isRunning">
+                <span>Model</span>
+                <select v-model="selectedModelCombined" :disabled="isRunning || activeRun !== null">
                   <option v-for="option in modelOptions" :key="option.value" :value="option.value">
                     {{ option.label }}
                   </option>
                 </select>
-              </label>
-
-              <label class="model-pill">
-                <span>Executor</span>
-                <select v-model="selectedCoderCombined" :disabled="isRunning">
-                  <option v-for="option in modelOptions" :key="option.value" :value="option.value">
-                    {{ option.label }}
-                  </option>
-                </select>
-              </label>
-
-              <label class="round-pill">
-                <span>Rounds</span>
-                <input v-model.number="maxRounds" :disabled="isRunning" type="number" min="1" max="10" />
               </label>
             </div>
 
             <button
               class="send-button"
-              :disabled="isRunning || !taskInput.trim() || !selectedPlannerCombined || !selectedCoderCombined"
+              :disabled="isRunning || !taskInput.trim() || !selectedModelCombined"
               @click="handleSendTask"
-              aria-label="Run workflow"
+              aria-label="Send message"
             >
               ↑
             </button>
@@ -663,3 +594,114 @@ onBeforeUnmount(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+/* Extra component level styles for visual wow factor */
+.welcome-gradient-logo {
+  width: 68px;
+  height: 68px;
+  border-radius: 20px;
+  margin: 0 auto 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 850;
+  font-size: 1.6rem;
+  background: linear-gradient(135deg, #7bd88f, #9db7ff);
+  color: #111111;
+  box-shadow: 0 10px 25px rgba(123, 216, 143, 0.25);
+  animation: logoPulse 4s infinite alternate;
+}
+
+@keyframes logoPulse {
+  0% { transform: scale(1); filter: brightness(1); }
+  100% { transform: scale(1.05); filter: brightness(1.1); }
+}
+
+.pulsing-loader {
+  animation: pulseOpacity 1.5s infinite alternate;
+}
+
+@keyframes pulseOpacity {
+  0% { opacity: 0.6; }
+  100% { opacity: 1; }
+}
+
+.composer textarea:focus {
+  border-color: #555;
+}
+
+.projects-accordion {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  margin-top: 14px;
+}
+
+.project-accordion-item {
+  margin-bottom: 4px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.project-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s ease;
+}
+
+.project-header:hover {
+  background: var(--sidebar-active);
+  color: var(--text);
+}
+
+.project-header.active {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.chevron-icon {
+  font-size: 0.65rem;
+  margin-right: 8px;
+  color: var(--faint);
+  display: inline-block;
+  width: 10px;
+}
+
+.project-chats-list {
+  padding-left: 10px;
+  margin-top: 2px;
+  border-left: 1px solid var(--border);
+  margin-left: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.project-header .delete-project-btn {
+  background: transparent;
+  color: var(--faint);
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  border-radius: 4px;
+  display: none;
+  transition: all 0.2s ease;
+}
+
+.project-header:hover .delete-project-btn {
+  display: block;
+}
+
+.project-header .delete-project-btn:hover {
+  color: var(--danger);
+  background: rgba(255, 138, 128, 0.15);
+}
+</style>
