@@ -2,12 +2,14 @@ import { computed, ref, type Ref } from 'vue';
 import type { Run, Project } from '@bridgemind/shared';
 import { api } from '../api/client';
 import { DEFAULT_PROJECT_PATH } from '../lib/format';
+import { useCustomDialog } from './useCustomDialog';
 
 /**
  * Owns the project list, the active project selection and the add/remove
  * project flow. Run counts are derived from the passed-in runs ref.
  */
 export function useProjects(runs: Ref<Run[]>) {
+  const { showAlert, showConfirm } = useCustomDialog();
   const projects = ref<Project[]>([]);
   const activeProjectPath = ref(DEFAULT_PROJECT_PATH);
 
@@ -41,7 +43,7 @@ export function useProjects(runs: Ref<Run[]>) {
       newProjectPath.value = data.path;
       newProjectName.value = data.name;
     } catch (err: any) {
-      window.alert(err.message || 'Failed to open folder selection dialog.');
+      await showAlert(err.message || 'Failed to open folder selection dialog.');
     }
   }
 
@@ -55,7 +57,7 @@ export function useProjects(runs: Ref<Run[]>) {
       closeAddProjectModal();
       return added.path;
     } catch (err: any) {
-      window.alert(err.message || 'An error occurred while saving the project.');
+      await showAlert(err.message || 'An error occurred while saving the project.');
       return null;
     } finally {
       isSubmittingProject.value = false;
@@ -65,10 +67,10 @@ export function useProjects(runs: Ref<Run[]>) {
   /** Removes a project; returns the fallback path to select if the active one was deleted. */
   async function deleteProject(projectPath: string): Promise<string | null> {
     if (projectOptions.value.length <= 1) {
-      window.alert('At least one project must be defined.');
+      await showAlert('At least one project must be defined.');
       return null;
     }
-    if (!window.confirm('Are you sure you want to remove this project from the list? (Existing chat history will not be deleted)')) {
+    if (!(await showConfirm('Are you sure you want to remove this project from the list? (Existing chat history will not be deleted)'))) {
       return null;
     }
 

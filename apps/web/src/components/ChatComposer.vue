@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch, nextTick } from 'vue';
+import { useCustomDialog } from '../composables/useCustomDialog';
+
+const { showAlert } = useCustomDialog();
 import type { PermissionDecision } from '../api/client';
 import type { MessageGroup } from '../lib/messageGroups';
 import { MODES_LIST, type ChatMode, type ModelOption } from '../composables/useComposerSettings';
@@ -100,7 +103,7 @@ async function handleFileChange(event: Event) {
 
   for (const file of Array.from(target.files)) {
     if (file.size > 2 * 1024 * 1024) {
-      window.alert(`File too large (max 2MB): ${file.name}`);
+      await showAlert(`File too large (max 2MB): ${file.name}`);
       continue;
     }
     try {
@@ -115,7 +118,7 @@ async function handleFileChange(event: Event) {
       });
     } catch (err) {
       console.error(`Error reading file ${file.name}:`, err);
-      window.alert(`Failed to read file: ${file.name}`);
+      await showAlert(`Failed to read file: ${file.name}`);
     }
   }
   target.value = '';

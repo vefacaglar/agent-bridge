@@ -33,7 +33,22 @@ const {
   messages
 } = chat;
 
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { useCustomDialog } from './composables/useCustomDialog';
+
+const { activeDialog } = useCustomDialog();
+
+function handleEscape(e: KeyboardEvent) {
+  if (e.key === 'Escape' && activeDialog.value) {
+    activeDialog.value.resolve(false);
+  }
+}
+onMounted(() => {
+  window.addEventListener('keydown', handleEscape);
+});
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleEscape);
+});
 
 const isSidebarCollapsed = ref(false);
 function toggleSidebar() {
@@ -167,6 +182,43 @@ const currentProjectName = computed(() => {
       @revoke="permissions.revokePermission"
       @clear-all="permissions.clearPermissions"
     />
+
+    <!-- Custom Dialog Modal (Alert/Confirm) -->
+    <Transition name="fade">
+      <div v-if="activeDialog" class="modal-overlay" @click="activeDialog.resolve(false)">
+        <div class="modal-card dialog-modal-card" @click.stop>
+          <header class="modal-header">
+            <h3>{{ activeDialog.title || (activeDialog.type === 'confirm' ? 'Confirmation' : 'Notification') }}</h3>
+            <button class="close-modal-btn" @click="activeDialog.resolve(false)">Close</button>
+          </header>
+          <div class="modal-body dialog-modal-body">
+            <div class="dialog-content-wrapper">
+              <div class="dialog-icon-wrap" :class="activeDialog.type">
+                <svg v-if="activeDialog.type === 'confirm'" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                  <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+                <svg v-else xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
+                  <line x1="12" y1="9" x2="12" y2="13"></line>
+                  <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+              </div>
+              <p class="dialog-message">{{ activeDialog.message }}</p>
+            </div>
+          </div>
+          <footer class="modal-footer">
+            <button v-if="activeDialog.type === 'confirm'" class="ghost-button" @click="activeDialog.resolve(false)">
+              Cancel
+            </button>
+            <button class="primary-button" @click="activeDialog.resolve(true)">
+              {{ activeDialog.type === 'confirm' ? 'Confirm' : 'OK' }}
+            </button>
+          </footer>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -244,5 +296,45 @@ const currentProjectName = computed(() => {
   white-space: nowrap;
   flex: 1;
   min-width: 0;
+}
+
+/* Dialog Modal Custom Styling */
+.dialog-modal-card {
+  width: min(420px, 90%);
+}
+
+.dialog-content-wrapper {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 8px 0;
+}
+
+.dialog-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dialog-icon-wrap.confirm {
+  background: rgba(94, 162, 235, 0.12);
+  color: #5ea2eb;
+}
+
+.dialog-icon-wrap.alert {
+  background: rgba(255, 170, 0, 0.12);
+  color: #ffaa00;
+}
+
+.dialog-message {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--text);
+  padding-top: 8px;
 }
 </style>

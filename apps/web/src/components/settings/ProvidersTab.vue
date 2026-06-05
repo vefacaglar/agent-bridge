@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
 import { api } from '../../api/client';
+import { useCustomDialog } from '../../composables/useCustomDialog';
+
+const { showAlert, showConfirm } = useCustomDialog();
 
 const configs = ref<Record<string, any>>({});
 const isEditing = ref(false);
@@ -68,7 +71,7 @@ function removeModelInput(index: number) {
 
 async function handleDeleteProvider() {
   if (!editingProviderId.value) return;
-  if (!window.confirm(`Are you sure you want to delete the provider "${editingProviderId.value}"?`)) return;
+  if (!(await showConfirm(`Are you sure you want to delete the provider "${editingProviderId.value}"?`))) return;
 
   const newConfigs = { ...configs.value };
   delete newConfigs[editingProviderId.value];
@@ -79,22 +82,22 @@ async function handleDeleteProvider() {
     isEditing.value = false;
     window.location.reload();
   } catch (err: any) {
-    window.alert(err.message || 'An error occurred.');
+    await showAlert(err.message || 'An error occurred.');
   }
 }
 
 async function handleSave() {
   const idSlug = formId.value.trim().toLowerCase().replace(/[^a-z0-9-_]/g, '');
   if (!idSlug) {
-    window.alert('Provider ID is required (only lowercase letters, numbers, hyphens, and underscores).');
+    await showAlert('Provider ID is required (only lowercase letters, numbers, hyphens, and underscores).');
     return;
   }
   if (!formDisplayName.value.trim()) {
-    window.alert('Display Name is required.');
+    await showAlert('Display Name is required.');
     return;
   }
   if (!formBaseUrl.value.trim()) {
-    window.alert('Base URL is required.');
+    await showAlert('Base URL is required.');
     return;
   }
 
@@ -124,7 +127,7 @@ async function handleSave() {
     isEditing.value = false;
     window.location.reload();
   } catch (err: any) {
-    window.alert(err.message || 'An error occurred.');
+    await showAlert(err.message || 'An error occurred.');
   }
 }
 
@@ -141,7 +144,7 @@ const isFetchingModels = ref(false);
 
 async function handleFetchModels() {
   if (!formBaseUrl.value.trim()) {
-    window.alert('Please enter a Base URL first to fetch models.');
+    await showAlert('Please enter a Base URL first to fetch models.');
     return;
   }
 
@@ -157,12 +160,12 @@ async function handleFetchModels() {
     if (res.success && res.models && res.models.length > 0) {
       formModelsList.value = res.models;
     } else if (res.error) {
-      window.alert(`Failed to fetch models: ${res.error}`);
+      await showAlert(`Failed to fetch models: ${res.error}`);
     } else {
-      window.alert('No models returned from provider.');
+      await showAlert('No models returned from provider.');
     }
   } catch (err: any) {
-    window.alert(`Error fetching models: ${err.message || err}`);
+    await showAlert(`Error fetching models: ${err.message || err}`);
   } finally {
     isFetchingModels.value = false;
   }

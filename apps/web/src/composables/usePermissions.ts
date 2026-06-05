@@ -1,12 +1,14 @@
 import { ref } from 'vue';
 import type { PermissionRule } from '@bridgemind/shared';
 import { api } from '../api/client';
+import { useCustomDialog } from './useCustomDialog';
 
 /**
  * Owns the standing-permissions list and the settings modal that manages it.
  * Permissions are loaded lazily when the modal opens.
  */
 export function usePermissions() {
+  const { showConfirm } = useCustomDialog();
   const permissions = ref<PermissionRule[]>([]);
   const showSettings = ref(false);
   const isLoading = ref(false);
@@ -37,7 +39,7 @@ export function usePermissions() {
 
   async function clearPermissions() {
     if (permissions.value.length === 0) return;
-    if (!window.confirm('Are you sure you want to remove all saved permissions?')) return;
+    if (!(await showConfirm('Are you sure you want to remove all saved permissions?'))) return;
     await api.clearPermissions();
     permissions.value = [];
   }

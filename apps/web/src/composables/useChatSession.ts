@@ -4,6 +4,7 @@ import { api, type PermissionDecision } from '../api/client';
 import { ACTIVE_STATUSES, splitCombined } from '../lib/format';
 import { groupMessages, type MessageGroup } from '../lib/messageGroups';
 import { getConfirmationOptions } from '../lib/confirmation';
+import { useCustomDialog } from './useCustomDialog';
 
 interface ChatSessionOptions {
   providers: Ref<ProviderMetadata[]>;
@@ -22,6 +23,7 @@ interface ChatSessionOptions {
  * project/settings composables to avoid circular dependencies.
  */
 export function useChatSession(options: ChatSessionOptions) {
+  const { showAlert } = useCustomDialog();
   const providers = options.providers;
   const runs = options.runs;
   const messages = ref<RunMessage[]>([]);
@@ -210,7 +212,7 @@ export function useChatSession(options: ChatSessionOptions) {
       } catch (err: any) {
         isRunning.value = false;
         taskInput.value = currentTask; // restore input on error
-        window.alert(err.message);
+        await showAlert(err.message);
         return;
       }
 
@@ -236,7 +238,7 @@ export function useChatSession(options: ChatSessionOptions) {
         connectEventSource(run.id);
       } catch (err: any) {
         isRunning.value = false;
-        window.alert(err.message);
+        await showAlert(err.message);
       }
     }
   }
@@ -256,7 +258,7 @@ export function useChatSession(options: ChatSessionOptions) {
         finishEventStream();
       } else {
         const err = await response.json().catch(() => ({}));
-        window.alert(err.error || 'Cancel request failed.');
+        await showAlert(err.error || 'Cancel request failed.');
       }
     } catch (err) {
       console.error('Failed to contact server for cancellation:', err);
@@ -272,7 +274,7 @@ export function useChatSession(options: ChatSessionOptions) {
       showPermissionModal.value = false;
       pendingPermissionRequest.value = null;
     } catch (err: any) {
-      window.alert(err.message || 'Connection error.');
+      await showAlert(err.message || 'Connection error.');
     }
   }
 
