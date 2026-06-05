@@ -85,33 +85,58 @@ export class Orchestrator {
       checkCancelled();
 
       // ==========================================
-      // STEP 1 — Planning Phase
+      // STEP 1 — Planning Phase / Reusing Plan
       // ==========================================
-      console.log(`[Orchestrator] Run ${runId} - Entering PLANNING state`);
-      this.emitStatus(runId, "planning", { currentRound: 0 });
+      let planText = "";
 
-      const planningMsgs = compilePlanningMessages(run.task);
-      const plannerRes = await plannerProvider.complete({
-        model: run.plannerModel,
-        systemPrompt: PLANNER_SYSTEM_PROMPT,
-        messages: planningMsgs
-      });
+      if (run.retryType === "retry-coder" && run.sourceRunId) {
+        console.log(`[Orchestrator] Run ${runId} - Copying plan from source run ${run.sourceRunId}`);
+        // Fetch plan message from source run
+        const sourceMessages = this.messageRepo.listByRunId(run.sourceRunId);
+        const planMsg = sourceMessages.find(m => m.agentRole === "planner");
+        if (!planMsg) {
+          throw new Error(`Planner plan message not found in source run ${run.sourceRunId}`);
+        }
+        planText = planMsg.content;
 
-      checkCancelled();
+        // Copy plan message as a new message under current run in DB and SSE
+        this.emitMessage(runId, {
+          id: `msg-plan-copied-${Date.now()}`,
+          runId,
+          role: "assistant",
+          agentRole: "planner",
+          providerId: run.plannerProviderId,
+          providerDisplayName: run.plannerProviderDisplayName,
+          model: run.plannerModel,
+          content: planText,
+          createdAt: new Date().toISOString()
+        });
+      } else {
+        console.log(`[Orchestrator] Run ${runId} - Entering PLANNING state`);
+        this.emitStatus(runId, "planning", { currentRound: 0 });
 
-      // Save plan message
-      let planText = plannerRes.content;
-      this.emitMessage(runId, {
-        id: `msg-plan-${Date.now()}`,
-        runId,
-        role: "assistant",
-        agentRole: "planner",
-        providerId: run.plannerProviderId,
-        providerDisplayName: run.plannerProviderDisplayName,
-        model: run.plannerModel,
-        content: planText,
-        createdAt: new Date().toISOString()
-      });
+        const planningMsgs = compilePlanningMessages(run.task);
+        const plannerRes = await plannerProvider.complete({
+          model: run.plannerModel,
+          systemPrompt: PLANNER_SYSTEM_PROMPT,
+          messages: planningMsgs
+        });
+
+        checkCancelled();
+
+        planText = plannerRes.content;
+        this.emitMessage(runId, {
+          id: `msg-plan-${Date.now()}`,
+          runId,
+          role: "assistant",
+          agentRole: "planner",
+          providerId: run.plannerProviderId,
+          providerDisplayName: run.plannerProviderDisplayName,
+          model: run.plannerModel,
+          content: planText,
+          createdAt: new Date().toISOString()
+        });
+      }
 
       // ==========================================
       // STEP 2 & 3 — Coder-Reviewer Loop

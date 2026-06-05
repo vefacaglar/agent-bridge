@@ -340,6 +340,87 @@ async function cancelActiveRun() {
   }
 }
 
+// Duplicate a run with selectable planner/coder configuration
+async function duplicateRun() {
+  if (!activeRun.value || isRunning.value) return;
+  const runId = activeRun.value.id;
+
+  const [plannerProviderId, plannerModel] = selectedPlannerCombined.value.split(':');
+  const [coderProviderId, coderModel] = selectedCoderCombined.value.split(':');
+
+  try {
+    isRunning.value = true;
+    finalOutputCode.value = '';
+    messages.value = [];
+
+    const res = await fetch(`${API_BASE}/api/runs/${runId}/duplicate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        plannerProviderId,
+        plannerModel,
+        coderProviderId,
+        coderModel,
+        maxRounds: maxRounds.value
+      })
+    });
+
+    if (res.ok) {
+      const runData = await res.json() as Run;
+      activeRunId.value = runData.id;
+      activeRun.value = runData;
+      runs.value.unshift(runData);
+      connectEventSource(runData.id);
+    } else {
+      isRunning.value = false;
+      const errData = await res.json();
+      alert(`Duplication failed: ${errData.error}`);
+    }
+  } catch (err: any) {
+    isRunning.value = false;
+    alert(`Network error during duplicate: ${err.message}`);
+  }
+}
+
+// Retry coder on the same task and planner plan, but with different coder model
+async function retryCoder() {
+  if (!activeRun.value || isRunning.value) return;
+  const runId = activeRun.value.id;
+
+  const [coderProviderId, coderModel] = selectedCoderCombined.value.split(':');
+
+  try {
+    isRunning.value = true;
+    finalOutputCode.value = '';
+    messages.value = [];
+
+    const res = await fetch(`${API_BASE}/api/runs/${runId}/retry-coder`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        coderProviderId,
+        coderModel,
+        maxRounds: maxRounds.value
+      })
+    });
+
+    if (res.ok) {
+      const runData = await res.json() as Run;
+      activeRunId.value = runData.id;
+      activeRun.value = runData;
+      runs.value.unshift(runData);
+      connectEventSource(runData.id);
+    } else {
+      isRunning.value = false;
+      const errData = await res.json();
+      alert(`Coder retry failed: ${errData.error}`);
+    }
+  } catch (err: any) {
+    isRunning.value = false;
+    alert(`Network error during retry: ${err.message}`);
+  }
+}
+
 // Copy finalized code to clipboard
 const copyCode = () => {
   navigator.clipboard.writeText(finalOutputCode.value);
@@ -445,6 +526,14 @@ onBeforeUnmount(() => {
           <button v-if="isRunning" @click="cancelActiveRun" class="btn btn-secondary" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; border-color: var(--error-color); color: var(--error-color);">
             Cancel Run
           </button>
+          <template v-else-if="activeRun.status !== 'created'">
+            <button @click="duplicateRun" class="btn btn-secondary" style="padding: 0.25rem 0.6rem; font-size: 0.75rem;">
+              Duplicate Run
+            </button>
+            <button v-if="messages.some(m => m.agentRole === 'planner')" @click="retryCoder" class="btn btn-secondary" style="padding: 0.25rem 0.6rem; font-size: 0.75rem;">
+              Retry Coder
+            </button>
+          </template>
           <span class="badge" :style="{
             backgroundColor: isRunning ? 'var(--accent-glow)' : 'rgba(255, 255, 255, 0.03)',
             color: isRunning ? 'var(--accent-light)' : 'var(--text-secondary)'

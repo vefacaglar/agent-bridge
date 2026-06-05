@@ -95,6 +95,123 @@ server.post("/api/runs/:id/cancel", async (request, reply) => {
   return { success: true };
 });
 
+// Duplicate a run with selectable planner/coder configuration
+server.post("/api/runs/:id/duplicate", async (request, reply) => {
+  const { id } = request.params as { id: string };
+  const sourceRun = runRepo.getById(id);
+  if (!sourceRun) {
+    reply.status(404);
+    return { error: `Source run with id "${id}" not found` };
+  }
+
+  const { plannerProviderId, plannerModel, coderProviderId, coderModel, maxRounds: requestedMaxRounds } = request.body as {
+    plannerProviderId: string;
+    plannerModel: string;
+    coderProviderId: string;
+    coderModel: string;
+    maxRounds?: number;
+  };
+
+  if (!plannerProviderId || !plannerModel || !coderProviderId || !coderModel) {
+    reply.status(400);
+    return { error: "Missing required fields: plannerProviderId, plannerModel, coderProviderId, coderModel" };
+  }
+
+  const maxRoundsVal = requestedMaxRounds ?? sourceRun.maxRounds;
+
+  const plannerMeta = registry.getSafeMetadata().find(p => p.id === plannerProviderId);
+  const coderMeta = registry.getSafeMetadata().find(p => p.id === coderProviderId);
+
+  const plannerProviderDisplayName = plannerMeta ? plannerMeta.displayName : plannerProviderId;
+  const coderProviderDisplayName = coderMeta ? coderMeta.displayName : coderProviderId;
+
+  const runId = `run-${Date.now()}`;
+
+  const run = {
+    id: runId,
+    title: sourceRun.title,
+    task: sourceRun.task,
+    status: "created" as RunStatus,
+    plannerProviderId,
+    plannerProviderDisplayName,
+    plannerModel,
+    coderProviderId,
+    coderProviderDisplayName,
+    coderModel,
+    maxRounds: maxRoundsVal,
+    currentRound: 0,
+    sourceRunId: id,
+    retryType: "duplicate",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+
+  runRepo.create(run);
+
+  // Trigger asynchronously in the background
+  orchestrator.run(runId).catch(err => {
+    console.error(`[Orchestrator] Error running duplicated job ${runId}:`, err.message);
+  });
+
+  return run;
+});
+
+// Retry coder on the same task and planner plan, but with different coder model
+server.post("/api/runs/:id/retry-coder", async (request, reply) => {
+  const { id } = request.params as { id: string };
+  const sourceRun = runRepo.getById(id);
+  if (!sourceRun) {
+    reply.status(404);
+    return { error: `Source run with id "${id}" not found` };
+  }
+
+  const { coderProviderId, coderModel, maxRounds: requestedMaxRounds } = request.body as {
+    coderProviderId: string;
+    coderModel: string;
+    maxRounds?: number;
+  };
+
+  if (!coderProviderId || !coderModel) {
+    reply.status(400);
+    return { error: "Missing required fields: coderProviderId, coderModel" };
+  }
+
+  const maxRoundsVal = requestedMaxRounds ?? sourceRun.maxRounds;
+
+  const coderMeta = registry.getSafeMetadata().find(p => p.id === coderProviderId);
+  const coderProviderDisplayName = coderMeta ? coderMeta.displayName : coderProviderId;
+
+  const runId = `run-${Date.now()}`;
+
+  const run = {
+    id: runId,
+    title: sourceRun.title,
+    task: sourceRun.task,
+    status: "created" as RunStatus,
+    plannerProviderId: sourceRun.plannerProviderId,
+    plannerProviderDisplayName: sourceRun.plannerProviderDisplayName,
+    plannerModel: sourceRun.plannerModel,
+    coderProviderId,
+    coderProviderDisplayName,
+    coderModel,
+    maxRounds: maxRoundsVal,
+    currentRound: 0,
+    sourceRunId: id,
+    retryType: "retry-coder",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+
+  runRepo.create(run);
+
+  // Trigger asynchronously in the background
+  orchestrator.run(runId).catch(err => {
+    console.error(`[Orchestrator] Error running coder-retried job ${runId}:`, err.message);
+  });
+
+  return run;
+});
+
 // Get run history list
 server.get("/api/runs", async (request, reply) => {
   return runRepo.list();
