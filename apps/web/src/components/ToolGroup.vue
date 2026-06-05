@@ -125,21 +125,21 @@ const expanded = ref(false);
 }
 
 .tool-status-badge.success {
-  background: rgba(76, 175, 80, 0.1);
-  color: #81c784;
-  border-color: rgba(76, 175, 80, 0.2);
+  background: rgba(123, 216, 143, 0.1);
+  color: var(--success);
+  border-color: rgba(123, 216, 143, 0.2);
 }
 
 .tool-status-badge.failed {
-  background: rgba(244, 67, 54, 0.1);
-  color: #e57373;
-  border-color: rgba(244, 67, 54, 0.2);
+  background: rgba(255, 138, 128, 0.1);
+  color: var(--danger);
+  border-color: rgba(255, 138, 128, 0.2);
 }
 
 .tool-status-badge.pending {
-  background: rgba(255, 152, 0, 0.1);
-  color: #ffb74d;
-  border-color: rgba(255, 152, 0, 0.2);
+  background: rgba(255, 209, 138, 0.1);
+  color: var(--warning);
+  border-color: rgba(255, 209, 138, 0.2);
   animation: toolPulse 1.5s infinite ease-in-out;
 }
 
@@ -150,8 +150,8 @@ const expanded = ref(false);
 
 .tool-group-details-list {
   padding: 12px;
-  background: #121212;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--bg);
+  border-top: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -191,35 +191,35 @@ const expanded = ref(false);
 .label-badge {
   font-size: 0.65rem;
   font-weight: 600;
-  padding: 1px 4px;
+  padding: 1px 6px;
   border-radius: 3px;
-  color: #ffffff;
+  color: #111111;
 }
 
 .label-badge.call {
-  background: #2196f3;
+  background: var(--info);
 }
 
 .label-badge.response {
-  background: #9e9e9e;
+  background: var(--muted);
 }
 
 .label-badge.response.success {
-  background: #4caf50;
+  background: var(--success);
 }
 
 .label-badge.response.failed {
-  background: #f44336;
+  background: var(--danger);
 }
 
 .label-badge.response.pending {
-  background: #ff9800;
+  background: var(--warning);
 }
 
 .tool-code-name {
   font-family: monospace;
   font-size: 0.8rem;
-  color: #ffcb6b;
+  color: var(--warning);
 }
 
 .status-text {
@@ -228,7 +228,7 @@ const expanded = ref(false);
 }
 
 .status-text.pending {
-  color: #ffb74d;
+  color: var(--warning);
   animation: toolPulse 1.5s infinite ease-in-out;
 }
 

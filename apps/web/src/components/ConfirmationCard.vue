@@ -36,8 +36,8 @@ const yesLabel = computed(() => (options.value.includes('Evet') ? 'Evet' : 'Yes'
   bottom: calc(100% - 6px);
   left: 12px;
   right: 12px;
-  background: #1c1c1e;
-  border: 1px solid #2c2c2e;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 14px 16px;
   z-index: 1;
@@ -53,7 +53,7 @@ const yesLabel = computed(() => (options.value.includes('Evet') ? 'Evet' : 'Yes'
   align-items: center;
   gap: 8px;
   font-size: 0.9rem;
-  color: #ffffff;
+  color: var(--text);
 }
 
 .confirm-card-footer {
@@ -73,26 +73,26 @@ const yesLabel = computed(() => (options.value.includes('Evet') ? 'Evet' : 'Yes'
 }
 
 .composer-confirm-btn.no {
-  background: rgba(255, 69, 58, 0.1);
-  color: #ff453a;
-  border: 1px solid rgba(255, 69, 58, 0.2);
+  background: rgba(255, 138, 128, 0.1);
+  color: var(--danger);
+  border: 1px solid rgba(255, 138, 128, 0.2);
 }
 
 .composer-confirm-btn.no:hover {
-  background: rgba(255, 69, 58, 0.2);
-  border-color: rgba(255, 69, 58, 0.3);
+  background: rgba(255, 138, 128, 0.2);
+  border-color: rgba(255, 138, 128, 0.3);
 }
 
 .composer-confirm-btn.yes {
-  background: #ffffff;
-  color: #000000;
+  background: var(--text);
+  color: var(--bg);
   border: none;
   font-weight: 600;
-  box-shadow: 0 2px 6px rgba(255, 255, 255, 0.15);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 
 .composer-confirm-btn.yes:hover {
-  background: #f2f2f7;
+  background: #ffffff;
   transform: translateY(-1px);
 }
 </style>

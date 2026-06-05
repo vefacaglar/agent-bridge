@@ -117,9 +117,9 @@ function basename(path: string): string {
 
 .perm-rule-revoke {
   flex: 0 0 auto;
-  background: rgba(255, 69, 58, 0.1);
-  color: #ff453a;
-  border: 1px solid rgba(255, 69, 58, 0.2);
+  background: rgba(255, 138, 128, 0.1);
+  color: var(--danger);
+  border: 1px solid rgba(255, 138, 128, 0.2);
   padding: 6px 14px;
   border-radius: 6px;
   font-size: 0.8rem;
@@ -129,11 +129,11 @@ function basename(path: string): string {
 }
 
 .perm-rule-revoke:hover {
-  background: rgba(255, 69, 58, 0.2);
-  border-color: rgba(255, 69, 58, 0.3);
+  background: rgba(255, 138, 128, 0.2);
+  border-color: rgba(255, 138, 128, 0.3);
 }
 
 .danger-text {
-  color: #ff453a;
+  color: var(--danger);
 }
 </style>

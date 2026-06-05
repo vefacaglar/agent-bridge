@@ -132,8 +132,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeyDown, true));
   bottom: calc(100% - 6px);
   left: 12px;
   right: 12px;
-  background: #161618;
-  border: 1px solid #2c2c2e;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 14px;
   z-index: 1;
@@ -153,15 +153,15 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeyDown, true));
 
 .cc-perm-action {
   font-weight: 600;
-  color: #e5e5ea;
-  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  background: var(--surface-strong);
   padding: 2px 8px;
   border-radius: 6px;
 }
 
 .cc-perm-path {
   font-family: monospace;
-  color: #c7c7cc;
+  color: var(--muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -171,7 +171,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeyDown, true));
   margin-left: auto;
   font-family: monospace;
   font-size: 0.72rem;
-  color: #8e8e93;
+  color: var(--faint);
 }
 
 /* Diff view */
@@ -179,8 +179,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeyDown, true));
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.75rem;
   line-height: 1.5;
-  background: #0d0d0f;
-  border: 1px solid #232325;
+  background: var(--bg);
+  border: 1px solid var(--border);
   border-radius: 8px;
   max-height: 280px;
   overflow: auto;
@@ -193,11 +193,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeyDown, true));
 }
 
 .cc-diff-row.add {
-  background: rgba(46, 160, 67, 0.16);
+  background: rgba(123, 216, 143, 0.16);
 }
 
 .cc-diff-row.del {
-  background: rgba(248, 81, 73, 0.16);
+  background: rgba(255, 138, 128, 0.16);
 }
 
 .cc-diff-gutter {
@@ -205,7 +205,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeyDown, true));
   width: 3ch;
   padding: 0 6px;
   text-align: right;
-  color: #5a5a5f;
+  color: var(--faint);
   user-select: none;
 }
 
@@ -218,23 +218,23 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeyDown, true));
 
 .cc-diff-row.add .cc-diff-sign,
 .cc-diff-row.add .cc-diff-text {
-  color: #7ee787;
+  color: var(--success);
 }
 
 .cc-diff-row.del .cc-diff-sign,
 .cc-diff-row.del .cc-diff-text {
-  color: #ffa198;
+  color: var(--danger);
 }
 
 .cc-diff-text {
   flex: 1 1 auto;
-  color: #d4d4d8;
+  color: var(--text);
   padding-right: 10px;
 }
 
 .cc-perm-pathbox {
-  background: #0d0d0f;
-  border: 1px solid #232325;
+  background: var(--bg);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 8px 12px;
   overflow-x: auto;
@@ -243,7 +243,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeyDown, true));
 .cc-perm-pathbox code {
   font-family: monospace;
   font-size: 0.78rem;
-  color: #c7c7cc;
+  color: var(--muted);
   white-space: pre-wrap;
   word-break: break-all;
 }
@@ -251,7 +251,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeyDown, true));
 .cc-perm-question {
   margin: 2px 0 0;
   font-size: 0.88rem;
-  color: #ffffff;
+  color: var(--text);
 }
 
 /* Numbered options */
@@ -272,24 +272,24 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeyDown, true));
   border-radius: 6px;
   cursor: pointer;
   font-size: 0.85rem;
-  color: #c7c7cc;
+  color: var(--muted);
   border-left: 2px solid transparent;
   transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
 }
 
 .cc-perm-option.active {
-  background: rgba(255, 255, 255, 0.07);
-  color: #ffffff;
+  background: var(--surface-strong);
+  color: var(--text);
   border-left-color: var(--success);
 }
 
 .cc-perm-number {
-  color: #8e8e93;
+  color: var(--faint);
   font-variant-numeric: tabular-nums;
 }
 
 .cc-perm-option.active .cc-perm-number {
-  color: #c7c7cc;
+  color: var(--muted);
 }
 
 .cc-perm-label {
@@ -299,9 +299,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeyDown, true));
 .cc-perm-hint {
   font-family: monospace;
   font-size: 0.72rem;
-  color: #8e8e93;
-  background: #202022;
-  border: 1px solid #2d2d30;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 4px;
   padding: 1px 6px;
 }

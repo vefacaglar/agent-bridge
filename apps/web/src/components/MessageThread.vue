@@ -71,9 +71,9 @@ function copyText(value: string) {
   justify-content: center;
   font-weight: 850;
   font-size: 1.6rem;
-  background: linear-gradient(135deg, #7bd88f, #9db7ff);
-  color: #111111;
-  box-shadow: 0 10px 25px rgba(123, 216, 143, 0.25);
+  background: linear-gradient(135deg, var(--success), var(--planner));
+  color: var(--bg);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
   animation: logoPulse 4s infinite alternate;
 }
 
