@@ -317,4 +317,109 @@ test("Orchestrator Integration Tests", async (t) => {
     assert.strictEqual(finishedRun?.status, "done");
     assert.ok(fs.existsSync(createdFilePath));
   });
+
+  await t.test("Orchestrator - runs tool call read_file and list_directory successfully", async () => {
+    const registry = new ProviderRegistry(testConfigPath);
+    const runRepo = new RunRepository();
+    const messageRepo = new MessageRepository();
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry);
+
+    const runId = "run-test-read-list";
+    const tempDir = path.join(process.cwd(), "temp_test_dir");
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir);
+    }
+    const tempJsonPath = path.join(tempDir, "test_read_temp.json");
+    fs.writeFileSync(tempJsonPath, '{"status": "ok"}', "utf-8");
+
+    const runData: Run = {
+      id: runId,
+      title: "Test Read List Task",
+      task: "Read index.json and list current dir",
+      status: "created",
+      providerId: "test-provider",
+      providerDisplayName: "Test Provider",
+      model: "model-1",
+      projectPath: tempDir,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    runRepo.create(runData);
+
+    t.after(() => {
+      if (fs.existsSync(tempJsonPath)) {
+        fs.unlinkSync(tempJsonPath);
+      }
+      if (fs.existsSync(tempDir)) {
+        fs.rmdirSync(tempDir);
+      }
+    });
+
+    let callCount = 0;
+    globalThis.fetch = async (url: any, options: any) => {
+      callCount++;
+      if (callCount === 1) {
+        return {
+          ok: true,
+          json: async () => ({
+            choices: [{
+              message: {
+                role: "assistant",
+                content: "Reading file and listing directory...",
+                tool_calls: [
+                  {
+                    id: "call_read_1",
+                    type: "function",
+                    function: {
+                      name: "read_file",
+                      arguments: JSON.stringify({ path: "test_read_temp.json" })
+                    }
+                  },
+                  {
+                    id: "call_list_1",
+                    type: "function",
+                    function: {
+                      name: "list_directory",
+                      arguments: JSON.stringify({ path: "" })
+                    }
+                  }
+                ]
+              }
+            }]
+          })
+        } as any;
+      } else {
+        return {
+          ok: true,
+          json: async () => ({
+            choices: [{ message: { role: "assistant", content: "Completed read and list." } }]
+          })
+        } as any;
+      }
+    };
+
+    await orchestrator.run(runId);
+
+    // Verify database record has done status
+    const finishedRun = runRepo.getById(runId);
+    assert.strictEqual(finishedRun?.status, "done");
+
+    // Verify messages saved (1 assistant tools, 2 tool outputs, 1 final assistant text response)
+    const savedMsgs = messageRepo.listByRunId(runId);
+    assert.strictEqual(savedMsgs.length, 4);
+    assert.strictEqual(savedMsgs[0].role, "assistant");
+    
+    // Parse read_file response
+    const readResponse = JSON.parse(savedMsgs[1].content);
+    assert.strictEqual(readResponse.success, true);
+    assert.strictEqual(readResponse.content, '{"status": "ok"}');
+
+    // Parse list_directory response
+    const listResponse = JSON.parse(savedMsgs[2].content);
+    assert.strictEqual(listResponse.success, true);
+    assert.ok(listResponse.files.some((f: any) => f.name === 'test_read_temp.json'));
+    
+    assert.strictEqual(savedMsgs[3].role, "assistant");
+  });
 });

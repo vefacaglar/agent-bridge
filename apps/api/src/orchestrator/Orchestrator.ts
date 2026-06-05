@@ -44,6 +44,40 @@ const WORKSPACE_TOOLS = [
         required: ["path"]
       }
     }
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "read_file",
+      description: "Reads the content of a specified file in the local workspace directory.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description: "The file path relative to the workspace directory."
+          }
+        },
+        required: ["path"]
+      }
+    }
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "list_directory",
+      description: "Lists all files and folders in a specified directory path (relative to the workspace). Use empty string '' or '.' for the root directory.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description: "The directory path relative to the workspace (e.g., 'src' or '')."
+          }
+        },
+        required: ["path"]
+      }
+    }
   }
 ];
 
@@ -257,7 +291,7 @@ export class Orchestrator {
             try {
               const args = JSON.parse(tc.function.arguments);
               const relativePath = args.path;
-              if (!relativePath) {
+              if (relativePath === undefined || relativePath === null) {
                 throw new Error("Missing parameter: path");
               }
 
@@ -293,6 +327,36 @@ export class Orchestrator {
                   result = JSON.stringify({ success: true, message: `File deleted successfully at ${relativePath}` });
                 } else {
                   result = JSON.stringify({ success: false, message: `File not found at ${relativePath}` });
+                }
+              } else if (tc.function.name === "read_file") {
+                if (fs.existsSync(absolutePath)) {
+                  const stat = fs.statSync(absolutePath);
+                  if (stat.isDirectory()) {
+                    throw new Error(`Path '${relativePath}' is a directory, not a file. Use list_directory instead.`);
+                  }
+                  const content = fs.readFileSync(absolutePath, "utf-8");
+                  result = JSON.stringify({ success: true, content });
+                } else {
+                  result = JSON.stringify({ success: false, error: `File not found at ${relativePath}` });
+                }
+              } else if (tc.function.name === "list_directory") {
+                if (fs.existsSync(absolutePath)) {
+                  const stat = fs.statSync(absolutePath);
+                  if (!stat.isDirectory()) {
+                    throw new Error(`Path '${relativePath}' is a file, not a directory. Use read_file instead.`);
+                  }
+                  const files = fs.readdirSync(absolutePath).map(file => {
+                    const fileAbs = path.join(absolutePath, file);
+                    const fileStat = fs.statSync(fileAbs);
+                    return {
+                      name: file,
+                      isDirectory: fileStat.isDirectory(),
+                      size: fileStat.size
+                    };
+                  });
+                  result = JSON.stringify({ success: true, files });
+                } else {
+                  result = JSON.stringify({ success: false, error: `Directory not found at ${relativePath}` });
                 }
               } else {
                 throw new Error(`Unknown function: ${tc.function.name}`);
@@ -471,7 +535,7 @@ export class Orchestrator {
             try {
               const args = JSON.parse(tc.function.arguments);
               const relativePath = args.path;
-              if (!relativePath) {
+              if (relativePath === undefined || relativePath === null) {
                 throw new Error("Missing parameter: path");
               }
 
@@ -504,6 +568,36 @@ export class Orchestrator {
                   result = JSON.stringify({ success: true, message: `File deleted successfully at ${relativePath}` });
                 } else {
                   result = JSON.stringify({ success: false, message: `File not found at ${relativePath}` });
+                }
+              } else if (tc.function.name === "read_file") {
+                if (fs.existsSync(absolutePath)) {
+                  const stat = fs.statSync(absolutePath);
+                  if (stat.isDirectory()) {
+                    throw new Error(`Path '${relativePath}' is a directory, not a file. Use list_directory instead.`);
+                  }
+                  const content = fs.readFileSync(absolutePath, "utf-8");
+                  result = JSON.stringify({ success: true, content });
+                } else {
+                  result = JSON.stringify({ success: false, error: `File not found at ${relativePath}` });
+                }
+              } else if (tc.function.name === "list_directory") {
+                if (fs.existsSync(absolutePath)) {
+                  const stat = fs.statSync(absolutePath);
+                  if (!stat.isDirectory()) {
+                    throw new Error(`Path '${relativePath}' is a file, not a directory. Use read_file instead.`);
+                  }
+                  const files = fs.readdirSync(absolutePath).map(file => {
+                    const fileAbs = path.join(absolutePath, file);
+                    const fileStat = fs.statSync(fileAbs);
+                    return {
+                      name: file,
+                      isDirectory: fileStat.isDirectory(),
+                      size: fileStat.size
+                    };
+                  });
+                  result = JSON.stringify({ success: true, files });
+                } else {
+                  result = JSON.stringify({ success: false, error: `Directory not found at ${relativePath}` });
                 }
               } else {
                 throw new Error(`Unknown function: ${tc.function.name}`);
