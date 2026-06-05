@@ -71,8 +71,8 @@ const allDone = computed(() => tasks.value.length > 0 && doneCount.value === tas
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 14px;
-  font-size: 0.78rem;
+  padding: 5px 12px;
+  font-size: 0.76rem;
   color: var(--muted);
   font-weight: 500;
   cursor: pointer;
@@ -119,21 +119,21 @@ const allDone = computed(() => tasks.value.length > 0 && doneCount.value === tas
 
 .task-items {
   list-style: none;
-  padding: 6px 8px 10px;
+  padding: 3px 8px 5px;
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 0;
   border-top: 1px solid var(--border);
-  max-height: 220px;
+  max-height: 104px;
   overflow-y: auto;
 }
 
 .task-item {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  padding: 5px 8px;
+  gap: 9px;
+  padding: 2px 8px;
   border-radius: 6px;
 }
 

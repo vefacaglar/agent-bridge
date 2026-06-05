@@ -346,22 +346,27 @@ function statusLabel(status: string): string {
 }
 
 .plan-action.start {
-  border-color: var(--success);
-  color: var(--success);
+  border-color: #ffffff;
+  background: #ffffff;
+  color: #111111;
 }
 
 .plan-action.start:hover {
-  background: rgba(136, 168, 144, 0.12);
+  border-color: #ffffff;
+  background: #e6e6e6;
+  color: #111111;
 }
 
 .plan-action.reject {
-  flex: 0 0 auto;
-  color: var(--muted);
+  border-color: var(--danger);
+  background: var(--danger);
+  color: #ffffff;
 }
 
 .plan-action.reject:hover {
-  color: var(--danger);
   border-color: var(--danger);
-  background: rgba(184, 130, 130, 0.1);
+  background: var(--danger);
+  color: #ffffff;
+  filter: brightness(1.1);
 }
 </style>
