@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { statusClass, statusLabel } from './lib/format';
 import { useAppShell } from './composables/useAppShell';
 import AppSidebar from './components/AppSidebar.vue';
 import MessageThread from './components/MessageThread.vue';
@@ -33,12 +32,17 @@ const {
   activeConfirmationGroup
 } = chat;
 
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 
 const isSidebarCollapsed = ref(false);
 function toggleSidebar() {
   isSidebarCollapsed.value = !isSidebarCollapsed.value;
 }
+
+const currentProjectName = computed(() => {
+  const current = projects.projectOptions.value.find(p => p.path === projects.activeProjectPath.value);
+  return current ? current.name : 'Unknown Project';
+});
 </script>
 
 <template>
@@ -61,20 +65,28 @@ function toggleSidebar() {
 
     <main class="chat-shell" :class="{ 'landing-mode': !activeRun }">
       <header v-if="activeRun" class="chat-header">
-        <div class="thread-title">
-          <button v-if="isSidebarCollapsed" class="expand-sidebar-btn" @click="toggleSidebar" title="Expand Sidebar">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect width="18" height="18" x="3" y="3" rx="2" />
-              <path d="M9 3v18" />
-            </svg>
-          </button>
-          <strong>{{ visibleTitle }}</strong>
-          <span v-if="activeRun" class="status-pill" :class="statusClass(activeRun.status)">
-            {{ statusLabel(activeRun.status) }}
-          </span>
-        </div>
-        <div class="header-actions">
-          <button v-if="isRunning" class="danger-button" @click="chat.cancelActiveRun">Cancel</button>
+        <div class="chat-header-inner">
+          <div class="thread-title">
+            <button v-if="isSidebarCollapsed" class="expand-sidebar-btn" @click="toggleSidebar" title="Expand Sidebar">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect width="18" height="18" x="3" y="3" rx="2" />
+                <path d="M9 3v18" />
+              </svg>
+            </button>
+            
+            <div class="project-breadcrumb">
+              <svg class="folder-icon open-folder" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="m6 14 1.45-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.55 6a2 2 0 0 1-1.94 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2A2 2 0 0 0 12.07 6H20a2 2 0 0 1 2 2v2"/>
+              </svg>
+              <span class="breadcrumb-project">{{ currentProjectName }}</span>
+              <span class="breadcrumb-separator">/</span>
+              <span class="breadcrumb-chat-title">{{ visibleTitle }}</span>
+            </div>
+            
+          </div>
+          <div class="header-actions">
+            <button v-if="isRunning" class="danger-button" @click="chat.cancelActiveRun">Cancel</button>
+          </div>
         </div>
       </header>
 
@@ -166,5 +178,57 @@ function toggleSidebar() {
   padding: 40px 0;
   box-sizing: border-box;
   gap: 24px;
+}
+
+.chat-header {
+  display: block;
+  padding: 0;
+}
+
+.chat-header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 58px;
+  width: min(1080px, 100%);
+  margin: 0 auto;
+  padding: 0 24px;
+  box-sizing: border-box;
+}
+
+.project-breadcrumb {
+  display: flex;
+  align-items: center;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text);
+  min-width: 0;
+}
+
+.project-breadcrumb .folder-icon {
+  margin-right: 8px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.breadcrumb-project {
+  color: var(--muted);
+  font-weight: 400;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.breadcrumb-separator {
+  margin: 0 8px;
+  color: var(--faint);
+  user-select: none;
+}
+
+.breadcrumb-chat-title {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>
