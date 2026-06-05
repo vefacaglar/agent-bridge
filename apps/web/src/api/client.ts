@@ -110,5 +110,19 @@ export const api = {
     const response = await fetch(`${API_BASE}/api/projects/select-dir`, { method: 'POST' });
     if (!response.ok) throw new Error(await errorMessage(response, 'Klasor secilemedi.'));
     return response.json() as Promise<{ path: string; name: string }>;
+  },
+
+  async fetchModels(payload: { type: string; baseUrl: string; apiKey?: string; providerId?: string }): Promise<{ success: boolean; models?: string[]; error?: string }> {
+    const response = await fetch(`${API_BASE}/api/providers/fetch-models`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      const err = await errorMessage(response, 'Modeller alinamadi.');
+      return { success: false, error: err };
+    }
+    return response.json() as Promise<{ success: boolean; models?: string[]; error?: string }>;
   }
 };
+

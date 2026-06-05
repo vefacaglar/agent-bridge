@@ -338,7 +338,7 @@ onBeforeUnmount(() => {
                 :class="{ active: selectedModel === option.value }"
                 @click.stop="selectModel(option.value)"
               >
-                {{ option.label }}
+                <span class="model-name-text">{{ option.label }}</span>
               </div>
             </div>
           </div>
@@ -601,8 +601,10 @@ onBeforeUnmount(() => {
   position: absolute;
   bottom: calc(100% + 8px);
   right: 0;
-  width: 260px;
-  max-height: 220px;
+  width: max-content;
+  min-width: 280px;
+  max-width: 460px;
+  max-height: 280px;
   overflow-y: auto;
   background: #161618;
   border: 1px solid #2d2d30;
@@ -612,19 +614,43 @@ onBeforeUnmount(() => {
   padding: 6px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
+}
+
+.model-dropdown-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.model-dropdown-list::-webkit-scrollbar-thumb {
+  background: #2d2d30;
+  border-radius: 3px;
+}
+
+.model-dropdown-list::-webkit-scrollbar-thumb:hover {
+  background: #3f3f45;
 }
 
 .model-dropdown-item {
-  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  height: 42px;
+  padding: 0 14px;
   border-radius: 6px;
   color: var(--muted);
-  font-size: 0.82rem;
+  font-size: 0.85rem;
   cursor: pointer;
   transition: all 0.15s ease;
-  white-space: nowrap;
+  min-width: 0;
+}
+
+.model-name-text {
+  display: block;
+  width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: normal;
+  text-align: left;
 }
 
 .model-dropdown-item:hover {

@@ -127,6 +127,37 @@ async function handleSave() {
     window.alert(err.message || 'Hata oluştu.');
   }
 }
+
+const isFetchingModels = ref(false);
+
+async function handleFetchModels() {
+  if (!formBaseUrl.value.trim()) {
+    window.alert('Please enter a Base URL first to fetch models.');
+    return;
+  }
+
+  isFetchingModels.value = true;
+  try {
+    const res = await api.fetchModels({
+      type: formType.value,
+      baseUrl: formBaseUrl.value.trim(),
+      apiKey: formApiKey.value.trim(),
+      providerId: editingProviderId.value || undefined
+    });
+
+    if (res.success && res.models && res.models.length > 0) {
+      formModelsList.value = res.models;
+    } else if (res.error) {
+      window.alert(`Failed to fetch models: ${res.error}`);
+    } else {
+      window.alert('No models returned from provider.');
+    }
+  } catch (err: any) {
+    window.alert(`Error fetching models: ${err.message || err}`);
+  } finally {
+    isFetchingModels.value = false;
+  }
+}
 </script>
 
 <template>
@@ -212,13 +243,23 @@ async function handleSave() {
                 </svg>
               </button>
             </div>
-            <button 
-              type="button" 
-              class="ghost-button add-model-btn" 
-              @click="addModelInput"
-            >
-              + Add Model
-            </button>
+            <div style="display: flex; gap: 8px;">
+              <button 
+                type="button" 
+                class="ghost-button add-model-btn" 
+                @click="addModelInput"
+              >
+                + Add Model
+              </button>
+              <button 
+                type="button" 
+                class="ghost-button fetch-models-btn" 
+                :disabled="isFetchingModels"
+                @click="handleFetchModels"
+              >
+                {{ isFetchingModels ? 'Fetching...' : '⚡ Fetch Models from API' }}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -469,5 +510,27 @@ async function handleSave() {
   padding: 0 10px;
   font-size: 0.75rem;
   margin-top: 4px;
+}
+
+.fetch-models-btn {
+  align-self: flex-start;
+  min-height: 28px;
+  padding: 0 10px;
+  font-size: 0.75rem;
+  margin-top: 4px;
+  color: var(--success);
+  border-color: rgba(74, 222, 128, 0.2);
+  transition: all 0.2s ease;
+}
+
+.fetch-models-btn:hover:not(:disabled) {
+  background: rgba(74, 222, 128, 0.08);
+  border-color: rgba(74, 222, 128, 0.4);
+  color: #6ee7b7;
+}
+
+.fetch-models-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>
