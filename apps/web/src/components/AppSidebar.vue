@@ -41,6 +41,12 @@ function onDeleteProject(path: string, event: Event) {
 <template>
   <aside class="sidebar" :class="{ collapsed: isSidebarCollapsed }">
     <div class="sidebar-header">
+      <button class="search-btn" title="Search">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/>
+          <path d="m21 21-4.3-4.3"/>
+        </svg>
+      </button>
       <button class="collapse-btn" @click="emit('toggle-sidebar')" title="Collapse Sidebar">
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <rect width="18" height="18" x="3" y="3" rx="2" />
@@ -50,7 +56,6 @@ function onDeleteProject(path: string, event: Event) {
     </div>
 
     <button class="nav-action" :disabled="isRunning" @click="emit('new-chat')">New chat</button>
-    <button class="nav-action muted">Search</button>
 
     <div class="sidebar-block projects-accordion">
       <div class="sidebar-label flex-between">
@@ -69,24 +74,40 @@ function onDeleteProject(path: string, event: Event) {
             :class="{ active: project.path === activeProjectPath }"
             @click="emit('select-project', project.path)"
           >
-            <span class="project-name-text">{{ project.name }}</span>
+            <div class="project-header-left">
+              <!-- Open Folder SVG when active -->
+              <svg v-if="project.path === activeProjectPath" class="folder-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="m6 14 1.45-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.55 6a2 2 0 0 1-1.94 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2A2 2 0 0 0 12.07 6H20a2 2 0 0 1 2 2v2"/>
+              </svg>
+              <!-- Closed Folder SVG when inactive -->
+              <svg v-else class="folder-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>
+              </svg>
+              <span class="project-name-text">{{ project.name }}</span>
+            </div>
             <button class="delete-project-btn" title="Remove Project" @click="onDeleteProject(project.path, $event)">
-              Remove
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 6h18"/>
+                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+              </svg>
             </button>
           </div>
 
-          <div v-if="project.path === activeProjectPath" class="project-chats-list">
-            <div v-if="filteredRuns.length === 0" class="empty-sidebar">No chats in this project.</div>
-            <button
-              v-for="run in filteredRuns"
-              :key="run.id"
-              class="chat-history-item"
-              :class="{ active: run.id === activeRunId }"
-              @click="emit('select-run', run)"
-            >
-              <span>{{ run.title }}</span>
-            </button>
-          </div>
+          <Transition name="expand">
+            <div v-if="project.path === activeProjectPath" class="project-chats-list">
+              <div v-if="filteredRuns.length === 0" class="empty-sidebar">No chats in this project.</div>
+              <button
+                v-for="run in filteredRuns"
+                :key="run.id"
+                class="chat-history-item"
+                :class="{ active: run.id === activeRunId }"
+                @click="emit('select-run', run)"
+              >
+                <span>{{ run.title }}</span>
+              </button>
+            </div>
+          </Transition>
         </div>
       </div>
     </div>
@@ -105,8 +126,10 @@ function onDeleteProject(path: string, event: Event) {
   padding: 0 0 4px 0;
   background: transparent;
   border: none;
+  gap: 8px;
 }
 
+.search-btn,
 .collapse-btn {
   display: flex;
   align-items: center;
@@ -121,6 +144,7 @@ function onDeleteProject(path: string, event: Event) {
   border: none;
 }
 
+.search-btn:hover,
 .collapse-btn:hover {
   background: var(--sidebar-active);
   color: var(--text);
@@ -141,10 +165,17 @@ function onDeleteProject(path: string, event: Event) {
   gap: 8px;
 }
 
+.project-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
 .project-accordion-item {
-  margin-bottom: 4px;
-  border-radius: 8px;
+  border-radius: 6px;
   overflow: hidden;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .project-header {
@@ -152,21 +183,43 @@ function onDeleteProject(path: string, event: Event) {
   align-items: center;
   justify-content: space-between;
   padding: 8px 10px;
-  border-radius: 8px;
+  border-radius: 6px;
   color: var(--muted);
   cursor: pointer;
   user-select: none;
   transition: all 0.2s ease;
 }
 
+.project-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.folder-icon {
+  flex-shrink: 0;
+  color: var(--faint);
+  transition: color 0.2s ease;
+}
+
+.project-header:hover .folder-icon {
+  color: var(--muted);
+}
+
+.project-header.active .folder-icon {
+  color: var(--muted);
+}
+
 .project-header:hover {
-  background: var(--sidebar-active);
+  background: rgba(255, 255, 255, 0.04);
   color: var(--text);
 }
 
 .project-header.active {
   color: var(--text);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .project-name-text {
@@ -174,36 +227,52 @@ function onDeleteProject(path: string, event: Event) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 0.88rem;
 }
 
 .project-chats-list {
-  padding-left: 10px;
-  margin-top: 2px;
-  border-left: 1px solid var(--border);
-  margin-left: 14px;
+  padding: 4px 6px 8px 16px;
+  margin-top: 0;
+  border-left: none;
+  margin-left: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 
 .delete-project-btn {
   background: transparent;
   color: var(--faint);
-  font-size: 0.72rem;
   cursor: pointer;
-  padding: 2px 6px;
-  line-height: 1;
+  padding: 4px;
   border-radius: 4px;
-  display: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
   transition: all 0.2s ease;
 }
 
 .project-header:hover .delete-project-btn {
-  display: block;
+  opacity: 1;
 }
 
 .delete-project-btn:hover {
   color: var(--danger);
   background: rgba(255, 138, 128, 0.15);
+}
+
+/* Slide expand transition for the accordion */
+.expand-enter-active,
+.expand-leave-active {
+  transition: max-height 0.22s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.22s ease;
+  max-height: 400px;
+  overflow: hidden;
+}
+
+.expand-enter-from,
+.expand-leave-to {
+  max-height: 0;
+  opacity: 0;
 }
 </style>

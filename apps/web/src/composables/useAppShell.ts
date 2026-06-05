@@ -36,8 +36,12 @@ export function useAppShell() {
 
   function selectProject(projectPath: string) {
     if (chat.isRunning.value) return;
-    projects.activeProjectPath.value = projectPath;
-    chat.startNewRunSetup();
+    if (projects.activeProjectPath.value === projectPath) {
+      projects.activeProjectPath.value = '';
+    } else {
+      projects.activeProjectPath.value = projectPath;
+      chat.startNewRunSetup();
+    }
   }
 
   async function submitProject() {
