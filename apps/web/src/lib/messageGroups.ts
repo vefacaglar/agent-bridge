@@ -2,7 +2,7 @@ import type { RunMessage } from '@bridgemind/shared';
 import { formatJson } from './format';
 
 export interface MessageGroup {
-  type: 'user' | 'assistant' | 'tool_group';
+  type: 'user' | 'assistant' | 'tool_group' | 'system';
   id: string;
   message: RunMessage;
   toolCalls: any[];
@@ -29,6 +29,7 @@ export function isToolSuccess(content: string): boolean {
   }
 }
 
+/** Collapses structural tool data classes for styling. */
 export function getToolStatusClass(response?: RunMessage): string {
   if (!response) return 'pending';
   return isToolSuccess(response.content) ? 'success' : 'failed';
@@ -52,6 +53,9 @@ export function groupMessages(messages: RunMessage[]): MessageGroup[] {
 
     if (msg.role === 'user') {
       result.push({ type: 'user', id: msg.id, message: msg, toolCalls: [], toolResponses: [] });
+      i++;
+    } else if (msg.role === 'system') {
+      result.push({ type: 'system', id: msg.id, message: msg, toolCalls: [], toolResponses: [] });
       i++;
     } else if (msg.role === 'assistant') {
       if (hasToolCalls(msg)) {

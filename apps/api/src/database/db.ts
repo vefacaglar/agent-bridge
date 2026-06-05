@@ -106,14 +106,27 @@ if (projectCount.count === 0) {
 
 // Reset any runs left in active states on startup
 try {
-  const stmt = db.prepare(`
-    UPDATE runs 
-    SET status = 'failed', error_message = 'Session interrupted due to server restart.' 
+  const stuckRuns = db.prepare(`
+    SELECT id FROM runs 
     WHERE status IN ('created', 'generating', 'awaiting_permission')
-  `);
-  const info = stmt.run();
-  if (info.changes > 0) {
-    console.log(`[Database] Cleaned up ${info.changes} stuck runs from previous session.`);
+  `).all() as { id: string }[];
+
+  if (stuckRuns.length > 0) {
+    const updateRun = db.prepare(`
+      UPDATE runs 
+      SET status = 'failed', error_message = 'Session interrupted due to server restart.' 
+      WHERE id = ?
+    `);
+    const insertMessage = db.prepare(`
+      INSERT INTO messages (id, run_id, role, content, created_at)
+      VALUES (?, ?, 'system', 'Session interrupted due to server restart.', ?)
+    `);
+
+    for (const r of stuckRuns) {
+      updateRun.run(r.id);
+      insertMessage.run(`msg-err-restart-${r.id}-${Date.now()}`, r.id, new Date().toISOString());
+    }
+    console.log(`[Database] Cleaned up ${stuckRuns.length} stuck runs from previous session and added system error messages.`);
   }
 } catch (err: any) {
   console.error("[Database] Failed to clean up stuck runs:", err.message);

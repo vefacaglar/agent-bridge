@@ -201,6 +201,26 @@ export function registerRunRoutes(server: FastifyInstance, ctx: AppContext) {
 
     reply.raw.write(`data: ${JSON.stringify({ type: "connected" })}\n\n`);
 
+    const run = ctx.runRepo.getById(id);
+    if (!run) {
+      reply.raw.write(`data: ${JSON.stringify({ type: "run_failed", errorMessage: "Run not found." })}\n\n`);
+      reply.raw.end();
+      return;
+    }
+
+    // If the run is already in a final state, immediately notify client and close the stream.
+    if (run.status === "done" || run.status === "failed" || run.status === "cancelled") {
+      if (run.status === "failed") {
+        reply.raw.write(`data: ${JSON.stringify({ type: "run_failed", errorMessage: run.errorMessage })}\n\n`);
+      } else if (run.status === "done") {
+        reply.raw.write(`data: ${JSON.stringify({ type: "run_completed", finalOutput: "" })}\n\n`);
+      } else {
+        reply.raw.write(`data: ${JSON.stringify({ type: "status_changed", status: run.status })}\n\n`);
+      }
+      reply.raw.end();
+      return;
+    }
+
     const listener = (event: any) => {
       reply.raw.write(`data: ${JSON.stringify(event)}\n\n`);
 

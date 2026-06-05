@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch, nextTick } from 'vue';
 import type { PermissionDecision } from '../api/client';
 import type { MessageGroup } from '../lib/messageGroups';
 import { MODES_LIST, type ChatMode, type ModelOption } from '../composables/useComposerSettings';
@@ -73,6 +73,21 @@ watch(() => props.isRunning, (running) => {
   if (!running) requestAnimationFrame(() => textarea.value?.focus());
 });
 
+function adjustHeight() {
+  const el = textarea.value;
+  if (!el) return;
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight + 'px';
+}
+
+watch(() => props.taskInput, (val) => {
+  if (!val) {
+    if (textarea.value) textarea.value.style.height = '';
+  } else {
+    nextTick(adjustHeight);
+  }
+});
+
 function handleDocumentClick(e: MouseEvent) {
   const target = e.target as HTMLElement;
   if (!target.closest('.mode-selector-wrap')) showModeMenu.value = false;
@@ -97,7 +112,10 @@ function handleKeyDown(e: KeyboardEvent) {
 onMounted(() => {
   document.addEventListener('click', handleDocumentClick);
   window.addEventListener('keydown', handleKeyDown);
-  requestAnimationFrame(() => textarea.value?.focus());
+  requestAnimationFrame(() => {
+    textarea.value?.focus();
+    adjustHeight();
+  });
 });
 
 onBeforeUnmount(() => {
@@ -256,7 +274,8 @@ onBeforeUnmount(() => {
   width: 100%;
   min-height: 44px;
   max-height: 180px;
-  resize: vertical;
+  resize: none;
+  overflow-y: auto;
   border: 0;
   outline: none;
   background: transparent;

@@ -337,6 +337,16 @@ export class Orchestrator {
         console.log(`[Orchestrator] Run ${runId} - Process safely stopped by cancellation.`);
       } else {
         console.error(`[Orchestrator] Run ${runId} - Failed with error:`, error.message);
+
+        const errorMsg: RunMessage = {
+          id: randomId("msg-err"),
+          runId,
+          role: "system",
+          content: error.message || "Failed to query provider.",
+          createdAt: new Date().toISOString()
+        };
+        this.emitMessage(runId, errorMsg);
+
         this.emitStatus(runId, "failed", { errorMessage: error.message });
         eventBus.emit(`run:${runId}`, { type: "run_failed", errorMessage: error.message });
       }

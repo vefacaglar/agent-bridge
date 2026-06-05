@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onUnmounted, nextTick } from 'vue';
+import { ref, watch, nextTick } from 'vue';
 import type { Run } from '@bridgemind/shared';
 import type { MessageGroup } from '../lib/messageGroups';
 import { renderMarkdown, cleanMessageContent } from '../lib/markdown';
@@ -41,6 +41,10 @@ const hasActiveMessage = computed(() => {
   if (props.groupedMessages.length === 0) return false;
   const last = props.groupedMessages[props.groupedMessages.length - 1];
   return last && (last.type === 'assistant' || last.type === 'tool_group');
+});
+
+const hasSystemErrorInHistory = computed(() => {
+  return props.groupedMessages.some(g => g.type === 'system');
 });
 
 watch(() => props.groupedMessages, () => {
@@ -134,11 +138,45 @@ watch(() => props.groupedMessages, () => {
         <div class="markdown-body" v-html="renderMarkdown(cleanMessageContent(group.message.content))"></div>
         <button class="copy-button" @click="copyText(group.message.content)">Copy entire response</button>
       </article>
+
+      <article v-else-if="group.type === 'system'" class="assistant-message system-error-message">
+        <div class="assistant-meta">
+          <span class="agent-badge danger-badge">System Error</span>
+          <span>{{ formatTime(group.message.createdAt) }}</span>
+        </div>
+        <div class="error-bubble">
+          <div class="error-icon-wrap">
+            <svg class="error-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect width="18" height="18" x="3" y="3" rx="2" />
+              <path d="m15 9-6 6" />
+              <path d="m9 9 6 6" />
+            </svg>
+          </div>
+          <div class="error-text">
+            {{ group.message.content }}
+          </div>
+        </div>
+      </article>
     </template>
 
-    <div v-if="activeRun.status === 'failed'" class="system-line danger">
-      {{ activeRun.errorMessage || 'Chat generation failed.' }}
-    </div>
+    <article v-if="activeRun.status === 'failed' && !hasSystemErrorInHistory" class="assistant-message system-error-message">
+      <div class="assistant-meta">
+        <span class="agent-badge danger-badge">System Error</span>
+        <span>{{ formatTime(activeRun.updatedAt) }}</span>
+      </div>
+      <div class="error-bubble">
+        <div class="error-icon-wrap">
+          <svg class="error-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect width="18" height="18" x="3" y="3" rx="2" />
+            <path d="m15 9-6 6" />
+            <path d="m9 9 6 6" />
+          </svg>
+        </div>
+        <div class="error-text">
+          {{ activeRun.errorMessage || 'Chat generation failed.' }}
+        </div>
+      </div>
+    </article>
 
     <!-- Subtle loader before message starts streaming -->
     <div v-if="isRunning && !hasActiveMessage" class="system-line active pulsing-loader">
