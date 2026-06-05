@@ -145,6 +145,7 @@ onUnmounted(() => {
         :thought="group.message.content"
         :tool-calls="group.toolCalls"
         :tool-responses="group.toolResponses"
+        @open-plan="emit('open-plan')"
       />
 
       <article v-else-if="group.type === 'assistant'" class="assistant-message">

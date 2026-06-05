@@ -10,7 +10,23 @@ const props = defineProps<{
   toolResponses: RunMessage[];
 }>();
 
+const emit = defineEmits<{
+  (e: 'open-plan'): void;
+}>();
+
 const detailsExpanded = ref<Record<number, boolean>>({});
+
+/** Title of an update_plan call, for the clickable plan card. */
+function getPlanTitle(argumentsJson: string): string {
+  const parsed = parseArgs(argumentsJson);
+  return typeof parsed.title === 'string' && parsed.title.trim() ? parsed.title.trim() : 'Plan';
+}
+
+/** Number of steps in an update_plan call's tasks array. */
+function getPlanTaskCount(argumentsJson: string): number {
+  const parsed = parseArgs(argumentsJson);
+  return Array.isArray(parsed.tasks) ? parsed.tasks.length : 0;
+}
 
 function toggleDetails(index: number) {
   detailsExpanded.value[index] = !detailsExpanded.value[index];
@@ -206,9 +222,23 @@ function formatToolResult(name: string, contentJson: string): string {
 
     <!-- Tool Call Accordions -->
     <div class="tool-calls-list">
-      <div 
-        v-for="(tc, idx) in toolCalls" 
-        :key="idx" 
+      <template v-for="(tc, idx) in toolCalls" :key="idx">
+      <!-- update_plan renders as a clickable card that opens the plan panel -->
+      <button
+        v-if="tc.function?.name === 'update_plan'"
+        type="button"
+        class="plan-tool-card"
+        @click="emit('open-plan')"
+      >
+        <span class="plan-tool-label">Plan: {{ getPlanTitle(tc.function?.arguments) }}</span>
+        <span v-if="getPlanTaskCount(tc.function?.arguments)" class="plan-tool-count">
+          {{ getPlanTaskCount(tc.function?.arguments) }} steps
+        </span>
+        <span class="plan-tool-action">Open in panel</span>
+      </button>
+
+      <div
+        v-else
         class="tool-call-accordion"
         :class="{ 'is-expanded': detailsExpanded[idx] }"
       >
@@ -281,11 +311,57 @@ function formatToolResult(name: string, contentJson: string): string {
           </div>
         </div>
       </div>
+      </template>
     </div>
   </div>
 </template>
 
 <style scoped>
+.plan-tool-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding: 11px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-strong);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.plan-tool-card:hover {
+  border-color: var(--muted);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.plan-tool-label {
+  flex: 1 1 auto;
+  font-weight: 550;
+  font-size: 0.88rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plan-tool-count {
+  flex: 0 0 auto;
+  font-family: monospace;
+  font-size: 0.72rem;
+  color: var(--faint);
+}
+
+.plan-tool-action {
+  flex: 0 0 auto;
+  font-size: 0.74rem;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 8px;
+}
+
 .tool-group-wrap {
   margin: 14px 0;
   width: 100%;
