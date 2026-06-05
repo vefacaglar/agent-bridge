@@ -39,34 +39,59 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
 <template>
   <transition name="settings-fade">
     <div v-if="show" class="settings-screen">
-      <header class="settings-topbar">
-        <h2 class="settings-title">Settings</h2>
-        <button class="settings-close" title="Close (Esc)" @click="emit('close')">Close</button>
-      </header>
+      <div class="app-shell">
+        <aside class="sidebar">
+          <div class="sidebar-header" style="justify-content: flex-start; margin-bottom: 8px; padding-bottom: 4px;">
+            <span class="sidebar-label" style="font-size: 1.05rem; font-weight: 600; color: var(--text);">Settings</span>
+          </div>
 
-      <div class="settings-main">
-        <nav class="settings-rail">
-          <button
-            v-for="tab in TABS"
-            :key="tab.id"
-            class="settings-rail-item"
-            :class="{ active: activeTab === tab.id }"
-            @click="activeTab = tab.id"
-          >
-            {{ tab.label }}
+          <div class="sidebar-block" style="flex: 1; display: flex; flex-direction: column; gap: 6px;">
+            <button
+              v-for="tab in TABS"
+              :key="tab.id"
+              class="nav-action"
+              :class="{ active: activeTab === tab.id }"
+              @click="activeTab = tab.id"
+            >
+              {{ tab.label }}
+            </button>
+          </div>
+
+          <button class="nav-action muted" style="margin-top: auto; display: flex; align-items: center; gap: 8px;" @click="emit('close')">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m15 18-6-6 6-6"/>
+            </svg>
+            Back to Chat
           </button>
-        </nav>
+        </aside>
 
-        <section class="settings-content">
-          <PermissionsTab
-            v-if="activeTab === 'permissions'"
-            :permissions="permissions"
-            :is-loading="isLoading"
-            @revoke="emit('revoke', $event)"
-            @clear-all="emit('clear-all')"
-          />
-          <ProvidersTab v-else-if="activeTab === 'providers'" :providers="providers" />
-        </section>
+        <main class="chat-shell">
+          <header class="chat-header">
+            <div class="chat-header-inner">
+              <div class="thread-title">
+                <span class="breadcrumb-chat-title" style="font-size: 1.05rem; font-weight: 600; color: var(--text);">
+                  {{ activeTab === 'permissions' ? 'Permissions' : 'Providers' }}
+                </span>
+              </div>
+              <div class="header-actions">
+                <button class="ghost-button" title="Close Settings (Esc)" @click="emit('close')">Close</button>
+              </div>
+            </div>
+          </header>
+
+          <section class="messages-scroll">
+            <div class="settings-container-wrap">
+              <PermissionsTab
+                v-if="activeTab === 'permissions'"
+                :permissions="permissions"
+                :is-loading="isLoading"
+                @revoke="emit('revoke', $event)"
+                @clear-all="emit('clear-all')"
+              />
+              <ProvidersTab v-else-if="activeTab === 'providers'" :providers="providers" />
+            </div>
+          </section>
+        </main>
       </div>
     </div>
   </transition>
@@ -82,97 +107,24 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
   flex-direction: column;
 }
 
-.settings-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 56px;
-  padding: 0 22px;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
-  flex-shrink: 0;
-}
-
-.settings-title {
-  margin: 0;
-  font-size: 1.05rem;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.settings-close {
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--muted);
-  font-size: 0.85rem;
-  line-height: 1;
-  cursor: pointer;
-  padding: 7px 14px;
-  border-radius: 8px;
-  transition: all 0.2s ease;
-}
-
-.settings-close:hover {
-  color: var(--text);
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.settings-main {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-}
-
-.settings-rail {
-  flex: 0 0 220px;
-  border-right: 1px solid var(--border);
-  background: var(--sidebar);
-  padding: 16px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.settings-rail-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--muted);
-  font-size: 0.9rem;
-  text-align: left;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.settings-rail-item:hover {
-  color: var(--text);
+.settings-screen .nav-action.active {
   background: var(--sidebar-active);
-}
-
-.settings-rail-item.active {
   color: var(--text);
-  background: var(--sidebar-active);
   font-weight: 600;
 }
 
-.settings-content {
-  flex: 1;
-  min-width: 0;
-  overflow-y: auto;
-  padding: 28px 32px;
-}
-
-/* Shared panel chrome used by tab components */
-.settings-content :deep(.settings-tab-panel) {
+.settings-container-wrap {
   max-width: 720px;
   margin: 0 auto;
+  width: 100%;
 }
 
-.settings-content :deep(.settings-section-head) {
+/* Shared panel style overrides for tab components */
+.messages-scroll :deep(.settings-tab-panel) {
+  width: 100%;
+}
+
+.messages-scroll :deep(.settings-section-head) {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -180,13 +132,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
   margin-bottom: 18px;
 }
 
-.settings-content :deep(.settings-section-title) {
+.messages-scroll :deep(.settings-section-title) {
   margin: 0 0 4px;
   font-size: 1.1rem;
   color: var(--text);
 }
 
-.settings-content :deep(.settings-section-desc) {
+.messages-scroll :deep(.settings-section-desc) {
   margin: 0;
   font-size: 0.82rem;
   color: var(--muted);
@@ -194,14 +146,14 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
   max-width: 460px;
 }
 
-.settings-content :deep(.settings-section-desc code) {
+.messages-scroll :deep(.settings-section-desc code) {
   font-family: monospace;
   background: var(--surface-strong);
   padding: 1px 5px;
   border-radius: 4px;
 }
 
-.settings-content :deep(.settings-empty) {
+.messages-scroll :deep(.settings-empty) {
   padding: 40px 12px;
   text-align: center;
   color: var(--faint);
