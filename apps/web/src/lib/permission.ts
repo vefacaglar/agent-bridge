@@ -43,7 +43,7 @@ export function actionQuestion(preview: PermissionPreview | null | undefined, to
     case 'mkdir': return `Do you want to create the folder ${target}?`;
     case 'move': return `Do you want to move ${target} to ${preview.destPath ?? ''}?`;
     case 'search': return `Do you want to search for "${preview.query ?? ''}"?`;
-    case 'command': return `Do you want to run "${preview.command ?? ''}"?`;
+    case 'command': return 'Do you want to run this command?';
     default: return 'Do you want to proceed?';
   }
 }
