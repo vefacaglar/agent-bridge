@@ -213,7 +213,7 @@ watch(() => props.groupedMessages, () => {
 
     <!-- Subtle loader before message starts streaming -->
     <div v-if="isRunning && !hasActiveMessage" class="system-line active pulsing-loader">
-      AI is thinking...
+      Thinking...
     </div>
   </div>
 </template>
@@ -242,6 +242,7 @@ watch(() => props.groupedMessages, () => {
 
 .pulsing-loader {
   animation: pulseOpacity 1.5s infinite alternate;
+  align-self: flex-start;
 }
 
 @keyframes pulseOpacity {

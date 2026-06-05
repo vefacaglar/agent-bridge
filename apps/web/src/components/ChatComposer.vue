@@ -66,35 +66,6 @@ const contextTokens = computed(() => {
   return total;
 });
 
-const activeMessageStats = computed(() => {
-  if (!props.messages || props.messages.length === 0) {
-    return { status: 'idle', tokens: 0 };
-  }
-  
-  const lastMsg = props.messages[props.messages.length - 1];
-  
-  if (props.isRunning) {
-    if (lastMsg && lastMsg.role === 'assistant') {
-      const tokens = estimateTokens((lastMsg.content || '') + (lastMsg.reasoningContent || ''));
-      const isThinking = lastMsg.reasoningContent && !lastMsg.content;
-      return {
-        status: isThinking ? 'thinking' : 'generating',
-        tokens
-      };
-    }
-    return { status: 'running', tokens: 0 };
-  }
-  
-  // Idle: find last assistant message in the conversation
-  const assistantMessages = props.messages.filter(m => m.role === 'assistant');
-  if (assistantMessages.length > 0) {
-    const lastAssistant = assistantMessages[assistantMessages.length - 1];
-    const tokens = estimateTokens((lastAssistant.content || '') + (lastAssistant.reasoningContent || ''));
-    return { status: 'last_response', tokens };
-  }
-  
-  return { status: 'idle', tokens: 0 };
-});
 
 const canSend = computed(() => {
   return !props.isRunning && props.selectedModel && (props.taskInput.trim() || attachedFiles.value.length > 0);
@@ -262,17 +233,6 @@ onBeforeUnmount(() => {
 
       <!-- Token info bar (placed outside the input box) -->
       <div class="composer-token-info">
-        <span class="draft-tokens">
-          <template v-if="activeMessageStats.status === 'thinking'">
-            <span class="token-dot active thinking"></span>
-            Thinking: {{ activeMessageStats.tokens }} tokens
-          </template>
-          <template v-else-if="activeMessageStats.status === 'generating'">
-            <span class="token-dot active generating"></span>
-            Generating: {{ activeMessageStats.tokens }} tokens
-          </template>
-
-        </span>
         <span class="context-tokens" title="Total context (system prompt + history + draft) sent to model">
           Context: {{ contextTokens + draftTokens }} tokens
         </span>
@@ -455,7 +415,7 @@ onBeforeUnmount(() => {
 
 .composer-token-info {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   margin-bottom: 6px;
   font-size: 0.72rem;
