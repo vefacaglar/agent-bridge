@@ -35,6 +35,74 @@ const emit = defineEmits<{
 }>();
 
 const textarea = ref<HTMLTextAreaElement | null>(null);
+const fileInput = ref<HTMLInputElement | null>(null);
+const attachedFiles = ref<{ name: string; content: string; extension: string }[]>([]);
+
+const canSend = computed(() => {
+  return !props.isRunning && props.selectedModel && (props.taskInput.trim() || attachedFiles.value.length > 0);
+});
+
+function triggerFileSelect() {
+  fileInput.value?.click();
+}
+
+async function handleFileChange(event: Event) {
+  const target = event.target as HTMLInputElement;
+  if (!target.files || target.files.length === 0) return;
+
+  for (const file of Array.from(target.files)) {
+    if (file.size > 2 * 1024 * 1024) {
+      window.alert(`Dosya çok büyük (maksimum 2MB): ${file.name}`);
+      continue;
+    }
+    try {
+      const content = await readFileAsText(file);
+      const extension = file.name.split('.').pop() || '';
+      attachedFiles.value.push({
+        name: file.name,
+        content,
+        extension
+      });
+    } catch (err) {
+      console.error(`Error reading file ${file.name}:`, err);
+      window.alert(`Dosya okunamadı: ${file.name}`);
+    }
+  }
+  target.value = '';
+}
+
+function readFileAsText(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsText(file);
+  });
+}
+
+function removeAttachment(idx: number) {
+  attachedFiles.value.splice(idx, 1);
+}
+
+function handleSend() {
+  if (!canSend.value) return;
+
+  if (attachedFiles.value.length > 0) {
+    let finalTask = props.taskInput;
+    for (const file of attachedFiles.value) {
+      const syntaxLang = file.extension ? file.extension.toLowerCase() : '';
+      finalTask += `\n\n### Dosya: ${file.name}\n\`\`\`${syntaxLang}\n${file.content}\n\`\`\``;
+    }
+    emit('update:taskInput', finalTask);
+    attachedFiles.value = [];
+    nextTick(() => {
+      emit('send');
+    });
+  } else {
+    emit('send');
+  }
+}
+
 const showModeMenu = ref(false);
 const showModelMenu = ref(false);
 
@@ -135,19 +203,40 @@ onBeforeUnmount(() => {
       />
 
       <div class="composer-input-box" style="position: relative; z-index: 2;">
+        <!-- Attached Files List -->
+        <div v-if="attachedFiles.length > 0" class="composer-attachments">
+          <div
+            v-for="(file, idx) in attachedFiles"
+            :key="idx"
+            class="attachment-pill"
+          >
+            <svg class="file-icon" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/>
+              <path d="M14 2v4a2 2 0 0 0 2 2h4"/>
+            </svg>
+            <span class="attachment-name" :title="file.name">{{ file.name }}</span>
+            <button class="remove-attachment-btn" @click="removeAttachment(idx)" title="Remove file">
+              <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 6 6 18"/>
+                <path d="m6 6 12 12"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
         <textarea
           ref="textarea"
           :value="taskInput"
           :disabled="isRunning"
           placeholder="Type a message..."
           @input="emit('update:taskInput', ($event.target as HTMLTextAreaElement).value)"
-          @keydown.enter.exact.prevent="emit('send')"
+          @keydown.enter.exact.prevent="handleSend"
         />
         <button
           class="composer-send-btn"
-          :disabled="isRunning || !taskInput.trim() || !selectedModel"
+          :disabled="!canSend"
           title="Send message"
-          @click="emit('send')"
+          @click="handleSend"
         >
           Send
         </button>
@@ -184,6 +273,25 @@ onBeforeUnmount(() => {
               </ul>
             </div>
           </div>
+
+          <input
+            type="file"
+            ref="fileInput"
+            style="display: none;"
+            multiple
+            @change="handleFileChange"
+          />
+          <button
+            class="mode-pill-btn attach-file-btn"
+            title="Attach files"
+            :disabled="isRunning"
+            @click="triggerFileSelect"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 12h14"/>
+              <path d="M12 5v14"/>
+            </svg>
+          </button>
 
           <!-- Project selection dropdown (only on landing screen) -->
           <div v-if="isLanding" class="project-dropdown-wrap">
@@ -567,5 +675,69 @@ onBeforeUnmount(() => {
 .status-indicator-ring.active .ring-dot {
   background: var(--success);
   animation: pulseDot 1.2s infinite alternate;
+}
+
+/* File attachments styling inside the input box */
+.composer-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #2d2d30;
+}
+
+.attachment-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #252528;
+  border: 1px solid #333;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 0.78rem;
+  color: var(--text);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+}
+
+.attachment-pill .file-icon {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.attachment-name {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.remove-attachment-btn {
+  background: transparent;
+  color: var(--faint);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 3px;
+  transition: all 0.2s ease;
+}
+
+.remove-attachment-btn:hover {
+  color: var(--danger);
+  background: rgba(255, 138, 128, 0.1);
+}
+
+/* Attach file button styling */
+.attach-file-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  flex-shrink: 0;
 }
 </style>
