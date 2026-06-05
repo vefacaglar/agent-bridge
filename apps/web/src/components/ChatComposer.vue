@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { PermissionDecision } from '../api/client';
 import type { MessageGroup } from '../lib/messageGroups';
 import { MODES_LIST, type ChatMode, type ModelOption } from '../composables/useComposerSettings';
@@ -18,6 +18,9 @@ const props = defineProps<{
   confirmationGroup: MessageGroup | null;
   showPermission: boolean;
   permissionRequest: any;
+  isLanding?: boolean;
+  projectOptions?: { path: string; name: string }[];
+  activeProjectPath?: string;
 }>();
 
 const emit = defineEmits<{
@@ -28,6 +31,7 @@ const emit = defineEmits<{
   (e: 'send'): void;
   (e: 'quick-reply', option: string): void;
   (e: 'permission-decision', decision: PermissionDecision): void;
+  (e: 'select-project', path: string): void;
 }>();
 
 const textarea = ref<HTMLTextAreaElement | null>(null);
@@ -48,6 +52,18 @@ function selectModel(value: string) {
   showModelMenu.value = false;
 }
 
+const showProjectMenu = ref(false);
+
+const activeProjectName = computed(() => {
+  const current = props.projectOptions?.find(p => p.path === props.activeProjectPath);
+  return current ? current.name : 'Select project...';
+});
+
+function selectProjectItem(path: string) {
+  emit('select-project', path);
+  showProjectMenu.value = false;
+}
+
 // Focus is driven by a signal counter incremented by the parent session.
 watch(() => props.focusSignal, () => {
   requestAnimationFrame(() => textarea.value?.focus());
@@ -61,6 +77,7 @@ function handleDocumentClick(e: MouseEvent) {
   const target = e.target as HTMLElement;
   if (!target.closest('.mode-selector-wrap')) showModeMenu.value = false;
   if (!target.closest('.model-dropdown-wrap')) showModelMenu.value = false;
+  if (!target.closest('.project-dropdown-wrap')) showProjectMenu.value = false;
 }
 
 function handleKeyDown(e: KeyboardEvent) {
@@ -119,33 +136,66 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="composer-menu-row" style="position: relative; z-index: 2;">
-        <div class="mode-selector-wrap">
-          <button class="mode-pill-btn" @click.stop="showModeMenu = !showModeMenu">
-            <span class="mode-pill-text">{{ getModeLabel(currentMode) }}</span>
-          </button>
+        <div class="composer-menu-left" style="display: flex; gap: 8px; align-items: center;">
+          <div class="mode-selector-wrap">
+            <button class="mode-pill-btn" @click.stop="showModeMenu = !showModeMenu">
+              <span class="mode-pill-text">{{ getModeLabel(currentMode) }}</span>
+            </button>
 
-          <div v-if="showModeMenu" class="mode-popup-menu">
-            <header class="mode-popup-header">
-              <span class="mode-popup-title">Mode</span>
-            </header>
-            <ul class="mode-popup-list">
-              <li
-                v-for="modeItem in MODES_LIST"
-                :key="modeItem.id"
-                :class="{ active: currentMode === modeItem.id }"
-                @click.stop="selectMode(modeItem.id)"
-              >
-                <span class="mode-item-name">{{ modeItem.label }}</span>
-                <span class="mode-item-shortcut">{{ modeItem.shortcut }}</span>
-              </li>
-              <li class="mode-popup-divider"></li>
-              <li @click.stop="emit('update:bypassPermissions', !bypassPermissions)">
-                <span class="mode-item-name">Bypass permissions</span>
-                <span class="bypass-toggle-badge" :class="{ enabled: bypassPermissions }">
-                  {{ bypassPermissions ? 'Disable' : 'Enable' }}
-                </span>
-              </li>
-            </ul>
+            <div v-if="showModeMenu" class="mode-popup-menu">
+              <header class="mode-popup-header">
+                <span class="mode-popup-title">Mode</span>
+              </header>
+              <ul class="mode-popup-list">
+                <li
+                  v-for="modeItem in MODES_LIST"
+                  :key="modeItem.id"
+                  :class="{ active: currentMode === modeItem.id }"
+                  @click.stop="selectMode(modeItem.id)"
+                >
+                  <span class="mode-item-name">{{ modeItem.label }}</span>
+                  <span class="mode-item-shortcut">{{ modeItem.shortcut }}</span>
+                </li>
+                <li class="mode-popup-divider"></li>
+                <li @click.stop="emit('update:bypassPermissions', !bypassPermissions)">
+                  <span class="mode-item-name">Bypass permissions</span>
+                  <span class="bypass-toggle-badge" :class="{ enabled: bypassPermissions }">
+                    {{ bypassPermissions ? 'Disable' : 'Enable' }}
+                  </span>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- Project selection dropdown (only on landing screen) -->
+          <div v-if="isLanding" class="project-dropdown-wrap">
+            <button class="mode-pill-btn" @click.stop="showProjectMenu = !showProjectMenu" title="Active Project">
+              <svg class="folder-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--muted); opacity: 0.85; margin-right: 6px;">
+                <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>
+              </svg>
+              <span class="mode-pill-text">{{ activeProjectName }}</span>
+            </button>
+
+            <div v-if="showProjectMenu" class="mode-popup-menu project-popup-menu">
+              <header class="mode-popup-header">
+                <span class="mode-popup-title">Active Project</span>
+              </header>
+              <ul class="mode-popup-list">
+                <li
+                  v-for="project in projectOptions"
+                  :key="project.path"
+                  :class="{ active: activeProjectPath === project.path }"
+                  @click.stop="selectProjectItem(project.path)"
+                >
+                  <span class="mode-item-name" style="display: flex; align-items: center; gap: 6px;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--faint);">
+                      <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>
+                    </svg>
+                    {{ project.name }}
+                  </span>
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
 
@@ -252,8 +302,13 @@ onBeforeUnmount(() => {
   padding: 0 4px;
 }
 
-.mode-selector-wrap {
+.mode-selector-wrap,
+.project-dropdown-wrap {
   position: relative;
+}
+
+.project-popup-menu {
+  width: 250px;
 }
 
 .mode-pill-btn {

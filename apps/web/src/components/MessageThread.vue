@@ -17,11 +17,7 @@ function copyText(value: string) {
 </script>
 
 <template>
-  <div v-if="!activeRun" class="empty-chat">
-    <div class="welcome-gradient-logo">BM</div>
-    <h1>BridgeMind</h1>
-    <p>Select a model below and type a prompt to start a local or cloud chat session.</p>
-  </div>
+  <div v-if="!activeRun" class="empty-chat"></div>
 
   <div v-else class="messages-inner">
     <article class="user-bubble">

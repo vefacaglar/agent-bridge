@@ -34,6 +34,7 @@ const {
 } = chat;
 
 import { ref } from 'vue';
+
 const isSidebarCollapsed = ref(false);
 function toggleSidebar() {
   isSidebarCollapsed.value = !isSidebarCollapsed.value;
@@ -58,8 +59,8 @@ function toggleSidebar() {
       @toggle-sidebar="toggleSidebar"
     />
 
-    <main class="chat-shell">
-      <header class="chat-header">
+    <main class="chat-shell" :class="{ 'landing-mode': !activeRun }">
+      <header v-if="activeRun" class="chat-header">
         <div class="thread-title">
           <button v-if="isSidebarCollapsed" class="expand-sidebar-btn" @click="toggleSidebar" title="Expand Sidebar">
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -77,30 +78,57 @@ function toggleSidebar() {
         </div>
       </header>
 
-      <section :ref="setMessagesContainer" class="messages-scroll">
-        <MessageThread
-          :active-run="activeRun"
-          :grouped-messages="groupedMessages"
-          :is-running="isRunning"
-        />
-      </section>
+      <template v-if="activeRun">
+        <section :ref="setMessagesContainer" class="messages-scroll">
+          <MessageThread
+            :active-run="activeRun"
+            :grouped-messages="groupedMessages"
+            :is-running="isRunning"
+          />
+        </section>
 
-      <ChatComposer
-        v-model:task-input="taskInput"
-        v-model:current-mode="settings.currentMode.value"
-        v-model:bypass-permissions="settings.bypassPermissions.value"
-        v-model:selected-model="settings.selectedModelCombined.value"
-        :is-running="isRunning"
-        :model-options="settings.modelOptions.value"
-        :active-model-display-name="settings.activeModelDisplayName.value"
-        :focus-signal="focusSignal"
-        :confirmation-group="activeConfirmationGroup"
-        :show-permission="showPermissionModal"
-        :permission-request="pendingPermissionRequest"
-        @send="chat.handleSendTask"
-        @quick-reply="chat.sendQuickReply"
-        @permission-decision="chat.handlePermissionDecision"
-      />
+        <ChatComposer
+          v-model:task-input="taskInput"
+          v-model:current-mode="settings.currentMode.value"
+          v-model:bypass-permissions="settings.bypassPermissions.value"
+          v-model:selected-model="settings.selectedModelCombined.value"
+          :is-running="isRunning"
+          :model-options="settings.modelOptions.value"
+          :active-model-display-name="settings.activeModelDisplayName.value"
+          :focus-signal="focusSignal"
+          :confirmation-group="activeConfirmationGroup"
+          :show-permission="showPermissionModal"
+          :permission-request="pendingPermissionRequest"
+          @send="chat.handleSendTask"
+          @quick-reply="chat.sendQuickReply"
+          @permission-decision="chat.handlePermissionDecision"
+        />
+      </template>
+
+      <template v-else>
+        <div class="landing-center-wrap">
+          <ChatComposer
+            v-model:task-input="taskInput"
+            v-model:current-mode="settings.currentMode.value"
+            v-model:bypass-permissions="settings.bypassPermissions.value"
+            v-model:selected-model="settings.selectedModelCombined.value"
+            :is-running="isRunning"
+            :model-options="settings.modelOptions.value"
+            :active-model-display-name="settings.activeModelDisplayName.value"
+            :focus-signal="focusSignal"
+            :confirmation-group="activeConfirmationGroup"
+            :show-permission="showPermissionModal"
+            :permission-request="pendingPermissionRequest"
+            :is-landing="true"
+            :project-options="projects.projectOptions.value"
+            :active-project-path="projects.activeProjectPath.value"
+            @send="chat.handleSendTask"
+            @quick-reply="chat.sendQuickReply"
+            @permission-decision="chat.handlePermissionDecision"
+            @select-project="selectProject"
+          />
+        </div>
+      </template>
     </main>
 
     <AddProjectModal
@@ -125,3 +153,18 @@ function toggleSidebar() {
     />
   </div>
 </template>
+
+<style scoped>
+.landing-center-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: stretch;
+  width: 100%;
+  margin: 0 auto;
+  padding: 40px 0;
+  box-sizing: border-box;
+  gap: 24px;
+}
+</style>
