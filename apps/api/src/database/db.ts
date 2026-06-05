@@ -61,11 +61,19 @@ db.exec(`
     provider_display_name TEXT,
     model TEXT,
     content TEXT NOT NULL,
+    reasoning_content TEXT,
     raw_response TEXT,
     created_at TEXT NOT NULL,
     FOREIGN KEY (run_id) REFERENCES runs(id)
   );
 `);
+
+// Migration: Add reasoning_content column to messages if it doesn't already exist
+try {
+  db.exec("ALTER TABLE messages ADD COLUMN reasoning_content TEXT");
+} catch (e) {
+  // Ignored if column already exists
+}
 
 // Create Projects Table
 db.exec(`

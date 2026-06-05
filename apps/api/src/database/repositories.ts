@@ -26,12 +26,13 @@ function mapRowToMessage(row: any): RunMessage {
   return {
     id: row.id,
     runId: row.run_id,
-    role: row.role as "system" | "user" | "assistant",
+    role: row.role as "system" | "user" | "assistant" | "tool",
     agentRole: row.agent_role || undefined,
     providerId: row.provider_id || undefined,
     providerDisplayName: row.provider_display_name || undefined,
     model: row.model || undefined,
     content: row.content,
+    reasoningContent: row.reasoning_content || undefined,
     rawResponse: row.raw_response || undefined,
     createdAt: row.created_at
   };
@@ -127,8 +128,8 @@ export class MessageRepository {
       INSERT INTO messages (
         id, run_id, role, agent_role,
         provider_id, provider_display_name, model,
-        content, raw_response, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        content, reasoning_content, raw_response, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
@@ -140,6 +141,7 @@ export class MessageRepository {
       message.providerDisplayName || null,
       message.model || null,
       message.content,
+      message.reasoningContent || null,
       message.rawResponse || null,
       message.createdAt
     );
@@ -149,6 +151,33 @@ export class MessageRepository {
     const stmt = db.prepare("SELECT * FROM messages WHERE run_id = ? ORDER BY created_at ASC");
     const rows = stmt.all(runId) as any[];
     return rows.map(mapRowToMessage);
+  }
+
+  update(id: string, updates: Partial<RunMessage>): void {
+    const fields: string[] = [];
+    const values: any[] = [];
+
+    const mappings: Record<string, string> = {
+      content: "content",
+      reasoningContent: "reasoning_content",
+      rawResponse: "raw_response"
+    };
+
+    for (const [key, val] of Object.entries(updates)) {
+      const dbField = mappings[key];
+      if (dbField) {
+        fields.push(`${dbField} = ?`);
+        values.push(val === undefined ? null : val);
+      }
+    }
+
+    if (fields.length === 0) return;
+
+    const sql = `UPDATE messages SET ${fields.join(", ")} WHERE id = ?`;
+    values.push(id);
+
+    const stmt = db.prepare(sql);
+    stmt.run(...values);
   }
 }
 

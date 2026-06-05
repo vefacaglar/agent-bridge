@@ -79,7 +79,10 @@ export class AnthropicProvider implements ModelProvider {
     this.apiKey = apiKey;
   }
 
-  async complete(request: CompletionRequest): Promise<CompletionResponse> {
+  async complete(
+    request: CompletionRequest,
+    onChunk?: (chunk: { content?: string; reasoningContent?: string }) => void
+  ): Promise<CompletionResponse> {
     const url = `${this.baseUrl}/v1/messages`;
 
     const body: any = {
@@ -132,6 +135,11 @@ export class AnthropicProvider implements ModelProvider {
         .map((block: any) => block.text)
         .join("\n");
 
+      const reasoningContent = data.content
+        .filter((block: any) => block.type === "thinking")
+        .map((block: any) => block.thinking)
+        .join("\n") || undefined;
+
       const toolUseBlocks = data.content.filter((block: any) => block.type === "tool_use");
       const toolCalls = toolUseBlocks.length > 0
         ? toolUseBlocks.map((block: any) => ({
@@ -144,7 +152,7 @@ export class AnthropicProvider implements ModelProvider {
           }))
         : undefined;
 
-      if ((!content || !content.trim()) && (!toolCalls || toolCalls.length === 0)) {
+      if ((!content || !content.trim()) && (!reasoningContent || !reasoningContent.trim()) && (!toolCalls || toolCalls.length === 0)) {
         throw new Error("Provider returned an empty response");
       }
 
@@ -152,6 +160,7 @@ export class AnthropicProvider implements ModelProvider {
 
       return {
         content,
+        reasoningContent,
         toolCalls,
         raw: data,
         usage: usage ? {

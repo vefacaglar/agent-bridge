@@ -84,6 +84,15 @@ export class Orchestrator {
     eventBus.emit(`run:${runId}`, { type: "message_created", message: msg });
   }
 
+  private updateMessage(runId: string, msg: RunMessage) {
+    this.messageRepo.update(msg.id, {
+      content: msg.content,
+      reasoningContent: msg.reasoningContent,
+      rawResponse: msg.rawResponse
+    });
+    eventBus.emit(`run:${runId}`, { type: "message_updated", message: msg });
+  }
+
   // --- Run lifecycle -------------------------------------------------------
 
   cancel(runId: string): boolean {
@@ -231,29 +240,63 @@ export class Orchestrator {
       while (!completionDone) {
         checkCancelled();
 
+        const msgId = randomId("msg-res");
+        let accumulatedContent = "";
+        let accumulatedReasoning = "";
+        let hasCreatedMessage = false;
+
         const response = await provider.complete({
           model: run.model,
           systemPrompt: buildSystemPrompt(run.projectName, run.projectPath, run.mode),
           messages: currentMessages,
           tools: WORKSPACE_TOOLS
-        });
+        }, (chunk) => {
+          checkCancelled();
+          if (chunk.content) accumulatedContent += chunk.content;
+          if (chunk.reasoningContent) accumulatedReasoning += chunk.reasoningContent;
 
-        checkCancelled();
-
-        if (response.toolCalls && response.toolCalls.length > 0) {
           const assistantMsg: RunMessage = {
-            id: randomId("msg-res-tools"),
+            id: msgId,
             runId,
             role: "assistant",
             providerId: run.providerId,
             providerDisplayName: run.providerDisplayName,
             model: run.model,
-            content: response.content || "Calling workspace tools...",
-            rawResponse: JSON.stringify(response.toolCalls),
+            content: accumulatedContent,
+            reasoningContent: accumulatedReasoning || undefined,
             createdAt: new Date().toISOString()
           };
-          this.emitMessage(runId, assistantMsg);
 
+          if (!hasCreatedMessage) {
+            this.emitMessage(runId, assistantMsg);
+            hasCreatedMessage = true;
+          } else {
+            this.updateMessage(runId, assistantMsg);
+          }
+        });
+
+        checkCancelled();
+
+        const finalMsg: RunMessage = {
+          id: msgId,
+          runId,
+          role: "assistant",
+          providerId: run.providerId,
+          providerDisplayName: run.providerDisplayName,
+          model: run.model,
+          content: response.content || (response.toolCalls ? "Calling workspace tools..." : ""),
+          reasoningContent: response.reasoningContent,
+          rawResponse: response.toolCalls ? JSON.stringify(response.toolCalls) : undefined,
+          createdAt: new Date().toISOString()
+        };
+
+        if (!hasCreatedMessage) {
+          this.emitMessage(runId, finalMsg);
+        } else {
+          this.updateMessage(runId, finalMsg);
+        }
+
+        if (response.toolCalls && response.toolCalls.length > 0) {
           currentMessages.push({
             role: "assistant",
             content: response.content || "",
@@ -281,17 +324,6 @@ export class Orchestrator {
             });
           }
         } else {
-          const assistantMsg: RunMessage = {
-            id: randomId("msg-res"),
-            runId,
-            role: "assistant",
-            providerId: run.providerId,
-            providerDisplayName: run.providerDisplayName,
-            model: run.model,
-            content: response.content,
-            createdAt: new Date().toISOString()
-          };
-          this.emitMessage(runId, assistantMsg);
           completionDone = true;
         }
       }

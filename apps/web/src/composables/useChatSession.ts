@@ -145,6 +145,15 @@ export function useChatSession(options: ChatSessionOptions) {
         }
       }
 
+      if (data.type === 'message_updated' && activeRun.value?.id === runId) {
+        const index = messages.value.findIndex(m => m.id === data.message.id);
+        if (index !== -1) {
+          messages.value[index] = data.message;
+        } else {
+          messages.value.push(data.message);
+        }
+      }
+
       if (data.type === 'run_completed') {
         if (activeRun.value?.id === runId) updateRunStatus(runId, 'done');
         finishEventStream();

@@ -34,6 +34,7 @@ export interface CompletionRequest {
 
 export interface CompletionResponse {
   content: string;
+  reasoningContent?: string;
   toolCalls?: ToolCall[];
   raw?: unknown;
   usage?: {
@@ -58,6 +59,7 @@ export interface RunMessage {
   providerDisplayName?: string;
   model?: string;
   content: string;
+  reasoningContent?: string;
   rawResponse?: string;
   createdAt: string;
 }
