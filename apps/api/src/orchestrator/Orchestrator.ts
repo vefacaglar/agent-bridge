@@ -198,6 +198,16 @@ export class Orchestrator {
       console.log(`[Orchestrator] Run ${runId} has been cancelled by user.`);
       return true;
     }
+
+    // Fallback for runs that are marked active in DB but not running in memory (e.g. after server restart)
+    const run = this.runRepo.getById(runId);
+    if (run && (run.status === "created" || run.status === "generating" || run.status === "awaiting_permission")) {
+      this.emitStatus(runId, "cancelled");
+      eventBus.emit(`run:${runId}`, { type: "run_failed", errorMessage: "Chat generation cancelled by user." });
+      console.log(`[Orchestrator] Run ${runId} (inactive in memory) has been marked as cancelled.`);
+      return true;
+    }
+
     return false;
   }
 

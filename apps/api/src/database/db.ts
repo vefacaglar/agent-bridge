@@ -96,5 +96,20 @@ if (projectCount.count === 0) {
   `).run(wsRoot, defaultProjectName, new Date().toISOString());
 }
 
+// Reset any runs left in active states on startup
+try {
+  const stmt = db.prepare(`
+    UPDATE runs 
+    SET status = 'failed', error_message = 'Session interrupted due to server restart.' 
+    WHERE status IN ('created', 'generating', 'awaiting_permission')
+  `);
+  const info = stmt.run();
+  if (info.changes > 0) {
+    console.log(`[Database] Cleaned up ${info.changes} stuck runs from previous session.`);
+  }
+} catch (err: any) {
+  console.error("[Database] Failed to clean up stuck runs:", err.message);
+}
+
 console.log("[Database] Database initialized and tables verified.");
 

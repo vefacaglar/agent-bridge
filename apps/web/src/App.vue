@@ -198,6 +198,90 @@ function formatJson(content: string): string {
   }
 }
 
+const groupedMessages = computed(() => {
+  const result: Array<{
+    type: 'user' | 'assistant' | 'tool_group';
+    id: string;
+    message: RunMessage;
+    toolCalls: any[];
+    toolResponses: RunMessage[];
+  }> = [];
+
+  let i = 0;
+  while (i < messages.value.length) {
+    const msg = messages.value[i];
+
+    if (msg.role === 'user') {
+      result.push({
+        type: 'user',
+        id: msg.id,
+        message: msg,
+        toolCalls: [],
+        toolResponses: []
+      });
+      i++;
+    } else if (msg.role === 'assistant') {
+      if (hasToolCalls(msg)) {
+        let toolCalls: any[] = [];
+        try {
+          toolCalls = JSON.parse(msg.rawResponse || '[]');
+        } catch (e) {
+          toolCalls = [];
+        }
+        const toolResponses: RunMessage[] = [];
+
+        // Collect all following tool responses
+        let j = i + 1;
+        while (j < messages.value.length && messages.value[j].role === 'tool') {
+          toolResponses.push(messages.value[j]);
+          j++;
+        }
+
+        result.push({
+          type: 'tool_group',
+          id: msg.id,
+          message: msg,
+          toolCalls,
+          toolResponses
+        });
+        i = j;
+      } else {
+        result.push({
+          type: 'assistant',
+          id: msg.id,
+          message: msg,
+          toolCalls: [],
+          toolResponses: []
+        });
+        i++;
+      }
+    } else if (msg.role === 'tool') {
+      result.push({
+        type: 'tool_group',
+        id: msg.id,
+        message: msg,
+        toolCalls: [{ function: { name: 'Workspace Tool Output', arguments: '{}' } }],
+        toolResponses: [msg]
+      });
+      i++;
+    } else {
+      i++;
+    }
+  }
+
+  return result;
+});
+
+function getToolStatusClass(response?: RunMessage): string {
+  if (!response) return 'pending';
+  return isToolSuccess(response.content) ? 'success' : 'failed';
+}
+
+function formatToolArgs(args?: string): string {
+  if (!args) return '';
+  return formatJson(args);
+}
+
 
 
 function cleanMessageContent(content: string): string {
@@ -450,10 +534,20 @@ async function handleSendTask() {
 }
 
 async function cancelActiveRun() {
-  if (!activeRunId.value || !isRunning.value) return;
-  const response = await fetch(`${API_BASE}/api/runs/${activeRunId.value}/cancel`, { method: 'POST' });
-  if (response.ok) {
-    updateRunStatus(activeRunId.value, 'cancelled');
+  if (!activeRunId.value) return;
+  try {
+    const response = await fetch(`${API_BASE}/api/runs/${activeRunId.value}/cancel`, { method: 'POST' });
+    if (response.ok || response.status === 400) {
+      updateRunStatus(activeRunId.value, 'cancelled');
+      finishEventStream();
+    } else {
+      const err = await response.json().catch(() => ({}));
+      window.alert(err.error || 'Cancel request failed.');
+    }
+  } catch (err) {
+    console.error('Failed to contact server for cancellation:', err);
+    // Force UI cancel/fail state to avoid getting stuck
+    updateRunStatus(activeRunId.value, 'failed');
     finishEventStream();
   }
 }
@@ -736,60 +830,80 @@ onBeforeUnmount(() => {
             <pre>{{ activeRun.task }}</pre>
           </article>
 
-          <template v-for="message in messages" :key="message.id">
+          <template v-for="group in groupedMessages" :key="group.id">
             <!-- User message (continuation) -->
-            <article v-if="message.role === 'user'" class="user-bubble">
-              <pre>{{ message.content }}</pre>
+            <article v-if="group.type === 'user'" class="user-bubble">
+              <pre>{{ group.message.content }}</pre>
             </article>
 
-            <!-- Tool Invocation Block -->
+            <!-- Tool Execution Group Block -->
             <article
-              v-else-if="message.role === 'assistant' && message.rawResponse && hasToolCalls(message)"
-              class="tool-log-block"
+              v-else-if="group.type === 'tool_group'"
+              class="tool-group-block"
             >
-              <header class="tool-log-header" @click="toggleMessageExpansion(message.id)">
-                <span class="tool-log-title">
-                  <i>🔧 Calling workspace tools...</i>
-                </span>
-                <span class="tool-log-toggle">
-                  {{ expandedMessageIds[message.id] ? '▼' : '▶' }}
+              <header class="tool-group-header" @click="toggleMessageExpansion(group.id)">
+                <div class="tool-group-summary-left">
+                  <span class="tool-group-title">Workspace Tools</span>
+                  <span class="tool-group-count">{{ group.toolCalls.length }} calls</span>
+                </div>
+                <div class="tool-group-summary-right">
+                  <span 
+                    v-for="(tc, idx) in group.toolCalls" 
+                    :key="idx" 
+                    class="tool-status-badge"
+                    :class="getToolStatusClass(group.toolResponses[idx])"
+                  >
+                    {{ tc.function?.name || 'unknown' }}
+                  </span>
+                </div>
+                <span class="tool-group-toggle-arrow">
+                  {{ expandedMessageIds[group.id] ? '▼' : '▶' }}
                 </span>
               </header>
-              <div v-if="expandedMessageIds[message.id]" class="tool-log-details">
-                <pre class="faint-code">{{ formatJson(message.rawResponse) }}</pre>
-              </div>
-            </article>
-
-            <!-- Tool Execution Result Block -->
-            <article
-              v-else-if="message.role === 'tool'"
-              class="tool-log-block"
-            >
-              <header class="tool-log-header" @click="toggleMessageExpansion(message.id)">
-                <span class="tool-log-title">
-                  <i>{{ isToolSuccess(message.content) ? '✅' : '❌' }} Tool response</i>
-                </span>
-                <span class="tool-log-toggle">
-                  {{ expandedMessageIds[message.id] ? '▼' : '▶' }}
-                </span>
-              </header>
-              <div v-if="expandedMessageIds[message.id]" class="tool-log-details">
-                <pre class="faint-code">{{ formatJson(message.content) }}</pre>
+              
+              <div v-if="expandedMessageIds[group.id]" class="tool-group-details-list">
+                <div 
+                  v-for="(tc, idx) in group.toolCalls" 
+                  :key="idx" 
+                  class="tool-call-response-pair"
+                >
+                  <div class="tool-call-sub-block">
+                    <div class="sub-block-title">
+                      <span class="label-badge call">CALL</span>
+                      <code class="tool-code-name">{{ tc.function?.name }}</code>
+                    </div>
+                    <pre class="faint-code">{{ formatToolArgs(tc.function?.arguments) }}</pre>
+                  </div>
+                  
+                  <div class="tool-response-sub-block">
+                    <div class="sub-block-title">
+                      <span class="label-badge response" :class="getToolStatusClass(group.toolResponses[idx])">RESPONSE</span>
+                      <span class="status-text" v-if="group.toolResponses[idx]">
+                        {{ isToolSuccess(group.toolResponses[idx].content) ? 'Success' : 'Failed' }}
+                      </span>
+                      <span class="status-text pending" v-else>Running...</span>
+                    </div>
+                    <pre v-if="group.toolResponses[idx]" class="faint-code">{{ formatJson(group.toolResponses[idx].content) }}</pre>
+                    <div v-else class="tool-running-shimmer">
+                      <div class="shimmer-bar"></div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </article>
 
             <!-- Assistant message -->
             <article
-              v-else-if="message.role === 'assistant'"
+              v-else-if="group.type === 'assistant'"
               class="assistant-message"
             >
               <div class="assistant-meta">
                 <span class="agent-badge">AI Assistant</span>
-                <span>{{ message.providerDisplayName }} / {{ message.model }}</span>
-                <span>{{ formatTime(message.createdAt) }}</span>
+                <span>{{ group.message.providerDisplayName }} / {{ group.message.model }}</span>
+                <span>{{ formatTime(group.message.createdAt) }}</span>
               </div>
-              <div class="markdown-body" v-html="renderMarkdown(cleanMessageContent(message.content))"></div>
-              <button class="copy-button" @click="copyText(message.content)">Copy entire response</button>
+              <div class="markdown-body" v-html="renderMarkdown(cleanMessageContent(group.message.content))"></div>
+              <button class="copy-button" @click="copyText(group.message.content)">Copy entire response</button>
             </article>
           </template>
 
@@ -961,7 +1075,7 @@ onBeforeUnmount(() => {
     <div v-if="showPermissionModal && pendingPermissionRequest" class="modal-overlay">
       <div class="modal-card permission-modal-card">
         <header class="modal-header">
-          <h3>📂 Permission Request</h3>
+          <h3>Permission Request</h3>
         </header>
         
         <main class="modal-body">
@@ -985,16 +1099,16 @@ onBeforeUnmount(() => {
         <footer class="modal-footer permission-footer">
           <div class="permission-button-grid">
             <button class="primary-button perm-btn green" @click="handlePermissionDecision('allow_once')">
-              ✅ Allow now
+              Allow now
             </button>
             <button class="primary-button perm-btn blue" @click="handlePermissionDecision('allow_project')">
-              💼 Always allow in this project
+              Always allow in this project
             </button>
             <button class="primary-button perm-btn purple" @click="handlePermissionDecision('allow_always')">
-              🌍 Always allow (Global)
+              Always allow (Global)
             </button>
             <button class="danger-button perm-btn red" @click="handlePermissionDecision('deny')">
-              ❌ Do not allow
+              Do not allow
             </button>
           </div>
         </footer>
@@ -1113,48 +1227,216 @@ onBeforeUnmount(() => {
   background: rgba(255, 138, 128, 0.15);
 }
 
-.tool-log-block {
-  margin: 6px 0;
-  border-radius: 6px;
+.tool-group-block {
+  margin: 10px 0;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.02);
-  border: 1px dashed rgba(255, 255, 255, 0.05);
-  font-size: 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 0.85rem;
   width: 100%;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-.tool-log-header {
+.tool-group-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 12px;
+  padding: 10px 14px;
   cursor: pointer;
   user-select: none;
-  color: var(--muted);
-  transition: background 0.2s ease;
+  background: rgba(255, 255, 255, 0.01);
+  transition: background 0.2s ease, border-color 0.2s ease;
 }
 
-.tool-log-header:hover {
+.tool-group-header:hover {
   background: rgba(255, 255, 255, 0.04);
 }
 
-.tool-log-title {
+.tool-group-summary-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-color, #e0e0e0);
+}
+
+.tool-group-icon {
+  font-size: 0.95rem;
+}
+
+.tool-group-title {
+  font-weight: 500;
+  font-size: 0.85rem;
+}
+
+.tool-group-count {
+  font-size: 0.75rem;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 2px 6px;
+  border-radius: 12px;
+}
+
+.tool-group-summary-right {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.8rem;
+  margin-left: auto;
+  margin-right: 12px;
+}
+
+.tool-status-badge {
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-weight: 500;
+  border: 1px solid transparent;
+}
+
+.tool-status-badge.success {
+  background: rgba(76, 175, 80, 0.1);
+  color: #81c784;
+  border-color: rgba(76, 175, 80, 0.2);
+}
+
+.tool-status-badge.failed {
+  background: rgba(244, 67, 54, 0.1);
+  color: #e57373;
+  border-color: rgba(244, 67, 54, 0.2);
+}
+
+.tool-status-badge.pending {
+  background: rgba(255, 152, 0, 0.1);
+  color: #ffb74d;
+  border-color: rgba(255, 152, 0, 0.2);
+  animation: toolPulse 1.5s infinite ease-in-out;
+}
+
+.tool-group-toggle-arrow {
+  font-size: 0.7rem;
   color: var(--muted);
 }
 
-.tool-log-toggle {
-  font-size: 0.65rem;
-  color: var(--faint);
+.tool-group-details-list {
+  padding: 12px;
+  background: #121212;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.tool-log-details {
-  padding: 10px 12px;
-  background: #141414;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-  overflow-x: auto;
+.tool-call-response-pair {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.01);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.tool-call-sub-block, .tool-response-sub-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tool-response-sub-block {
+  border-top: 1px dashed rgba(255, 255, 255, 0.05);
+  padding-top: 8px;
+}
+
+.sub-block-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.label-badge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 1px 4px;
+  border-radius: 3px;
+  color: #ffffff;
+}
+
+.label-badge.call {
+  background: #2196f3;
+}
+
+.label-badge.response {
+  background: #9e9e9e;
+}
+
+.label-badge.response.success {
+  background: #4caf50;
+}
+
+.label-badge.response.failed {
+  background: #f44336;
+}
+
+.label-badge.response.pending {
+  background: #ff9800;
+}
+
+.tool-code-name {
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: #ffcb6b;
+}
+
+.status-text {
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.status-text.pending {
+  color: #ffb74d;
+  animation: toolPulse 1.5s infinite ease-in-out;
+}
+
+.tool-running-shimmer {
+  height: 24px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+
+.tool-running-shimmer::after {
+  content: '';
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.05),
+    transparent
+  );
+  animation: toolShimmer 1.5s infinite;
+}
+
+@keyframes toolShimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes toolPulse {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 .faint-code {

@@ -1,7 +1,7 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import path from "node:path";
-import type { RunStatus } from "@bridgemind/shared";
+import type { Run, RunStatus } from "@bridgemind/shared";
 import { ProviderRegistry } from "./providers/ProviderRegistry.js";
 import { RunRepository, MessageRepository, ProjectRepository } from "./database/repositories.js";
 import { Orchestrator } from "./orchestrator/Orchestrator.js";
@@ -175,8 +175,12 @@ server.post("/api/runs/:id/cancel", async (request, reply) => {
   const { id } = request.params as { id: string };
   const success = orchestrator.cancel(id);
   if (!success) {
-    reply.status(400);
-    return { error: `Run with id "${id}" is not actively running or cannot be cancelled` };
+    const run = runRepo.getById(id);
+    if (run) {
+      return { success: true, message: "Run was not actively running." };
+    }
+    reply.status(404);
+    return { error: `Run with id "${id}" not found` };
   }
   return { success: true };
 });
