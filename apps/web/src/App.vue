@@ -274,6 +274,40 @@ function formatToolArgs(args?: string): string {
   return formatJson(args);
 }
 
+function getConfirmationOptions(content: string): string[] | null {
+  const cleanText = content.toLowerCase();
+  if (cleanText.includes('(evet / hayır)') || cleanText.includes('(evet/hayır)') || cleanText.includes('evet/hayır') || cleanText.includes('evet veya hayır')) {
+    return ['Evet', 'Hayır'];
+  }
+  if (cleanText.includes('(yes / no)') || cleanText.includes('(yes/no)') || cleanText.includes('yes/no')) {
+    return ['Yes', 'No'];
+  }
+  return null;
+}
+
+function canShowConfirmation(group: { id: string; message: RunMessage }) {
+  const options = getConfirmationOptions(group.message.content);
+  if (!options) return false;
+
+  const idx = groupedMessages.value.findIndex(g => g.id === group.id);
+  if (idx === -1) return false;
+
+  for (let k = idx + 1; k < groupedMessages.value.length; k++) {
+    if (groupedMessages.value[k].type === 'user') {
+      return false;
+    }
+  }
+
+  if (isRunning.value) return false;
+
+  return true;
+}
+
+async function sendQuickReply(option: string) {
+  taskInput.value = option;
+  await handleSendTask();
+}
+
 
 
 function cleanMessageContent(content: string): string {
@@ -895,6 +929,20 @@ onBeforeUnmount(() => {
                 <span>{{ formatTime(group.message.createdAt) }}</span>
               </div>
               <div class="markdown-body" v-html="renderMarkdown(cleanMessageContent(group.message.content))"></div>
+
+              <!-- Quick confirmation buttons -->
+              <div v-if="canShowConfirmation(group)" class="confirmation-actions">
+                <button 
+                  v-for="option in getConfirmationOptions(group.message.content)" 
+                  :key="option"
+                  class="confirm-btn"
+                  :class="option.toLowerCase() === 'evet' || option.toLowerCase() === 'yes' ? 'yes' : 'no'"
+                  @click="sendQuickReply(option)"
+                >
+                  {{ option }}
+                </button>
+              </div>
+
               <button class="copy-button" @click="copyText(group.message.content)">Copy entire response</button>
             </article>
           </template>
@@ -2034,8 +2082,47 @@ onBeforeUnmount(() => {
   animation: pulseDot 1.2s infinite alternate;
 }
 
-@keyframes pulseDot {
-  0% { transform: scale(0.85); opacity: 0.6; }
-  100% { transform: scale(1.15); opacity: 1; }
+.confirmation-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.confirm-btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+  background: rgba(255, 255, 255, 0.05);
+  color: #ffffff;
+}
+
+.confirm-btn:hover {
+  transform: translateY(-1px);
+}
+
+.confirm-btn.yes {
+  background: rgba(76, 175, 80, 0.15);
+  color: #81c784;
+  border-color: rgba(76, 175, 80, 0.25);
+}
+
+.confirm-btn.yes:hover {
+  background: rgba(76, 175, 80, 0.25);
+  box-shadow: 0 0 10px rgba(76, 175, 80, 0.1);
+}
+
+.confirm-btn.no {
+  background: rgba(244, 67, 54, 0.15);
+  color: #e57373;
+  border-color: rgba(244, 67, 54, 0.25);
+}
+
+.confirm-btn.no:hover {
+  background: rgba(244, 67, 54, 0.25);
+  box-shadow: 0 0 10px rgba(244, 67, 54, 0.1);
 }
 </style>
