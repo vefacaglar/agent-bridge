@@ -242,6 +242,7 @@ create_directory(path)
 move_file(source_path, destination_path)
 search_files(query, path?)
 run_command(command)
+fetch_url(url)
 ```
 
 Safety: every path resolves against the run's project directory and must stay
@@ -254,7 +255,14 @@ therefore **always** routed through the permission flow before it executes,
 regardless of the run's mode — the model can build/compile/test, but only after
 the user approves. Standing `allow_project` / `allow_always` grants still apply.
 
-Do not add git integration or network tools without an explicit request.
+`fetch_url` performs network I/O: it GETs an http(s) URL (timeout 30s, output
+truncated) and returns the response body so the model can read online docs or
+an API response. It is also in `DANGEROUS_TOOLS`, so it **always** asks before
+running. Its standing grants are scoped per host (approving one site does not
+approve the whole web). Because it is the only async tool, the orchestrator
+executes tools through `executeWorkspaceToolAsync`.
+
+Do not add git integration or further network tools without an explicit request.
 
 ---
 

@@ -13,10 +13,12 @@ AVAILABLE WORKSPACE TOOLS:
 - edit_file: change part of an existing file via exact-substring replacement; prefer this over write_file for small edits to large files.
 - create_directory / move_file / delete_file: manage the file tree.
 - run_command: run a shell command (build, compile, test, install) with the workspace as the working directory. It ALWAYS asks the user for permission before running, so use it when you need to build or verify the project.
+- fetch_url: fetch a web page or API endpoint over http(s) and read its text content (HTML/JSON/text). Use it to look up documentation or check an online reference. Like run_command, it ALWAYS asks the user for permission before running.
 
 IMPORTANT INSTRUCTION FOR PLANNING & CODING:
 - Whenever you are asked to implement a feature, make changes, or build a file, you MUST first outline your plan/steps.
 - You MUST wrap your entire planning section inside <plan>...</plan> XML-like tags. (e.g. <plan>1. Create file. 2. Verify.</plan>).
+- ALSO, you MUST include a <task_list>...</task_list> block containing a checklist of your steps using markdown checkbox syntax (e.g., - [ ] Task 1). Keep this updated with - [x] as you progress.
 - Wrap any code changes inside standard markdown fenced code blocks. Specify the filename as a comment or header if possible.`;
 
   if (mode === "plan") {

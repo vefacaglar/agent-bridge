@@ -5,7 +5,7 @@ import { ProviderRegistry } from "../providers/ProviderRegistry.js";
 import { eventBus } from "./eventBus.js";
 import { db } from "../database/db.js";
 import { buildSystemPrompt } from "./systemPrompt.js";
-import { WORKSPACE_TOOLS, executeWorkspaceTool, buildPermissionPreview, DANGEROUS_TOOLS, permissionKey } from "./workspaceTools.js";
+import { WORKSPACE_TOOLS, executeWorkspaceToolAsync, buildPermissionPreview, DANGEROUS_TOOLS, permissionKey } from "./workspaceTools.js";
 
 type PermissionDecision = "allow_once" | "allow_project" | "allow_always" | "deny";
 
@@ -382,6 +382,6 @@ export class Orchestrator {
       }
       this.emitStatus(runId, "generating");
     }
-    return executeWorkspaceTool(run, toolCall);
+    return executeWorkspaceToolAsync(run, toolCall);
   }
 }

@@ -184,11 +184,28 @@ export const WORKSPACE_TOOLS = [
         required: ["command"]
       }
     }
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "fetch_url",
+      description: "Fetches a web page or API endpoint over HTTP(S) and returns its text content (HTML, JSON, or plain text). Use this to look up documentation, read an API response, or check a reference online. Only http and https URLs are allowed. This always requires explicit user permission before it runs.",
+      parameters: {
+        type: "object",
+        properties: {
+          url: {
+            type: "string",
+            description: "The absolute http(s) URL to fetch (e.g., 'https://example.com/docs')."
+          }
+        },
+        required: ["url"]
+      }
+    }
   }
 ];
 
 /** Tools that must always be gated behind an explicit permission prompt. */
-export const DANGEROUS_TOOLS = new Set(["run_command"]);
+export const DANGEROUS_TOOLS = new Set(["run_command", "fetch_url"]);
 
 /**
  * The key a standing permission grant is scoped to. For run_command the grant
@@ -205,6 +222,18 @@ export function permissionKey(toolCall: ToolCall): { tool: string; command: stri
       command = "";
     }
     return { tool, command };
+  }
+  if (tool === "fetch_url") {
+    // Scope the grant to the host, so approving one site does not approve the
+    // whole web. The host is stashed in the `command` slot of the key.
+    let host = "";
+    try {
+      const raw = String(JSON.parse(toolCall.function.arguments || "{}").url ?? "").trim();
+      host = new URL(raw).host;
+    } catch {
+      host = "";
+    }
+    return { tool, command: host };
   }
   return { tool, command: "" };
 }
@@ -323,6 +352,16 @@ export function buildPermissionPreview(run: Run, toolCall: ToolCall): Permission
         oldContent: null,
         newContent: null,
         command: typeof args.command === "string" ? args.command : ""
+      };
+    case "fetch_url":
+      return {
+        tool: "fetch_url",
+        action: "fetch",
+        path: "",
+        absolutePath: baseDir,
+        oldContent: null,
+        newContent: null,
+        url: typeof args.url === "string" ? args.url : ""
       };
     default:
       return null;
@@ -504,11 +543,74 @@ export function executeWorkspaceTool(run: Run, toolCall: ToolCall): string {
           });
         }
       }
+      case "fetch_url":
+        // Network access, so it is gated like run_command. Returns a promise
+        // that the caller awaits via executeWorkspaceToolAsync.
+        return JSON.stringify({ success: false, error: "fetch_url must be executed via executeWorkspaceToolAsync." });
       default:
         throw new Error(`Unknown function: ${toolCall.function.name}`);
     }
   } catch (err: any) {
     return JSON.stringify({ success: false, error: err.message });
+  }
+}
+
+/**
+ * Async variant of executeWorkspaceTool. Identical for synchronous tools, but
+ * handles fetch_url (the only tool that performs network I/O) by awaiting the
+ * HTTP request. The orchestrator should call this so web fetches resolve.
+ */
+export async function executeWorkspaceToolAsync(run: Run, toolCall: ToolCall): Promise<string> {
+  if (toolCall.function.name !== "fetch_url") {
+    return executeWorkspaceTool(run, toolCall);
+  }
+  try {
+    const args = JSON.parse(toolCall.function.arguments);
+    return await fetchUrl(typeof args.url === "string" ? args.url : "");
+  } catch (err: any) {
+    return JSON.stringify({ success: false, error: err.message });
+  }
+}
+
+/** Fetches an http(s) URL and returns its text body (truncated). */
+async function fetchUrl(rawUrl: string): Promise<string> {
+  const url = rawUrl.trim();
+  if (url === "") {
+    return JSON.stringify({ success: false, error: "Missing parameter: url" });
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return JSON.stringify({ success: false, error: `Invalid URL: ${url}` });
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return JSON.stringify({ success: false, error: "Only http and https URLs are allowed." });
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30_000);
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      redirect: "follow",
+      signal: controller.signal,
+      headers: { "User-Agent": "AgentBridge/1.0 (+local workspace assistant)" }
+    });
+    const contentType = response.headers.get("content-type") ?? "";
+    const body = await response.text();
+    return JSON.stringify({
+      success: response.ok,
+      status: response.status,
+      contentType,
+      finalUrl: response.url,
+      content: truncateOutput(body)
+    });
+  } catch (err: any) {
+    const aborted = err?.name === "AbortError";
+    return JSON.stringify({ success: false, error: aborted ? "Request timed out after 30s." : (err?.message ?? "Fetch failed.") });
+  } finally {
+    clearTimeout(timeout);
   }
 }
 

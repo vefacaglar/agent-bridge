@@ -25,12 +25,21 @@ const toolName = computed<string>(() => props.request?.toolCall?.function?.name 
 // For run_command, a grant is scoped to the exact command, so the "don't ask
 // again" options mean "for this exact command" — relabel them to make that clear.
 const options = computed(() => {
-  if (toolName.value !== 'run_command') return PERMISSION_OPTIONS;
-  return PERMISSION_OPTIONS.map((o) => {
-    if (o.decision === 'allow_project') return { ...o, label: "Yes, and allow this exact command in this project" };
-    if (o.decision === 'allow_always') return { ...o, label: 'Yes, and allow this exact command globally' };
-    return o;
-  });
+  if (toolName.value === 'run_command') {
+    return PERMISSION_OPTIONS.map((o) => {
+      if (o.decision === 'allow_project') return { ...o, label: "Yes, and allow this exact command in this project" };
+      if (o.decision === 'allow_always') return { ...o, label: 'Yes, and allow this exact command globally' };
+      return o;
+    });
+  }
+  if (toolName.value === 'fetch_url') {
+    return PERMISSION_OPTIONS.map((o) => {
+      if (o.decision === 'allow_project') return { ...o, label: 'Yes, and allow this host in this project' };
+      if (o.decision === 'allow_always') return { ...o, label: 'Yes, and allow this host globally' };
+      return o;
+    });
+  }
+  return PERMISSION_OPTIONS;
 });
 const headerPath = computed(() => preview.value?.path || preview.value?.absolutePath || '');
 const question = computed(() => actionQuestion(preview.value, toolName.value));
@@ -42,6 +51,7 @@ const previewDetail = computed(() => {
   const p = preview.value;
   if (!p) return '';
   if (p.action === 'command') return p.command ?? '';
+  if (p.action === 'fetch') return p.url ?? '';
   if (p.action === 'move') return `${p.path || p.absolutePath} → ${p.destPath ?? ''}`;
   if (p.action === 'search') return p.query ?? '';
   return p.absolutePath;

@@ -27,6 +27,7 @@ export function actionLabel(action?: string): string {
     case 'move': return 'Move';
     case 'search': return 'Search';
     case 'command': return 'Run command';
+    case 'fetch': return 'Fetch URL';
     default: return 'Run';
   }
 }
@@ -44,6 +45,7 @@ export function actionQuestion(preview: PermissionPreview | null | undefined, to
     case 'move': return `Do you want to move ${target} to ${preview.destPath ?? ''}?`;
     case 'search': return `Do you want to search for "${preview.query ?? ''}"?`;
     case 'command': return 'Do you want to run this command?';
+    case 'fetch': return `Do you want to fetch ${preview.url ?? ''}?`;
     default: return 'Do you want to proceed?';
   }
 }

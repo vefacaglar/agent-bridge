@@ -46,7 +46,10 @@ export function renderMarkdown(content: string): string {
   }
 }
 
-/** Strips internal <plan>...</plan> blocks before displaying assistant text. */
+/** Strips internal <plan>...</plan> and <task_list>...</task_list> blocks before displaying assistant text. */
 export function cleanMessageContent(content: string): string {
-  return content.replace(/<plan>[\s\S]*?<\/plan>/g, '').trim();
+  return content
+    .replace(/<plan>[\s\S]*?<\/plan>/g, '')
+    .replace(/<task_list>[\s\S]*?<\/task_list>/g, '')
+    .trim();
 }
