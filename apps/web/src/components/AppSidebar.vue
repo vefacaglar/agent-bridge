@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import type { Run } from '@agent-bridge/shared';
 import { DEFAULT_PROJECT_PATH } from '../lib/format';
 
@@ -28,9 +28,28 @@ const emit = defineEmits<{
   (e: 'toggle-sidebar'): void;
 }>();
 
+const visibleLimit = ref(4);
+
+// Reset visible runs limit when project directory changes
+watch(() => props.activeProjectPath, () => {
+  visibleLimit.value = 4;
+});
+
 const filteredRuns = computed(() =>
   props.runs.filter(run => (run.projectPath || DEFAULT_PROJECT_PATH) === props.activeProjectPath)
 );
+
+const displayedRuns = computed(() =>
+  filteredRuns.value.slice(0, visibleLimit.value)
+);
+
+const hasMoreRuns = computed(() =>
+  filteredRuns.value.length > visibleLimit.value
+);
+
+function loadMore() {
+  visibleLimit.value += 10;
+}
 
 function onDeleteProject(path: string, event: Event) {
   event.stopPropagation();
@@ -55,12 +74,24 @@ function onDeleteProject(path: string, event: Event) {
       </button>
     </div>
 
-    <button class="nav-action" :disabled="isRunning" @click="emit('new-chat')">New chat</button>
+    <button class="nav-action new-chat-action" :disabled="isRunning" @click="emit('new-chat')">
+      <svg class="new-chat-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 20h9"/>
+        <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+      </svg>
+      <span>New session</span>
+    </button>
 
     <div class="sidebar-block projects-accordion">
       <div class="sidebar-label flex-between">
         <span>Projects</span>
-        <button class="add-project-btn" title="Add Project" @click="emit('add-project')">+</button>
+        <button class="add-project-btn" title="Add Project" @click="emit('add-project')">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>
+            <line x1="12" y1="10" x2="12" y2="16"/>
+            <line x1="9" y1="13" x2="15" y2="13"/>
+          </svg>
+        </button>
       </div>
       <div class="project-list">
         <div
@@ -96,15 +127,23 @@ function onDeleteProject(path: string, event: Event) {
 
           <Transition name="expand">
             <div v-if="project.path === activeProjectPath" class="project-chats-list">
-              <div v-if="filteredRuns.length === 0" class="empty-sidebar">No chats in this project.</div>
+              <div v-if="displayedRuns.length === 0" class="empty-sidebar">No chats in this project.</div>
               <button
-                v-for="run in filteredRuns"
+                v-for="run in displayedRuns"
                 :key="run.id"
                 class="chat-history-item"
                 :class="{ active: run.id === activeRunId }"
                 @click="emit('select-run', run)"
               >
                 <span>{{ run.title }}</span>
+              </button>
+              <button
+                v-if="hasMoreRuns"
+                type="button"
+                class="load-more-btn"
+                @click="loadMore"
+              >
+                load more...
               </button>
             </div>
           </Transition>
@@ -159,6 +198,16 @@ function onDeleteProject(path: string, event: Event) {
   overflow-y: auto;
   min-height: 0;
   margin-top: 14px;
+}
+
+.new-chat-action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.new-chat-icon {
+  flex-shrink: 0;
 }
 
 .settings-action {
@@ -278,5 +327,24 @@ function onDeleteProject(path: string, event: Event) {
 .expand-leave-to {
   max-height: 0;
   opacity: 0;
+}
+
+.load-more-btn {
+  background: transparent;
+  color: var(--faint);
+  font-size: 0.78rem;
+  padding: 6px 16px;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+  transition: color 0.2s ease;
+  font-style: italic;
+  border: none;
+  border-radius: 4px;
+}
+
+.load-more-btn:hover {
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.02);
 }
 </style>
