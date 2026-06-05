@@ -1,0 +1,236 @@
+# dependencies
+
+node_modules/
+.pnpm-store/
+.yarn/
+.yarn/cache/
+.yarn/unplugged/
+.yarn/build-state.yml
+.yarn/install-state.gz
+bower_components/
+
+# package manager logs
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# build outputs
+
+dist/
+build/
+out/
+.output/
+.nuxt/
+.next/
+.svelte-kit/
+.turbo/
+.cache/
+.parcel-cache/
+.rollup.cache/
+vite.config.*.timestamp-*
+vite.config.*.mtime-*
+
+# vue / vite
+
+*.local
+.env
+.env.*
+!.env.example
+!.env.template
+
+# bridgeMind local provider config
+
+providers.local.json
+providers.*.local.json
+*.local.json
+!providers.example.json
+
+# api keys / secrets
+
+secrets/
+*.secret
+*.secrets
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.csr
+*.cer
+id_rsa
+id_rsa.pub
+id_ed25519
+id_ed25519.pub
+
+# local databases
+
+*.sqlite
+*.sqlite3
+*.db
+*.db-shm
+*.db-wal
+data/
+.local-data/
+storage/
+tmp-db/
+
+# sqlite migration/runtime artifacts
+
+drizzle/meta/_journal.local.json
+drizzle/*.local.sql
+
+# logs
+
+logs/
+*.log
+*.log.*
+debug.log
+error.log
+
+# runtime files
+
+tmp/
+temp/
+.tmp/
+.pid
+*.pid
+*.seed
+*.pid.lock
+
+# coverage / test outputs
+
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
+blob-report/
+cypress/videos/
+cypress/screenshots/
+junit.xml
+coverage-final.json
+
+# typescript
+
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# eslint / prettier cache
+
+.eslintcache
+.prettiercache
+
+# editor folders
+
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.example.json
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# os files
+
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# docker / local infra
+
+.docker/
+docker-compose.override.yml
+docker-compose.*.override.yml
+
+# local certificates
+
+certs/
+ssl/
+https/
+*.localhost.pem
+*.localhost-key.pem
+
+# generated api clients / temporary generated files
+
+generated/
+.codegen/
+openapi.generated.*
+swagger.generated.*
+
+# monorepo tool caches
+
+.nx/
+.turbo/
+.rpt2_cache/
+.angular/cache/
+
+# serverless / deployment
+
+.vercel/
+.netlify/
+.wrangler/
+.serverless/
+
+# bun
+
+bun.lockb
+
+# deno
+
+.deno/
+
+# python accidental files
+
+**pycache**/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# misc archives
+
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+
+# local notes / scratch files
+
+scratch/
+.notes/
+TODO.local.md
+PLAN.local.md
+*.draft.md
+
+# ai tool local files
+
+.claude/settings.local.json
+.claude/local/
+.cursor/
+.aider*
+.continue/
+.opencode/
+.commandcode/
+.codex/
+.gemini/
+.roo/
+.windsurf/
+
+# keep examples
+
+!*.example
+!*.example.json
+!*.example.env
+!README.md
+!DEVELOPMENT_PLAN.md
