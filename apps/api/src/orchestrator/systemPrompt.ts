@@ -1,9 +1,30 @@
+/** Appends the active project workspace context, when available. */
+function projectContextSuffix(projectName?: string, projectPath?: string): string {
+  if (!projectName && !projectPath) return "";
+  let suffix = `\n\nActive Project Workspace Context:`;
+  if (projectName) suffix += `\n- Project Name: ${projectName}`;
+  if (projectPath) suffix += `\n- Project Folder Path: ${projectPath}`;
+  return suffix;
+}
+
 /**
  * Builds the system prompt for a single-model workspace chat session.
  * The prompt adapts to the active operational mode and injects the
  * active project workspace context when available.
  */
 export function buildSystemPrompt(projectName?: string, projectPath?: string, mode?: string): string {
+  // Chat mode is deliberately lightweight: a short prompt with no tool catalog
+  // or planning scaffolding, so casual conversations stay cheap on context and
+  // the model does not go scanning the project on its own.
+  if (mode === "chat") {
+    return `You are Agent Bridge, a helpful local-first AI assistant chatting with the user about their project. Keep replies conversational and to the point.
+
+CURRENT OPERATIONAL MODE: CHAT MODE
+- This is a lightweight conversation. Do NOT proactively explore, scan, read, or modify the workspace, and do NOT write <plan> or <task_list> blocks.
+- Workspace tools are available, but only use them if the user EXPLICITLY asks you to look at or change files. Otherwise just answer from the conversation.
+- If a request clearly needs hands-on work across the project, you can suggest the user switch to Build or Plan mode.${projectContextSuffix(projectName, projectPath)}`;
+  }
+
   let prompt = `You are Agent Bridge, a helpful local-first AI assistant. You help the user with code development, analysis, and general tasks in their active project workspace. You run locally on their machine, so you should refer to their local workspace directory when helpful.
 
 AVAILABLE WORKSPACE TOOLS:
@@ -41,20 +62,13 @@ IMPORTANT INSTRUCTION FOR PLANNING & CODING:
 - Do NOT ask the user for permission in plain text, and do NOT wait for a "yes" in the chat. The application automatically intercepts every tool call and shows the user an approval dialog before it runs.
 - Writing something like "should I delete X?" as text INSTEAD of calling the tool will NOT trigger the approval dialog and nothing will happen. Always express the action as a real tool call.`;
   } else if (mode === "accept_edits") {
-    prompt += `\n\nCURRENT OPERATIONAL MODE: ACCEPT EDITS MODE
-- You can suggest code changes and make tool calls to write files.
-- The user will manually review each proposed file modification before it is applied to their workspace.`;
+    prompt += `\n\nCURRENT OPERATIONAL MODE: BUILD MODE
+- You are implementing, not just planning. Directly perform the work: write code, create/edit/delete files by calling the workspace tools — file edits are applied immediately, so do not ask for confirmation before editing.
+- Proactively call the matching tool (e.g. 'write_file', 'edit_file', 'delete_file', 'read_file', 'list_directory') for every change instead of describing it as text. Only 'run_command' and 'fetch_url' pause for the user's approval.
+- Keep the in-message <task_list> up to date as you complete steps (re-output the full list each message with finished steps marked '- [x]').`;
   }
 
-  if (projectName || projectPath) {
-    prompt += `\n\nActive Project Workspace Context:`;
-    if (projectName) {
-      prompt += `\n- Project Name: ${projectName}`;
-    }
-    if (projectPath) {
-      prompt += `\n- Project Folder Path: ${projectPath}`;
-    }
-  }
+  prompt += projectContextSuffix(projectName, projectPath);
 
   return prompt;
 }

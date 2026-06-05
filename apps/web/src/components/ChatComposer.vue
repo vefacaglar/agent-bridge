@@ -173,7 +173,7 @@ const showModeMenu = ref(false);
 const showModelMenu = ref(false);
 
 function getModeLabel(modeId: string): string {
-  return MODES_LIST.find(m => m.id === modeId)?.label ?? 'Accept edits';
+  return MODES_LIST.find(m => m.id === modeId)?.label ?? 'Chat';
 }
 
 function selectMode(modeId: ChatMode) {
@@ -232,10 +232,9 @@ function handleDocumentClick(e: MouseEvent) {
 function handleKeyDown(e: KeyboardEvent) {
   if (!showModeMenu.value) return;
   const modeKeys: Record<string, ChatMode> = {
-    '1': 'ask_permissions',
+    '1': 'chat',
     '2': 'accept_edits',
-    '3': 'plan',
-    '4': 'auto'
+    '3': 'plan'
   };
   if (modeKeys[e.key]) {
     e.preventDefault();

@@ -211,6 +211,17 @@ ask_permissions  Each tool call requires explicit user approval first.
 auto             Autonomous; calls tools freely.
 ```
 
+The web UI exposes three modes: **Chat**, **Build** (the `accept_edits` backend
+mode — applies edits directly) and **Plan**. `ask_permissions` / `auto` remain
+valid backend modes (e.g. for older persisted runs and the permission flow) but
+are no longer offered in the mode picker.
+
+**Chat** mode is a lightweight conversational mode: `buildSystemPrompt` returns
+a short prompt with no tool catalog or planning scaffolding, and the model is
+told not to proactively scan/read/modify the workspace (only on explicit
+request). This keeps casual chats cheap on context. Build/Plan keep the full
+prompt. The picker defaults to Chat for new sessions.
+
 In **plan mode** the model records a structured, chat-specific plan via the
 `update_plan` tool (see Workspace Tools / Plan Panel below). That plan is a
 *stable document* shown in the right-hand panel — it is created once and only
