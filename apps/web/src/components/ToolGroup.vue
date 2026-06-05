@@ -28,6 +28,34 @@ function getPlanTaskCount(argumentsJson: string): number {
   return Array.isArray(parsed.tasks) ? parsed.tasks.length : 0;
 }
 
+/** A short plain-text summary for the plan card: first real line of the body,
+ *  falling back to the first few step titles. */
+function getPlanSummary(argumentsJson: string): string {
+  const parsed = parseArgs(argumentsJson);
+  const clip = (s: string) => (s.length > 150 ? s.slice(0, 150).trim() + '…' : s);
+
+  const body = typeof parsed.body === 'string' ? parsed.body : '';
+  for (const raw of body.split('\n')) {
+    let line = raw.trim();
+    if (!line || line.startsWith('#') || line.startsWith('```') || line.startsWith('|') || line.startsWith('---')) continue;
+    line = line
+      .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1') // links/images -> text
+      .replace(/[*_`>#]/g, '')                    // emphasis/markers
+      .trim();
+    if (line) return clip(line);
+  }
+
+  if (Array.isArray(parsed.tasks) && parsed.tasks.length) {
+    const joined = parsed.tasks
+      .slice(0, 3)
+      .map((t: any) => (typeof t?.text === 'string' ? t.text : ''))
+      .filter(Boolean)
+      .join(' · ');
+    if (joined) return clip(joined);
+  }
+  return '';
+}
+
 function toggleDetails(index: number) {
   detailsExpanded.value[index] = !detailsExpanded.value[index];
 }
@@ -230,9 +258,15 @@ function formatToolResult(name: string, contentJson: string): string {
         class="plan-tool-card"
         @click="emit('open-plan')"
       >
-        <span class="plan-tool-label">Plan: {{ getPlanTitle(tc.function?.arguments) }}</span>
-        <span v-if="getPlanTaskCount(tc.function?.arguments)" class="plan-tool-count">
-          {{ getPlanTaskCount(tc.function?.arguments) }} steps
+        <div class="plan-tool-head">
+          <span class="plan-tool-eyebrow">Plan</span>
+          <span v-if="getPlanTaskCount(tc.function?.arguments)" class="plan-tool-count">
+            {{ getPlanTaskCount(tc.function?.arguments) }} steps
+          </span>
+        </div>
+        <span class="plan-tool-title">{{ getPlanTitle(tc.function?.arguments) }}</span>
+        <span v-if="getPlanSummary(tc.function?.arguments)" class="plan-tool-summary">
+          {{ getPlanSummary(tc.function?.arguments) }}
         </span>
         <span class="plan-tool-action">Open in panel</span>
       </button>
@@ -319,13 +353,14 @@ function formatToolResult(name: string, contentJson: string): string {
 <style scoped>
 .plan-tool-card {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
   width: 100%;
   text-align: left;
-  padding: 11px 14px;
+  padding: 14px 16px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--surface-strong);
   color: var(--text);
   cursor: pointer;
@@ -337,29 +372,52 @@ function formatToolResult(name: string, contentJson: string): string {
   background: rgba(255, 255, 255, 0.04);
 }
 
-.plan-tool-label {
-  flex: 1 1 auto;
-  font-weight: 550;
-  font-size: 0.88rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.plan-tool-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.plan-tool-eyebrow {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--faint);
 }
 
 .plan-tool-count {
-  flex: 0 0 auto;
+  margin-left: auto;
   font-family: monospace;
   font-size: 0.72rem;
   color: var(--faint);
 }
 
+.plan-tool-title {
+  font-weight: 650;
+  font-size: 1rem;
+  line-height: 1.3;
+  color: var(--text);
+}
+
+.plan-tool-summary {
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .plan-tool-action {
-  flex: 0 0 auto;
+  margin-top: 3px;
   font-size: 0.74rem;
   color: var(--muted);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 2px 8px;
+  padding: 3px 10px;
 }
 
 .tool-group-wrap {
