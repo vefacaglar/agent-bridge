@@ -276,12 +276,38 @@ function formatToolArgs(args?: string): string {
 
 function getConfirmationOptions(content: string): string[] | null {
   const cleanText = content.toLowerCase();
-  if (cleanText.includes('(evet / hayır)') || cleanText.includes('(evet/hayır)') || cleanText.includes('evet/hayır') || cleanText.includes('evet veya hayır')) {
-    return ['Evet', 'Hayır'];
-  }
-  if (cleanText.includes('(yes / no)') || cleanText.includes('(yes/no)') || cleanText.includes('yes/no')) {
+  
+  // English check
+  if (
+    cleanText.includes('(yes / no)') || 
+    cleanText.includes('(yes/no)') || 
+    cleanText.includes('yes/no') || 
+    cleanText.includes('yes or no') ||
+    cleanText.includes('do you confirm') ||
+    cleanText.includes('do you approve') ||
+    cleanText.includes('confirm?') ||
+    cleanText.includes('approve?')
+  ) {
     return ['Yes', 'No'];
   }
+  
+  // Turkish check
+  if (
+    cleanText.includes('(evet / hayır)') || 
+    cleanText.includes('(evet/hayır)') || 
+    cleanText.includes('evet/hayır') || 
+    cleanText.includes('evet veya hayır') ||
+    cleanText.includes('onaylıyor musun') ||
+    cleanText.includes('onaylıyor musunuz') ||
+    cleanText.includes('onaylar mısın') ||
+    cleanText.includes('onaylar mısınız') ||
+    cleanText.includes('onay veriyor musun') ||
+    cleanText.includes('onay veriyor musunuz') ||
+    cleanText.includes('onay istiyor')
+  ) {
+    return ['Evet', 'Hayır'];
+  }
+  
   return null;
 }
 
@@ -316,6 +342,34 @@ const activeConfirmationGroup = computed(() => {
   }
   return null;
 });
+
+function getPermissionPath(toolCall: any): string {
+  if (!toolCall?.function?.arguments) return '';
+  try {
+    const parsed = JSON.parse(toolCall.function.arguments);
+    return parsed.path || toolCall.function.name;
+  } catch (e) {
+    return toolCall.function.name;
+  }
+}
+
+function getPermissionArguments(toolCall: any): string {
+  if (!toolCall?.function?.arguments) return '';
+  try {
+    const parsed = JSON.parse(toolCall.function.arguments);
+    if (parsed.path && activeRun.value?.projectPath) {
+      const base = activeRun.value.projectPath;
+      const rel = parsed.path;
+      const combined = base.endsWith('/') || rel.startsWith('/') 
+        ? `${base}${rel}` 
+        : `${base}/${rel}`;
+      return combined.replace(/([^:]\/)\/+/g, '$1');
+    }
+    return JSON.stringify(parsed);
+  } catch (e) {
+    return toolCall.function.arguments;
+  }
+}
 
 
 
@@ -971,6 +1025,38 @@ onBeforeUnmount(() => {
             </div>
           </transition>
 
+          <!-- Permission Request Inline Card (Claude Code Style) -->
+          <transition name="slide-up">
+            <div v-if="showPermissionModal && pendingPermissionRequest" class="inline-permission-card">
+              <div class="permission-card-header">
+                <div class="permission-card-title">
+                  <span class="yellow-dot">●</span>
+                  <strong>Allow BridgeMind to run {{ pendingPermissionRequest.toolCall?.function?.name }}?</strong>
+                </div>
+                <span class="permission-scope-badge">Ask permissions</span>
+              </div>
+              
+              <div class="permission-card-body">
+                <div class="permission-details-path">
+                  {{ getPermissionPath(pendingPermissionRequest.toolCall) }}
+                </div>
+                <div class="permission-arguments-box">
+                  <code>{{ getPermissionArguments(pendingPermissionRequest.toolCall) }}</code>
+                </div>
+              </div>
+              
+              <div class="permission-card-footer">
+                <button class="perm-btn-deny" @click="handlePermissionDecision('deny')">Deny</button>
+                
+                <div class="perm-btn-allow-group">
+                  <button class="perm-btn-secondary" @click="handlePermissionDecision('allow_always')">Always allow (Global)</button>
+                  <button class="perm-btn-secondary" @click="handlePermissionDecision('allow_project')">Always allow in this project</button>
+                  <button class="perm-btn-primary" @click="handlePermissionDecision('allow_once')">Allow once ↵</button>
+                </div>
+              </div>
+            </div>
+          </transition>
+
           <!-- Text Input Box -->
           <div class="composer-input-box" style="position: relative; z-index: 2;">
             <textarea
@@ -1117,49 +1203,7 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <!-- Permission Request Modal -->
-    <div v-if="showPermissionModal && pendingPermissionRequest" class="modal-overlay">
-      <div class="modal-card permission-modal-card">
-        <header class="modal-header">
-          <h3>Permission Request</h3>
-        </header>
-        
-        <main class="modal-body">
-          <p class="permission-prompt-text">
-            The agent is requesting permission to execute a tool:
-          </p>
-          <div class="tool-call-details-box">
-            <div class="detail-row">
-              <strong>Tool:</strong> <span>{{ pendingPermissionRequest.toolCall?.function?.name }}</span>
-            </div>
-            <div class="detail-row" v-if="pendingPermissionRequest.toolCall?.function?.arguments">
-              <strong>Arguments:</strong>
-              <pre class="permission-args-pre">{{ formatJson(pendingPermissionRequest.toolCall.function.arguments) }}</pre>
-            </div>
-          </div>
-          <p class="permission-warning-info">
-            Please select how you would like to handle this request:
-          </p>
-        </main>
-        
-        <footer class="modal-footer permission-footer">
-          <div class="permission-button-grid">
-            <button class="primary-button perm-btn green" @click="handlePermissionDecision('allow_once')">
-              Allow now
-            </button>
-            <button class="primary-button perm-btn blue" @click="handlePermissionDecision('allow_project')">
-              Always allow in this project
-            </button>
-            <button class="primary-button perm-btn purple" @click="handlePermissionDecision('allow_always')">
-              Always allow (Global)
-            </button>
-            <button class="danger-button perm-btn red" @click="handlePermissionDecision('deny')">
-              Do not allow
-            </button>
-          </div>
-        </footer>
-      </div>
-    </div>
+
   </div>
 </template>
 
