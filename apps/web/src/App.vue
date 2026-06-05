@@ -1,302 +1,339 @@
 <script setup lang="ts">
-import { ref } from 'vue';
-import type { Run, RunStatus, RunMessage } from '@bridgemind/shared';
+import { ref, onMounted, onBeforeUnmount, computed } from 'vue';
+import type { Run, RunStatus, RunMessage, ProviderMetadata } from '@bridgemind/shared';
 
-// Configurations State
-const plannerProvider = ref('anthropic');
-const plannerModel = ref('claude-sonnet-4.5');
-const coderProvider = ref('opencode');
-const coderModel = ref('qwen');
+const API_BASE = 'http://localhost:3000';
+
+// API Loaded States
+const providers = ref<ProviderMetadata[]>([]);
+const runs = ref<Run[]>([]);
+const activeRunId = ref<string | null>(null);
+const activeRun = ref<Run | null>(null);
+const messages = ref<RunMessage[]>([]);
+
+// Selection Dropdowns Combined Values (providerId:modelName)
+const selectedPlannerCombined = ref('');
+const selectedCoderCombined = ref('');
 const maxRounds = ref(3);
 const taskInput = ref('Create a simple node script that parses JSON safely.');
 
-// Simulation States
+// Runtime States
 const isRunning = ref(false);
-const activeRunStatus = ref<RunStatus>('done');
-const activeRunId = ref('run-1');
-const finalOutputCode = ref(`function safeParse(str, fallback = null) {
+const finalOutputCode = ref('');
+let pollingInterval: any = null;
+
+// Formats UTC string to local time representation
+function formatTime(isoString: string): string {
   try {
-    return JSON.parse(str);
-  } catch (error) {
-    return fallback;
+    const d = new Date(isoString);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } catch (e) {
+    return '';
   }
 }
-module.exports = { safeParse };`);
 
-// Feed timeline (includes user requests, agent logs, and system events)
-type FeedItem = 
-  | { type: 'system'; id: string; text: string; time: string }
-  | { type: 'message'; id: string; message: RunMessage };
-
-const feedItems = ref<FeedItem[]>([
-  {
-    type: 'system',
-    id: 'sys-1',
-    text: 'Run setup locked. Models initialized.',
-    time: '16:00'
-  },
-  {
-    type: 'message',
-    id: 'msg-u1',
-    message: {
-      id: 'u1',
-      runId: 'run-1',
-      role: 'user',
-      agentRole: 'user',
-      content: 'Create a simple node script that parses JSON safely.',
-      createdAt: '16:00'
+// Flat list of model options for dropdown selectors
+const modelOptions = computed(() => {
+  const options: { value: string; label: string; providerId: string }[] = [];
+  for (const p of providers.value) {
+    for (const m of p.models) {
+      options.push({
+        value: `${p.id}:${m}`,
+        label: `${p.displayName} — ${m}`,
+        providerId: p.id
+      });
     }
-  },
-  {
-    type: 'system',
-    id: 'sys-2',
-    text: 'Round 1 / 3 started',
-    time: '16:01'
-  },
-  {
-    type: 'message',
-    id: 'msg-p1',
-    message: {
-      id: 'p1',
-      runId: 'run-1',
-      role: 'assistant',
-      agentRole: 'planner',
-      providerId: 'anthropic',
-      providerDisplayName: 'Anthropic',
-      model: 'claude-sonnet-4.5',
-      content: 'PLAN:\n1. Create a function "safeParse" that accepts a string.\n2. Wrap JSON.parse in a try-catch block.\n3. Return a default fallback value or null if parsing fails.',
-      createdAt: '16:01'
-    }
-  },
-  {
-    type: 'message',
-    id: 'msg-c1',
-    message: {
-      id: 'c1',
-      runId: 'run-1',
-      role: 'assistant',
-      agentRole: 'coder',
-      providerId: 'opencode',
-      providerDisplayName: 'OpenCode',
-      model: 'qwen',
-      content: 'IMPLEMENTATION:\n\n```javascript\nfunction safeParse(str, fallback = null) {\n  try {\n    return JSON.parse(str);\n  } catch (error) {\n    return fallback;\n  }\n}\nmodule.exports = { safeParse };\n```',
-      createdAt: '16:03'
-    }
-  },
-  {
-    type: 'system',
-    id: 'sys-3',
-    text: 'Orchestrator invoking Planner for code review...',
-    time: '16:04'
-  },
-  {
-    type: 'message',
-    id: 'msg-p2',
-    message: {
-      id: 'p2',
-      runId: 'run-1',
-      role: 'assistant',
-      agentRole: 'reviewer',
-      providerId: 'anthropic',
-      providerDisplayName: 'Anthropic',
-      model: 'claude-sonnet-4.5',
-      content: 'FINAL_ACCEPTED\n\nReason:\nThe coder followed the guidelines exactly and implemented fallback support.',
-      createdAt: '16:04'
-    }
-  },
-  {
-    type: 'system',
-    id: 'sys-4',
-    text: 'Run completed successfully.',
-    time: '16:04'
   }
-]);
+  return options;
+});
 
-// Past Runs History
-const mockRuns = ref<Run[]>([
-  {
-    id: 'run-1',
-    title: 'JSON Safe Parser Script',
-    task: 'Create a simple node script that parses JSON safely.',
-    status: 'done',
-    plannerProviderId: 'anthropic',
-    plannerProviderDisplayName: 'Anthropic',
-    plannerModel: 'claude-sonnet-4.5',
-    coderProviderId: 'opencode',
-    coderProviderDisplayName: 'OpenCode',
-    coderModel: 'qwen',
-    maxRounds: 3,
-    currentRound: 1,
-    createdAt: '16:00',
-    updatedAt: '16:04',
-    finalOutput: '...'
-  },
-  {
-    id: 'run-2',
-    title: 'Vue Counter Component',
-    task: 'Write a simple Vue counter with increment and decrement buttons.',
-    status: 'failed',
-    plannerProviderId: 'openai',
-    plannerProviderDisplayName: 'OpenAI',
-    plannerModel: 'gpt-4o',
-    coderProviderId: 'commandcode',
-    coderProviderDisplayName: 'CommandCode',
-    coderModel: 'default',
-    maxRounds: 3,
-    currentRound: 0,
-    createdAt: 'Yesterday',
-    updatedAt: 'Yesterday',
-    errorMessage: 'API Key is missing or invalid'
-  }
-]);
+// Chronological chat feed containing both message bubbles and system logs
+interface FeedItem {
+  type: 'system' | 'message';
+  id: string;
+  text?: string;
+  time: string;
+  message?: RunMessage;
+}
 
-// Triggers simulation of a run sequence
-const handleSendTask = () => {
-  if (!taskInput.value.trim() || isRunning.value) return;
+const feedItems = computed<FeedItem[]>(() => {
+  const items: FeedItem[] = [];
+  if (!activeRun.value) return items;
 
-  // Clear timeline and start simulation
-  feedItems.value = [];
-  isRunning.value = true;
-  activeRunStatus.value = 'planning';
-  activeRunId.value = `run-${Date.now()}`;
-  finalOutputCode.value = '';
-
-  // 1. User Message
-  feedItems.value.push({
-    type: 'message',
-    id: `u-${Date.now()}`,
-    message: {
-      id: `u-${Date.now()}`,
-      runId: activeRunId.value,
-      role: 'user',
-      agentRole: 'user',
-      content: taskInput.value,
-      createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    }
+  // 1. Initial setup system message
+  items.push({
+    type: 'system',
+    id: 'sys-start',
+    text: `Orchestration setup locked. Models: Planner (${activeRun.value.plannerModel}) ➔ Coder (${activeRun.value.coderModel})`,
+    time: formatTime(activeRun.value.createdAt)
   });
 
-  // 2. System Init
-  setTimeout(() => {
-    feedItems.value.push({
-      type: 'system',
-      id: `sys-init-${Date.now()}`,
-      text: 'Run setup locked. Models initialized.',
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    });
-    
-    // 3. Round Started & Planner Think
-    setTimeout(() => {
-      feedItems.value.push({
+  // Sort messages by creation date
+  const sortedMsgs = [...messages.value].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+
+  let currentRoundInFeed = 0;
+  for (const msg of sortedMsgs) {
+    // Round change event
+    if (msg.agentRole === 'coder') {
+      currentRoundInFeed++;
+      items.push({
         type: 'system',
-        id: `sys-r1-${Date.now()}`,
-        text: 'Round 1 / 3 started',
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        id: `sys-round-${msg.id}`,
+        text: `Round ${currentRoundInFeed} / ${activeRun.value.maxRounds} started`,
+        time: formatTime(msg.createdAt)
       });
-      
-      feedItems.value.push({
-        type: 'message',
-        id: `p-${Date.now()}`,
-        message: {
-          id: `p-${Date.now()}`,
-          runId: activeRunId.value,
-          role: 'assistant',
-          agentRole: 'planner',
-          providerId: plannerProvider.value,
-          providerDisplayName: plannerProvider.value === 'anthropic' ? 'Anthropic' : 'OpenAI',
-          model: plannerModel.value,
-          content: `PLAN:\n1. Implement parser matching the user request: "${taskInput.value}"\n2. Design clear interfaces.\n3. Return clean code block output.`,
-          createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    }
+
+    // Reviewer trigger event
+    if (msg.agentRole === 'reviewer') {
+      items.push({
+        type: 'system',
+        id: `sys-review-${msg.id}`,
+        text: 'Orchestrator invoking Planner for code review...',
+        time: formatTime(msg.createdAt)
+      });
+    }
+
+    items.push({
+      type: 'message',
+      id: msg.id,
+      time: formatTime(msg.createdAt),
+      message: msg
+    });
+  }
+
+  // 2. Final state system message
+  if (activeRun.value.status === 'done') {
+    items.push({
+      type: 'system',
+      id: 'sys-done',
+      text: 'Orchestration completed successfully.',
+      time: formatTime(activeRun.value.updatedAt)
+    });
+  } else if (activeRun.value.status === 'failed') {
+    items.push({
+      type: 'system',
+      id: 'sys-failed',
+      text: `Run failed: ${activeRun.value.errorMessage || 'Unknown error'}`,
+      time: formatTime(activeRun.value.updatedAt)
+    });
+  } else if (activeRun.value.status === 'cancelled') {
+    items.push({
+      type: 'system',
+      id: 'sys-cancelled',
+      text: 'Orchestration cancelled by user.',
+      time: formatTime(activeRun.value.updatedAt)
+    });
+  } else if (activeRun.value.status === 'max_rounds_reached') {
+    items.push({
+      type: 'system',
+      id: 'sys-max',
+      text: 'Loop stopped: Maximum rounds reached without acceptance.',
+      time: formatTime(activeRun.value.updatedAt)
+    });
+  }
+
+  return items;
+});
+
+// Load providers list
+async function loadProviders() {
+  try {
+    const res = await fetch(`${API_BASE}/api/providers`);
+    if (res.ok) {
+      providers.value = await res.json();
+      // Set default models if options exist
+      if (modelOptions.value.length > 0) {
+        if (!selectedPlannerCombined.value) {
+          const anthropicOpt = modelOptions.value.find(o => o.providerId === 'anthropic');
+          selectedPlannerCombined.value = anthropicOpt ? anthropicOpt.value : modelOptions.value[0].value;
         }
-      });
+        if (!selectedCoderCombined.value) {
+          const openCodeOpt = modelOptions.value.find(o => o.providerId === 'opencode');
+          selectedCoderCombined.value = openCodeOpt ? openCodeOpt.value : modelOptions.value[0].value;
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Failed to load providers:', err);
+  }
+}
 
-      // 4. Coder Reply
-      setTimeout(() => {
-        activeRunStatus.value = 'implementing';
-        
-        feedItems.value.push({
-          type: 'message',
-          id: `c-${Date.now()}`,
-          message: {
-            id: `c-${Date.now()}`,
-            runId: activeRunId.value,
-            role: 'assistant',
-            agentRole: 'coder',
-            providerId: coderProvider.value,
-            providerDisplayName: coderProvider.value === 'opencode' ? 'OpenCode' : 'CommandCode',
-            model: coderModel.value,
-            content: `IMPLEMENTATION:\n\n\`\`\`javascript\n// Safe processing generated by Coder\nconsole.log("Processing task: ${taskInput.value}");\n\`\`\``,
-            createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          }
-        });
+// Load runs list
+async function loadRuns() {
+  try {
+    const res = await fetch(`${API_BASE}/api/runs`);
+    if (res.ok) {
+      runs.value = await res.json();
+    }
+  } catch (err) {
+    console.error('Failed to load runs history:', err);
+  }
+}
 
-        // 5. Reviewer Accept
-        setTimeout(() => {
-          activeRunStatus.value = 'reviewing';
-          
-          feedItems.value.push({
-            type: 'system',
-            id: `sys-rev-${Date.now()}`,
-            text: 'Orchestrator invoking Planner for code review...',
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          });
-          
-          feedItems.value.push({
-            type: 'message',
-            id: `rev-${Date.now()}`,
-            message: {
-              id: `rev-${Date.now()}`,
-              runId: activeRunId.value,
-              role: 'assistant',
-              agentRole: 'reviewer',
-              providerId: plannerProvider.value,
-              providerDisplayName: plannerProvider.value === 'anthropic' ? 'Anthropic' : 'OpenAI',
-              model: plannerModel.value,
-              content: 'FINAL_ACCEPTED\n\nReason:\nThe output meets the goal and complies with the rules.',
-              createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            }
-          });
+// Load messages for specific run
+async function loadMessages(runId: string) {
+  try {
+    const res = await fetch(`${API_BASE}/api/runs/${runId}/messages`);
+    if (res.ok) {
+      messages.value = await res.json();
+    }
+  } catch (err) {
+    console.error(`Failed to load messages for run ${runId}:`, err);
+  }
+}
 
-          // 6. Complete
-          setTimeout(() => {
-            activeRunStatus.value = 'done';
-            isRunning.value = false;
-            finalOutputCode.value = `// Safe processing generated by Coder\nconsole.log("Processing task: ${taskInput.value}");`;
-            
-            feedItems.value.push({
-              type: 'system',
-              id: `sys-done-${Date.now()}`,
-              text: 'Run completed successfully.',
-              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            });
+// Select a run from history sidebar
+async function selectRun(run: Run) {
+  if (pollingInterval) {
+    clearInterval(pollingInterval);
+    pollingInterval = null;
+    isRunning.value = false;
+  }
 
-            // Add to mock history
-            mockRuns.value.unshift({
-              id: activeRunId.value,
-              title: taskInput.value.length > 25 ? taskInput.value.substring(0, 25) + '...' : taskInput.value,
-              task: taskInput.value,
-              status: 'done',
-              plannerProviderId: plannerProvider.value,
-              plannerProviderDisplayName: plannerProvider.value === 'anthropic' ? 'Anthropic' : 'OpenAI',
-              plannerModel: plannerModel.value,
-              coderProviderId: coderProvider.value,
-              coderProviderDisplayName: coderProvider.value === 'opencode' ? 'OpenCode' : 'CommandCode',
-              coderModel: coderModel.value,
-              maxRounds: maxRounds.value,
-              currentRound: 1,
-              createdAt: 'Just now',
-              updatedAt: 'Just now',
-              finalOutput: finalOutputCode.value
-            });
-          }, 1000);
-        }, 1200);
-      }, 1500);
-    }, 1200);
-  }, 800);
-};
+  activeRunId.value = run.id;
+  activeRun.value = run;
+  finalOutputCode.value = run.finalOutput || '';
+  await loadMessages(run.id);
 
+  // If the selected run is still active, restart polling for it!
+  const activeStatuses: RunStatus[] = ['created', 'planning', 'implementing', 'reviewing', 'fixing'];
+  if (activeStatuses.includes(run.status)) {
+    isRunning.value = true;
+    startPolling(run.id);
+  }
+}
+
+// Start active polling for a running job
+function startPolling(runId: string) {
+  if (pollingInterval) clearInterval(pollingInterval);
+  pollingInterval = setInterval(async () => {
+    // 1. Fetch run details
+    const runRes = await fetch(`${API_BASE}/api/runs/${runId}`);
+    if (runRes.ok) {
+      const runData = await runRes.json() as Run;
+      
+      // Update active run reference
+      if (activeRunId.value === runId) {
+        activeRun.value = runData;
+        finalOutputCode.value = runData.finalOutput || '';
+      }
+
+      // Update in history list
+      const idx = runs.value.findIndex(r => r.id === runId);
+      if (idx !== -1) {
+        runs.value[idx] = runData;
+      }
+
+      // Check if termination status reached
+      const activeStatuses: RunStatus[] = ['created', 'planning', 'implementing', 'reviewing', 'fixing'];
+      if (!activeStatuses.includes(runData.status)) {
+        clearInterval(pollingInterval);
+        pollingInterval = null;
+        isRunning.value = false;
+        loadRuns(); // Reload history final state
+      }
+    }
+
+    // 2. Fetch updated messages
+    if (activeRunId.value === runId) {
+      await loadMessages(runId);
+    }
+  }, 1000);
+}
+
+// Trigger background run creation
+async function handleSendTask() {
+  if (!taskInput.value.trim() || isRunning.value) return;
+
+  const [plannerProviderId, plannerModel] = selectedPlannerCombined.value.split(':');
+  const [coderProviderId, coderModel] = selectedCoderCombined.value.split(':');
+
+  try {
+    isRunning.value = true;
+    finalOutputCode.value = '';
+    messages.value = [];
+
+    const res = await fetch(`${API_BASE}/api/runs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        task: taskInput.value,
+        plannerProviderId,
+        plannerModel,
+        coderProviderId,
+        coderModel,
+        maxRounds: maxRounds.value
+      })
+    });
+
+    if (res.ok) {
+      const runData = await res.json() as Run;
+      activeRunId.value = runData.id;
+      activeRun.value = runData;
+
+      // Add to local runs history list
+      runs.value.unshift(runData);
+
+      // Start active polling loop
+      startPolling(runData.id);
+    } else {
+      isRunning.value = false;
+      const errData = await res.json();
+      alert(`Error starting run: ${errData.error || 'Unknown error'}`);
+    }
+  } catch (err: any) {
+    isRunning.value = false;
+    alert(`Network error: ${err.message}`);
+  }
+}
+
+// Cancel a running orchestration job
+async function cancelActiveRun() {
+  if (!activeRunId.value || !isRunning.value) return;
+
+  try {
+    const res = await fetch(`${API_BASE}/api/runs/${activeRunId.value}/cancel`, {
+      method: 'POST'
+    });
+
+    if (res.ok) {
+      if (activeRun.value) {
+        activeRun.value.status = 'cancelled';
+      }
+      // Status will stabilize on next poll tick or we reload
+      clearInterval(pollingInterval);
+      pollingInterval = null;
+      isRunning.value = false;
+      loadRuns();
+    } else {
+      const errData = await res.json();
+      alert(`Cancellation failed: ${errData.error}`);
+    }
+  } catch (err: any) {
+    alert(`Network error during cancel: ${err.message}`);
+  }
+}
+
+// Copy finalized code to clipboard
 const copyCode = () => {
   navigator.clipboard.writeText(finalOutputCode.value);
 };
+
+onMounted(async () => {
+  await loadProviders();
+  await loadRuns();
+  // If history list has items, auto-select the latest one
+  if (runs.value.length > 0) {
+    selectRun(runs.value[0]);
+  }
+});
+
+onBeforeUnmount(() => {
+  if (pollingInterval) {
+    clearInterval(pollingInterval);
+  }
+});
 </script>
 
 <template>
@@ -315,18 +352,19 @@ const copyCode = () => {
           <div style="display: flex; flex-direction: column; gap: 1rem;">
             <div class="form-group">
               <label class="form-label">Planner Model</label>
-              <select v-model="plannerModel" class="form-select" :disabled="isRunning">
-                <option value="claude-sonnet-4.5">Anthropic Claude Sonnet 4.5</option>
-                <option value="gpt-4o">OpenAI GPT-4o</option>
+              <select v-model="selectedPlannerCombined" class="form-select" :disabled="isRunning">
+                <option v-for="opt in modelOptions" :key="opt.value" :value="opt.value">
+                  {{ opt.label }}
+                </option>
               </select>
             </div>
 
             <div class="form-group">
               <label class="form-label">Coder Model</label>
-              <select v-model="coderModel" class="form-select" :disabled="isRunning">
-                <option value="qwen">OpenCode Qwen</option>
-                <option value="glm">OpenCode GLM</option>
-                <option value="default">CommandCode Default</option>
+              <select v-model="selectedCoderCombined" class="form-select" :disabled="isRunning">
+                <option v-for="opt in modelOptions" :key="opt.value" :value="opt.value">
+                  {{ opt.label }}
+                </option>
               </select>
             </div>
 
@@ -341,18 +379,22 @@ const copyCode = () => {
         <div>
           <h2 class="section-title">Orchestration History</h2>
           <div class="history-list">
+            <div v-if="runs.length === 0" style="font-size: 0.8rem; color: var(--text-muted); text-align: center; padding: 1rem;">
+              No history found.
+            </div>
             <div 
-              v-for="run in mockRuns" 
+              v-for="run in runs" 
               :key="run.id" 
               class="history-item"
               :class="{ active: run.id === activeRunId }"
+              @click="selectRun(run)"
             >
               <div class="history-title">{{ run.title }}</div>
               <div class="history-meta">
                 <span>{{ run.plannerModel }} ➔ {{ run.coderModel }}</span>
                 <span class="badge" :style="{
-                  backgroundColor: run.status === 'done' ? 'var(--success-glow)' : 'rgba(239, 68, 68, 0.05)',
-                  color: run.status === 'done' ? 'var(--success-color)' : 'var(--error-color)'
+                  backgroundColor: run.status === 'done' ? 'var(--success-glow)' : 'rgba(255, 255, 255, 0.03)',
+                  color: run.status === 'done' ? 'var(--success-color)' : (run.status === 'failed' ? 'var(--error-color)' : 'var(--text-secondary)')
                 }">
                   {{ run.status }}
                 </span>
@@ -367,23 +409,37 @@ const copyCode = () => {
     <section class="chat-container">
       <!-- Chat Header -->
       <header class="chat-header">
-        <div>
-          <span class="chat-header-title">Active Run: {{ activeRunId }}</span>
+        <div v-if="activeRun">
+          <span class="chat-header-title">Active Run: {{ activeRun.id }}</span>
         </div>
-        <div style="display: flex; align-items: center; gap: 0.75rem;">
-          <span class="badge badge-success">API Online</span>
+        <div v-else>
+          <span class="chat-header-title">Select or Create a Run</span>
+        </div>
+        
+        <div v-if="activeRun" style="display: flex; align-items: center; gap: 0.75rem;">
+          <button v-if="isRunning" @click="cancelActiveRun" class="btn btn-secondary" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; border-color: var(--error-color); color: var(--error-color);">
+            Cancel Run
+          </button>
           <span class="badge" :style="{
             backgroundColor: isRunning ? 'var(--accent-glow)' : 'rgba(255, 255, 255, 0.03)',
             color: isRunning ? 'var(--accent-light)' : 'var(--text-secondary)'
           }">
-            Status: {{ activeRunStatus }}
+            Status: {{ activeRun.status.toUpperCase() }}
           </span>
         </div>
       </header>
 
       <!-- Chat Messages Timeline -->
       <div class="chat-feed">
+        <div v-if="!activeRun" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--text-muted); text-align: center; gap: 0.5rem;">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <span>Write a task below and launch the orchestration loop!</span>
+        </div>
+
         <div 
+          v-else
           v-for="item in feedItems" 
           :key="item.id" 
           class="chat-feed-row"
@@ -396,11 +452,10 @@ const copyCode = () => {
 
           <!-- Message Card Bubbles -->
           <div 
-            v-else 
+            v-else-if="item.message" 
             class="chat-bubble-row" 
             :class="{ 'user-row': item.message.role === 'user' }"
           >
-            <!-- Planner/Coder bubbles left aligned, User bubbles right aligned -->
             <div 
               class="message-bubble"
               :class="{ 
@@ -408,7 +463,7 @@ const copyCode = () => {
                 'coder-bubble': item.message.agentRole === 'coder'
               }"
             >
-              <!-- Left Avatar for Agent, Right Avatar for User -->
+              <!-- Left Avatar for Agent -->
               <div v-if="item.message.role !== 'user'" class="avatar" :class="item.message.agentRole">
                 {{ item.message.agentRole === 'planner' || item.message.agentRole === 'reviewer' ? 'P' : 'C' }}
               </div>
@@ -418,11 +473,12 @@ const copyCode = () => {
                   <span class="bubble-author">
                     {{ item.message.role === 'user' ? 'User' : (item.message.agentRole === 'reviewer' ? 'Reviewer (Planner)' : item.message.agentRole?.toUpperCase()) }}
                   </span>
-                  <span>{{ item.message.createdAt }}</span>
+                  <span>{{ item.time }}</span>
                 </div>
                 <div class="bubble-body">{{ item.message.content }}</div>
               </div>
 
+              <!-- Right Avatar for User -->
               <div v-if="item.message.role === 'user'" class="avatar user" style="margin-left: 1rem;">
                 U
               </div>
@@ -445,17 +501,17 @@ const copyCode = () => {
           <div class="chat-input-actions">
             <div class="chat-input-meta">
               <span class="badge" style="background-color: var(--planner-glow); color: var(--planner-color); border: none">
-                {{ plannerModel }}
+                Planner: {{ selectedPlannerCombined.split(':')[1] || 'None' }}
               </span>
               <span class="badge" style="background-color: var(--coder-glow); color: var(--coder-color); border: none">
-                {{ coderModel }}
+                Coder: {{ selectedCoderCombined.split(':')[1] || 'None' }}
               </span>
             </div>
             
             <button 
               @click="handleSendTask" 
               class="btn-icon" 
-              :disabled="isRunning || !taskInput.trim()"
+              :disabled="isRunning || !taskInput.trim() || !selectedPlannerCombined || !selectedCoderCombined"
               title="Start Orchestration"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
