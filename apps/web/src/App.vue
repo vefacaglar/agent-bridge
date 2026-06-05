@@ -36,7 +36,7 @@ const {
   currentPlan
 } = chat;
 
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import { useCustomDialog } from './composables/useCustomDialog';
 
 const { activeDialog } = useCustomDialog();
@@ -108,11 +108,17 @@ const showPlanActions = computed(() =>
 watch(activeRunId, () => { decidedPlanKey.value = ''; });
 
 // Start: approve the plan, switch to build (accept edits) mode, and kick off
-// implementation with a follow-up message.
-function startPlan() {
+// implementation with a follow-up message. We flip the mode FIRST and wait a
+// tick so the continue request (and the system prompt it rebuilds) is already
+// in Build mode before the approval message is sent — otherwise the model can
+// reply as if it were still in Plan mode and ask to switch again.
+async function startPlan() {
   decidedPlanKey.value = planKey.value;
   settings.currentMode.value = 'accept_edits';
-  chat.sendQuickReply('I approve this plan. Start implementing it step by step.');
+  await nextTick();
+  chat.sendQuickReply(
+    "I approve this plan. We are now in Build mode — implement it step by step right away. Do not ask me to switch modes; you are already in Build mode."
+  );
 }
 
 // Revise: stay in plan mode and focus the composer so the user can describe the

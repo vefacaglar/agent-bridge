@@ -234,6 +234,9 @@ test("Orchestrator Integration Tests", async (t) => {
     // Verify mode system prompt addition was present
     assert.ok(systemPromptUsed.includes("CURRENT OPERATIONAL MODE: PLAN MODE"));
     assert.ok(systemPromptUsed.includes("DO NOT call any file-mutating tools"));
+    assert.ok(systemPromptUsed.includes("Do NOT implement"));
+    assert.ok(systemPromptUsed.includes("Do NOT write production code"));
+    assert.ok(systemPromptUsed.includes("do not treat repeated or pasted plan text as approval"));
     assert.ok(systemPromptUsed.includes("INITIAL PROJECT GUIDANCE"));
     assert.ok(systemPromptUsed.includes("Agents.md"));
     assert.ok(systemPromptUsed.includes("Claude.md"));

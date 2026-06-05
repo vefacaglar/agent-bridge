@@ -66,11 +66,7 @@ function extractPlan(content: string): string | null {
 
 import { computed } from 'vue';
 
-const hasActiveMessage = computed(() => {
-  if (props.groupedMessages.length === 0) return false;
-  const last = props.groupedMessages[props.groupedMessages.length - 1];
-  return last && (last.type === 'assistant' || last.type === 'tool_group');
-});
+
 
 const hasSystemErrorInHistory = computed(() => {
   return props.groupedMessages.some(g => g.type === 'system');
@@ -110,8 +106,39 @@ watch(activeLightboxImage, (newVal) => {
   }
 });
 
+const elapsedSeconds = ref(0);
+let timerInterval: any = null;
+const startTime = ref<number | null>(null);
+
+watch([() => props.isRunning, () => props.activeRun?.id], ([running]) => {
+  if (running) {
+    startTime.value = Date.now();
+    elapsedSeconds.value = 0;
+    if (timerInterval) clearInterval(timerInterval);
+    timerInterval = setInterval(() => {
+      if (startTime.value) {
+        elapsedSeconds.value = Math.floor((Date.now() - startTime.value) / 1000);
+      }
+    }, 1000);
+  } else {
+    if (timerInterval) {
+      clearInterval(timerInterval);
+      timerInterval = null;
+    }
+    startTime.value = null;
+    elapsedSeconds.value = 0;
+  }
+}, { immediate: true });
+
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeyDown);
+  if (timerInterval) clearInterval(timerInterval);
+});
+
+const formattedElapsedTime = computed(() => {
+  const m = Math.floor(elapsedSeconds.value / 60);
+  const s = elapsedSeconds.value % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
 });
 </script>
 
@@ -152,7 +179,7 @@ onUnmounted(() => {
       <span class="plan-thread-link-action">Open</span>
     </button>
 
-    <template v-for="group in groupedMessages" :key="group.id">
+    <template v-for="(group, idx) in groupedMessages" :key="group.id">
       <div v-if="group.type === 'user'" class="user-message-container">
         <article class="user-bubble">
           <div class="user-markdown-body" v-html="renderMarkdown(group.message.content)"></div>
@@ -184,7 +211,6 @@ onUnmounted(() => {
 
       <article v-else-if="group.type === 'assistant'" class="assistant-message">
         <div class="assistant-meta">
-          <span class="agent-badge">AI Assistant</span>
           <span>{{ group.message.providerDisplayName }} / {{ group.message.model }}</span>
           <span>{{ formatTime(group.message.createdAt) }}</span>
         </div>
@@ -253,6 +279,11 @@ onUnmounted(() => {
           <span class="response-tokens-badge" style="font-size: 0.72rem; color: var(--faint); font-family: monospace; user-select: none;">
             {{ getMessageTokens(group.message) }} tokens
           </span>
+          <span v-if="isRunning && idx === groupedMessages.length - 1" class="working-loader-text">
+            <span>· Working on</span>
+            <span class="animating-dots"><span>.</span><span>.</span><span>.</span></span>
+            <span class="elapsed-time">({{ formattedElapsedTime }})</span>
+          </span>
         </div>
       </article>
 
@@ -294,11 +325,6 @@ onUnmounted(() => {
         </div>
       </div>
     </article>
-
-    <!-- Subtle loader before message starts streaming -->
-    <div v-if="isRunning && !hasActiveMessage" class="system-line active pulsing-loader">
-      Thinking...
-    </div>
 
     <!-- Lightbox Modal -->
     <Transition name="fade">
@@ -384,15 +410,7 @@ onUnmounted(() => {
   100% { transform: scale(1.05); filter: brightness(1.1); }
 }
 
-.pulsing-loader {
-  animation: pulseOpacity 1.5s infinite alternate;
-  align-self: flex-start;
-}
 
-@keyframes pulseOpacity {
-  0% { opacity: 0.6; }
-  100% { opacity: 1; }
-}
 
 /* Terminal Container Styling */
 .plan-terminal-container,
@@ -698,5 +716,45 @@ onUnmounted(() => {
 }
 .fade-leave-to .lightbox-img {
   transform: scale(0.95);
+}
+.working-loader-text {
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-style: italic;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 4px;
+}
+
+.working-loader-text .elapsed-time {
+  color: var(--faint);
+  font-style: normal;
+  margin-left: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.animating-dots {
+  display: inline-flex;
+}
+
+.animating-dots span {
+  animation: dotBlink 1.4s infinite both;
+  width: 4px;
+  text-align: center;
+}
+
+.animating-dots span:nth-child(2) {
+  animation-delay: .2s;
+}
+
+.animating-dots span:nth-child(3) {
+  animation-delay: .4s;
+}
+
+@keyframes dotBlink {
+  0% { opacity: .2; }
+  20% { opacity: 1; }
+  100% { opacity: .2; }
 }
 </style>
