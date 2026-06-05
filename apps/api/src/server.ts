@@ -1,6 +1,7 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { ProviderRegistry } from "./providers/ProviderRegistry.js";
+import { RunRepository, MessageRepository } from "./database/repositories.js";
 
 const server = Fastify({
   logger: true,
@@ -12,6 +13,8 @@ await server.register(cors, {
 });
 
 const registry = new ProviderRegistry();
+const runRepo = new RunRepository();
+const messageRepo = new MessageRepository();
 
 // Basic ping/health endpoint
 server.get("/ping", async (request, reply) => {
@@ -21,6 +24,33 @@ server.get("/ping", async (request, reply) => {
 // Get safe provider metadata (no keys exposed)
 server.get("/api/providers", async (request, reply) => {
   return registry.getSafeMetadata();
+});
+
+// Get run history list
+server.get("/api/runs", async (request, reply) => {
+  return runRepo.list();
+});
+
+// Get single run details
+server.get("/api/runs/:id", async (request, reply) => {
+  const { id } = request.params as { id: string };
+  const run = runRepo.getById(id);
+  if (!run) {
+    reply.status(404);
+    return { error: `Run with id "${id}" not found` };
+  }
+  return run;
+});
+
+// Get messages for a single run
+server.get("/api/runs/:id/messages", async (request, reply) => {
+  const { id } = request.params as { id: string };
+  const run = runRepo.getById(id);
+  if (!run) {
+    reply.status(404);
+    return { error: `Run with id "${id}" not found` };
+  }
+  return messageRepo.listByRunId(id);
 });
 
 // Test completion request to check provider configuration
