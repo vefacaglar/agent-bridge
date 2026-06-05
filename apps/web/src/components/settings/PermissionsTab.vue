@@ -15,6 +15,17 @@ function basename(path: string): string {
   const parts = path.replace(/\/+$/, '').split('/');
   return parts[parts.length - 1] || path;
 }
+
+function ruleTitle(rule: PermissionRule): string {
+  const tool = rule.tool || 'tool';
+  return rule.command ? `${tool}: ${rule.command}` : tool;
+}
+
+function ruleScopeText(rule: PermissionRule): string {
+  return rule.scope === 'global'
+    ? 'Allowed in all projects'
+    : `Allowed in ${basename(rule.projectPath)}`;
+}
 </script>
 
 <template>
@@ -46,11 +57,9 @@ function basename(path: string): string {
       <li v-for="rule in permissions" :key="rule.id" class="perm-rule-item">
         <span class="perm-rule-scope">{{ rule.scope }}</span>
         <div class="perm-rule-text">
-          <span class="perm-rule-title">
-            {{ rule.scope === 'global' ? 'All projects (global)' : basename(rule.projectPath) }}
-          </span>
+          <span class="perm-rule-title">{{ ruleTitle(rule) }}</span>
           <span class="perm-rule-sub">
-            {{ rule.scope === 'global' ? 'Tool calls run everywhere without asking' : rule.projectPath }}
+            {{ rule.scope === 'global' ? ruleScopeText(rule) : rule.projectPath }}
           </span>
         </div>
         <button class="perm-rule-revoke" title="Revoke" @click="emit('revoke', rule.id)">Revoke</button>

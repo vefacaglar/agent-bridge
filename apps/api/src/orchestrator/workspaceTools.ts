@@ -190,6 +190,25 @@ export const WORKSPACE_TOOLS = [
 /** Tools that must always be gated behind an explicit permission prompt. */
 export const DANGEROUS_TOOLS = new Set(["run_command"]);
 
+/**
+ * The key a standing permission grant is scoped to. For run_command the grant
+ * is per exact command string, so approving "dotnet build" does not approve
+ * "dotnet build -f". Other tools are scoped per tool name (command is empty).
+ */
+export function permissionKey(toolCall: ToolCall): { tool: string; command: string } {
+  const tool = toolCall.function.name;
+  if (tool === "run_command") {
+    let command = "";
+    try {
+      command = String(JSON.parse(toolCall.function.arguments || "{}").command ?? "").trim();
+    } catch {
+      command = "";
+    }
+    return { tool, command };
+  }
+  return { tool, command: "" };
+}
+
 /** Resolves a workspace-relative path to an absolute one, refusing to escape. */
 function resolveInside(baseDir: string, relativePath: string): string {
   const absolutePath = path.resolve(baseDir, relativePath);

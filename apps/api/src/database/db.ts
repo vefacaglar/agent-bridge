@@ -84,14 +84,29 @@ db.exec(`
   );
 `);
 
-// Create Permissions Table
+// Create Permissions Table.
+// Grants are keyed per tool and (for run_command) per exact command, so
+// approving "dotnet build" does not also approve "dotnet build -f".
+//
+// Migration: the original schema only had UNIQUE(scope, project_path) and no
+// tool/command columns — a single grant meant "allow every tool". That blanket
+// semantics conflicts with per-command approval, so the legacy table is dropped
+// and rebuilt; the user simply re-approves on next use.
+const permCols = db.prepare("PRAGMA table_info(permissions)").all() as { name: string }[];
+if (permCols.length > 0 && !permCols.some((c) => c.name === "tool")) {
+  console.log("[Database] Migrating permissions table to per-tool/command grants (clearing legacy blanket grants).");
+  db.exec("DROP TABLE permissions");
+}
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS permissions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     scope TEXT NOT NULL,
     project_path TEXT NOT NULL DEFAULT '',
+    tool TEXT NOT NULL DEFAULT '',
+    command TEXT NOT NULL DEFAULT '',
     status TEXT NOT NULL,
-    UNIQUE(scope, project_path)
+    UNIQUE(scope, project_path, tool, command)
   );
 `);
 

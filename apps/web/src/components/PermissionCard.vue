@@ -21,6 +21,17 @@ const selected = ref(0);
 
 const preview = computed<PermissionPreview | null>(() => props.request?.preview ?? null);
 const toolName = computed<string>(() => props.request?.toolCall?.function?.name ?? 'tool');
+
+// For run_command, a grant is scoped to the exact command, so the "don't ask
+// again" options mean "for this exact command" — relabel them to make that clear.
+const options = computed(() => {
+  if (toolName.value !== 'run_command') return PERMISSION_OPTIONS;
+  return PERMISSION_OPTIONS.map((o) => {
+    if (o.decision === 'allow_project') return { ...o, label: "Yes, and allow this exact command in this project" };
+    if (o.decision === 'allow_always') return { ...o, label: 'Yes, and allow this exact command globally' };
+    return o;
+  });
+});
 const headerPath = computed(() => preview.value?.path || preview.value?.absolutePath || '');
 const question = computed(() => actionQuestion(preview.value, toolName.value));
 const diffRows = computed(() => previewDiff(preview.value));
@@ -64,16 +75,16 @@ function onKeyDown(e: KeyboardEvent) {
     decide('deny');
   } else if (e.key === 'ArrowDown') {
     e.preventDefault();
-    selected.value = (selected.value + 1) % PERMISSION_OPTIONS.length;
+    selected.value = (selected.value + 1) % options.value.length;
   } else if (e.key === 'ArrowUp') {
     e.preventDefault();
-    selected.value = (selected.value - 1 + PERMISSION_OPTIONS.length) % PERMISSION_OPTIONS.length;
+    selected.value = (selected.value - 1 + options.value.length) % options.value.length;
   } else if (e.key === 'Enter') {
     e.preventDefault();
-    decide(PERMISSION_OPTIONS[selected.value].decision);
+    decide(options.value[selected.value].decision);
   } else if (['1', '2', '3', '4'].includes(e.key)) {
     e.preventDefault();
-    const option = PERMISSION_OPTIONS[Number(e.key) - 1];
+    const option = options.value[Number(e.key) - 1];
     if (option) decide(option.decision);
   }
 }
@@ -120,7 +131,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeyDown, true));
 
       <ul class="cc-perm-options">
         <li
-          v-for="(option, idx) in PERMISSION_OPTIONS"
+          v-for="(option, idx) in options"
           :key="option.decision"
           class="cc-perm-option"
           :class="{ active: idx === selected }"

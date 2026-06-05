@@ -150,6 +150,8 @@ export interface PermissionRule {
   id: number;
   scope: "global" | "project";
   projectPath: string;
+  tool: string;
+  command: string;
   status: string;
 }
 

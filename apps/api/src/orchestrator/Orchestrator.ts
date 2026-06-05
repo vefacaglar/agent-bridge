@@ -5,7 +5,7 @@ import { ProviderRegistry } from "../providers/ProviderRegistry.js";
 import { eventBus } from "./eventBus.js";
 import { db } from "../database/db.js";
 import { buildSystemPrompt } from "./systemPrompt.js";
-import { WORKSPACE_TOOLS, executeWorkspaceTool, buildPermissionPreview, DANGEROUS_TOOLS } from "./workspaceTools.js";
+import { WORKSPACE_TOOLS, executeWorkspaceTool, buildPermissionPreview, DANGEROUS_TOOLS, permissionKey } from "./workspaceTools.js";
 
 type PermissionDecision = "allow_once" | "allow_project" | "allow_always" | "deny";
 
@@ -42,15 +42,23 @@ export class Orchestrator {
     return this.pendingPermissions.get(runId);
   }
 
-  private checkPermission(projectPath?: string): boolean {
+  /**
+   * Whether a standing grant covers this exact tool call. Grants are scoped per
+   * tool, and for run_command per exact command string, so an approval never
+   * leaks to a different command or tool.
+   */
+  private checkPermission(run: Run, toolCall: any): boolean {
     try {
-      const globalPerm = db.prepare("SELECT * FROM permissions WHERE scope = 'global' AND status = 'allowed'").get();
+      const { tool, command } = permissionKey(toolCall);
+      const globalPerm = db
+        .prepare("SELECT 1 FROM permissions WHERE scope = 'global' AND tool = ? AND command = ? AND status = 'allowed'")
+        .get(tool, command);
       if (globalPerm) return true;
 
-      if (projectPath) {
+      if (run.projectPath) {
         const projectPerm = db
-          .prepare("SELECT * FROM permissions WHERE scope = 'project' AND project_path = ? AND status = 'allowed'")
-          .get(projectPath);
+          .prepare("SELECT 1 FROM permissions WHERE scope = 'project' AND project_path = ? AND tool = ? AND command = ? AND status = 'allowed'")
+          .get(run.projectPath, tool, command);
         if (projectPerm) return true;
       }
     } catch (err) {
@@ -362,8 +370,10 @@ export class Orchestrator {
    */
   private async runToolCall(runId: string, run: Run, toolCall: any): Promise<string> {
     const isDangerous = DANGEROUS_TOOLS.has(toolCall.function?.name);
-    const needsPermission =
-      (run.mode === "ask_permissions" || isDangerous) && !this.checkPermission(run.projectPath);
+    // run_command is always gated; other tools only in ask_permissions mode.
+    // Either way a matching per-tool/per-command grant lets it run silently.
+    const mustGate = isDangerous || run.mode === "ask_permissions";
+    const needsPermission = mustGate && !this.checkPermission(run, toolCall);
 
     if (needsPermission) {
       const decision = await this.requestPermission(runId, run, toolCall);

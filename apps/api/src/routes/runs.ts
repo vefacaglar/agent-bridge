@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import type { Run, RunStatus } from "@bridgemind/shared";
 import { type AppContext, normalizeProject } from "../context.js";
 import { eventBus } from "../orchestrator/eventBus.js";
+import { permissionKey } from "../orchestrator/workspaceTools.js";
 
 const PERMISSION_DECISIONS = ["allow_once", "allow_project", "allow_always", "deny"] as const;
 type PermissionDecision = (typeof PERMISSION_DECISIONS)[number];
@@ -142,11 +143,18 @@ export function registerRunRoutes(server: FastifyInstance, ctx: AppContext) {
       return { error: `Run with id "${id}" not found` };
     }
 
+    // Persist the grant scoped to the exact tool/command being approved, so it
+    // never leaks to a different command or tool. run_command grants are keyed
+    // to the exact command string.
+    const pending = ctx.orchestrator.getPendingPermission(id);
     try {
-      if (decision === "allow_project" && run.projectPath) {
-        ctx.permissionRepo.allowProject(run.projectPath);
-      } else if (decision === "allow_always") {
-        ctx.permissionRepo.allowGlobal();
+      if (pending?.toolCall && (decision === "allow_project" || decision === "allow_always")) {
+        const { tool, command } = permissionKey(pending.toolCall);
+        if (decision === "allow_project" && run.projectPath) {
+          ctx.permissionRepo.allowProject(run.projectPath, tool, command);
+        } else if (decision === "allow_always") {
+          ctx.permissionRepo.allowGlobal(tool, command);
+        }
       }
     } catch (err: any) {
       console.error("[Server] Error saving permission:", err.message);
