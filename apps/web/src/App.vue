@@ -1,34 +1,24 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import type { ProviderMetadata, Run } from '@bridgemind/shared';
 import { statusClass, statusLabel } from './lib/format';
-import { useComposerSettings } from './composables/useComposerSettings';
-import { useProjects } from './composables/useProjects';
-import { useChatSession } from './composables/useChatSession';
+import { useAppShell } from './composables/useAppShell';
 import AppSidebar from './components/AppSidebar.vue';
 import MessageThread from './components/MessageThread.vue';
 import ChatComposer from './components/ChatComposer.vue';
 import AddProjectModal from './components/AddProjectModal.vue';
 
-// Shared top-level state, owned here and passed down to avoid circular deps.
-const providers = ref<ProviderMetadata[]>([]);
-const runs = ref<Run[]>([]);
-const messagesContainer = ref<HTMLElement | null>(null);
-
-const settings = useComposerSettings(providers);
-const projects = useProjects(runs);
-const chat = useChatSession({
-  providers,
+const {
   runs,
-  selectedModelCombined: settings.selectedModelCombined,
-  currentMode: settings.currentMode,
-  bypassPermissions: settings.bypassPermissions,
-  activeProject: projects.activeProject,
-  activeProjectPath: projects.activeProjectPath
-});
+  setMessagesContainer,
+  settings,
+  projects,
+  chat,
+  isMac,
+  selectProject,
+  submitProject,
+  deleteProject
+} = useAppShell();
 
 const {
-  messages,
   activeRunId,
   activeRun,
   isRunning,
@@ -40,51 +30,6 @@ const {
   visibleTitle,
   activeConfirmationGroup
 } = chat;
-
-const isMac = computed(() =>
-  navigator.userAgent.toLowerCase().includes('mac') || navigator.platform.toLowerCase().includes('mac')
-);
-
-function selectProject(projectPath: string) {
-  if (isRunning.value) return;
-  projects.activeProjectPath.value = projectPath;
-  chat.startNewRunSetup();
-}
-
-async function onSubmitProject() {
-  const path = await projects.submitNewProject();
-  if (path) selectProject(path);
-}
-
-async function onDeleteProject(projectPath: string) {
-  const fallback = await projects.deleteProject(projectPath);
-  if (fallback !== null) selectProject(fallback);
-}
-
-function scrollToBottom() {
-  if (messagesContainer.value) {
-    messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
-  }
-}
-
-watch(messages, () => nextTick(scrollToBottom), { deep: true });
-watch(isRunning, () => nextTick(scrollToBottom));
-watch(activeRunId, () => nextTick(scrollToBottom));
-
-onMounted(async () => {
-  await chat.loadProviders();
-  settings.ensureDefaultModel();
-  await projects.loadProjects();
-  await chat.loadRuns();
-
-  if (runs.value.length > 0) {
-    await chat.selectRun(runs.value[0]);
-  } else if (projects.projectOptions.value.length > 0) {
-    projects.activeProjectPath.value = projects.projectOptions.value[0].path;
-  }
-});
-
-onBeforeUnmount(() => chat.disconnect());
 </script>
 
 <template>
@@ -99,7 +44,7 @@ onBeforeUnmount(() => chat.disconnect());
       @add-project="projects.openAddProjectModal"
       @select-project="selectProject"
       @select-run="chat.selectRun"
-      @delete-project="onDeleteProject"
+      @delete-project="deleteProject"
     />
 
     <main class="chat-shell">
@@ -115,7 +60,7 @@ onBeforeUnmount(() => chat.disconnect());
         </div>
       </header>
 
-      <section ref="messagesContainer" class="messages-scroll">
+      <section :ref="setMessagesContainer" class="messages-scroll">
         <MessageThread
           :active-run="activeRun"
           :grouped-messages="groupedMessages"
@@ -150,7 +95,7 @@ onBeforeUnmount(() => chat.disconnect());
       v-model:path="projects.newProjectPath.value"
       @close="projects.closeAddProjectModal"
       @browse="projects.browseFolder"
-      @submit="onSubmitProject"
+      @submit="submitProject"
     />
   </div>
 </template>
