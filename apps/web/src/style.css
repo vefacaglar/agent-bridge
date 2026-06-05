@@ -112,6 +112,7 @@ pre {
 }
 
 .nav-action,
+.project-item,
 .chat-history-item {
   width: 100%;
   border-radius: 8px;
@@ -127,6 +128,8 @@ pre {
 }
 
 .nav-action:hover,
+.project-item:hover,
+.project-item.active,
 .chat-history-item:hover,
 .chat-history-item.active {
   background: var(--sidebar-active);
@@ -154,9 +157,20 @@ pre {
   font-size: 0.82rem;
 }
 
-.project-name {
+.project-item {
+  display: block;
+  padding: 8px 10px;
+}
+
+.project-item span {
+  overflow: hidden;
   color: var(--muted);
-  font-size: 0.9rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-item.active span {
+  color: var(--text);
 }
 
 .empty-sidebar {
@@ -166,11 +180,10 @@ pre {
 }
 
 .chat-history-item {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-  align-items: center;
-  padding: 9px 10px;
+  display: block;
+  padding: 8px 10px 8px 16px;
+  color: var(--muted);
+  font-size: 0.9rem;
 }
 
 .chat-history-item span {
@@ -179,9 +192,8 @@ pre {
   white-space: nowrap;
 }
 
-.chat-history-item small {
-  color: var(--faint);
-  font-size: 0.72rem;
+.chat-history-item.active {
+  color: var(--text);
 }
 
 .chat-shell {

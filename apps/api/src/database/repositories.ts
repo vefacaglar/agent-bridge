@@ -7,6 +7,8 @@ function mapRowToRun(row: any): Run {
     id: row.id,
     title: row.title,
     task: row.task,
+    projectPath: row.project_path || undefined,
+    projectName: row.project_name || undefined,
     status: row.status as RunStatus,
     plannerProviderId: row.planner_provider_id,
     plannerProviderDisplayName: row.planner_provider_display_name,
@@ -45,18 +47,20 @@ export class RunRepository {
   create(run: Run): void {
     const stmt = db.prepare(`
       INSERT INTO runs (
-        id, title, task, status,
+        id, title, task, project_path, project_name, status,
         planner_provider_id, planner_provider_display_name, planner_model,
         coder_provider_id, coder_provider_display_name, coder_model,
         max_rounds, current_round, source_run_id, retry_type,
         final_output, error_message, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     
     stmt.run(
       run.id,
       run.title,
       run.task,
+      run.projectPath || process.cwd(),
+      run.projectName || "Workspace",
       run.status,
       run.plannerProviderId,
       run.plannerProviderDisplayName,
@@ -94,6 +98,8 @@ export class RunRepository {
     const mappings: Record<string, string> = {
       title: "title",
       task: "task",
+      projectPath: "project_path",
+      projectName: "project_name",
       status: "status",
       plannerProviderId: "planner_provider_id",
       plannerProviderDisplayName: "planner_provider_display_name",

@@ -59,6 +59,8 @@ export interface Run {
   id: string;
   title: string;
   task: string;
+  projectPath?: string;
+  projectName?: string;
   status: RunStatus;
   plannerProviderId: string;
   plannerProviderDisplayName: string;

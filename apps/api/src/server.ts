@@ -1,5 +1,6 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import path from "node:path";
 import type { RunStatus } from "@bridgemind/shared";
 import { ProviderRegistry } from "./providers/ProviderRegistry.js";
 import { RunRepository, MessageRepository } from "./database/repositories.js";
@@ -20,6 +21,16 @@ const runRepo = new RunRepository();
 const messageRepo = new MessageRepository();
 const orchestrator = new Orchestrator(runRepo, messageRepo, registry);
 
+const defaultProjectPath = process.cwd();
+
+function normalizeProject(projectPath?: string, projectName?: string) {
+  const normalizedPath = projectPath?.trim() || defaultProjectPath;
+  return {
+    projectPath: normalizedPath,
+    projectName: projectName?.trim() || path.basename(normalizedPath) || "Workspace"
+  };
+}
+
 // Basic ping/health endpoint
 server.get("/ping", async (request, reply) => {
   return { status: "ok", timestamp: new Date().toISOString() };
@@ -32,8 +43,10 @@ server.get("/api/providers", async (request, reply) => {
 
 // Create and trigger a new orchestration run
 server.post("/api/runs", async (request, reply) => {
-  const { task, plannerProviderId, plannerModel, coderProviderId, coderModel, maxRounds: requestedMaxRounds } = request.body as {
+  const { task, projectPath, projectName, plannerProviderId, plannerModel, coderProviderId, coderModel, maxRounds: requestedMaxRounds } = request.body as {
     task: string;
+    projectPath?: string;
+    projectName?: string;
     plannerProviderId: string;
     plannerModel: string;
     coderProviderId: string;
@@ -56,11 +69,13 @@ server.post("/api/runs", async (request, reply) => {
 
   const runId = `run-${Date.now()}`;
   const title = task.length > 25 ? task.substring(0, 25) + "..." : task;
+  const project = normalizeProject(projectPath, projectName);
 
   const run = {
     id: runId,
     title,
     task,
+    ...project,
     status: "created" as RunStatus,
     plannerProviderId,
     plannerProviderDisplayName,
@@ -131,6 +146,8 @@ server.post("/api/runs/:id/duplicate", async (request, reply) => {
     id: runId,
     title: sourceRun.title,
     task: sourceRun.task,
+    projectPath: sourceRun.projectPath,
+    projectName: sourceRun.projectName,
     status: "created" as RunStatus,
     plannerProviderId,
     plannerProviderDisplayName,
@@ -187,6 +204,8 @@ server.post("/api/runs/:id/retry-coder", async (request, reply) => {
     id: runId,
     title: sourceRun.title,
     task: sourceRun.task,
+    projectPath: sourceRun.projectPath,
+    projectName: sourceRun.projectName,
     status: "created" as RunStatus,
     plannerProviderId: sourceRun.plannerProviderId,
     plannerProviderDisplayName: sourceRun.plannerProviderDisplayName,

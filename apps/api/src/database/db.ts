@@ -15,6 +15,7 @@ function findWorkspaceRoot(): string {
 }
 
 const wsRoot = findWorkspaceRoot();
+const defaultProjectName = path.basename(wsRoot);
 const isTest = process.env.NODE_ENV === "test";
 const dbPath = isTest ? ":memory:" : (process.env.BRIDGEMIND_DB_PATH || path.join(wsRoot, "bridgemind.db"));
 
@@ -27,6 +28,8 @@ db.exec(`
     id TEXT PRIMARY KEY,
     title TEXT NOT NULL,
     task TEXT NOT NULL,
+    project_path TEXT NOT NULL DEFAULT '${wsRoot.replace(/'/g, "''")}',
+    project_name TEXT NOT NULL DEFAULT '${defaultProjectName.replace(/'/g, "''")}',
     status TEXT NOT NULL,
 
     planner_provider_id TEXT NOT NULL,
@@ -50,6 +53,17 @@ db.exec(`
     updated_at TEXT NOT NULL
   );
 `);
+
+const runColumns = db.prepare("PRAGMA table_info(runs)").all() as Array<{ name: string }>;
+const runColumnNames = new Set(runColumns.map(column => column.name));
+
+if (!runColumnNames.has("project_path")) {
+  db.exec(`ALTER TABLE runs ADD COLUMN project_path TEXT NOT NULL DEFAULT '${wsRoot.replace(/'/g, "''")}'`);
+}
+
+if (!runColumnNames.has("project_name")) {
+  db.exec(`ALTER TABLE runs ADD COLUMN project_name TEXT NOT NULL DEFAULT '${defaultProjectName.replace(/'/g, "''")}'`);
+}
 
 // Create Messages Table
 db.exec(`

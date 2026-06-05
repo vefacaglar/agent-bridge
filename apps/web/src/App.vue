@@ -14,6 +14,7 @@ const selectedPlannerCombined = ref('');
 const selectedCoderCombined = ref('');
 const maxRounds = ref(3);
 const taskInput = ref('');
+const activeProjectPath = ref('/Users/vefa/Projects/agent-bridge');
 
 const isRunning = ref(false);
 const finalOutput = ref('');
@@ -37,6 +38,36 @@ const modelOptions = computed(() => {
 
 const plannerMessage = computed(() => messages.value.find(message => message.agentRole === 'planner'));
 const visibleTitle = computed(() => activeRun.value?.title || 'New chat');
+
+const projectOptions = computed(() => {
+  const projects = new Map<string, { path: string; name: string; count: number }>();
+  projects.set('/Users/vefa/Projects/agent-bridge', {
+    path: '/Users/vefa/Projects/agent-bridge',
+    name: 'agent-bridge',
+    count: 0
+  });
+
+  for (const run of runs.value) {
+    const path = run.projectPath || '/Users/vefa/Projects/agent-bridge';
+    const name = run.projectName || path.split('/').filter(Boolean).at(-1) || 'Workspace';
+    const existing = projects.get(path);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      projects.set(path, { path, name, count: 1 });
+    }
+  }
+
+  return [...projects.values()].sort((a, b) => a.name.localeCompare(b.name));
+});
+
+const filteredRuns = computed(() => {
+  return runs.value.filter(run => (run.projectPath || '/Users/vefa/Projects/agent-bridge') === activeProjectPath.value);
+});
+
+const activeProject = computed(() => {
+  return projectOptions.value.find(project => project.path === activeProjectPath.value) || projectOptions.value[0];
+});
 
 function formatTime(value: string): string {
   return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -121,6 +152,7 @@ async function selectRun(run: Run) {
 
   activeRunId.value = run.id;
   activeRun.value = { ...run };
+  activeProjectPath.value = run.projectPath || activeProjectPath.value;
   taskInput.value = '';
   finalOutput.value = run.finalOutput || '';
 
@@ -141,6 +173,12 @@ function startNewRunSetup() {
   messages.value = [];
   finalOutput.value = '';
   taskInput.value = '';
+}
+
+function selectProject(projectPath: string) {
+  if (isRunning.value) return;
+  activeProjectPath.value = projectPath;
+  startNewRunSetup();
 }
 
 function connectEventSource(runId: string) {
@@ -215,6 +253,8 @@ async function handleSendTask() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       task: taskInput.value,
+      projectPath: activeProject.value?.path,
+      projectName: activeProject.value?.name,
       plannerProviderId: planner.providerId,
       plannerModel: planner.model,
       coderProviderId: coder.providerId,
@@ -294,6 +334,7 @@ async function startDerivedRun(path: string, payload: Record<string, unknown>) {
   const run = await response.json() as Run;
   activeRunId.value = run.id;
   activeRun.value = run;
+  activeProjectPath.value = run.projectPath || activeProjectPath.value;
   taskInput.value = '';
   runs.value.unshift(run);
   connectEventSource(run.id);
@@ -329,22 +370,29 @@ onBeforeUnmount(() => {
       <button class="nav-action muted">Search</button>
 
       <div class="sidebar-block">
-        <div class="sidebar-label">Project</div>
-        <div class="project-name">agent-bridge</div>
+        <div class="sidebar-label">Projects</div>
+        <button
+          v-for="project in projectOptions"
+          :key="project.path"
+          class="project-item"
+          :class="{ active: project.path === activeProjectPath }"
+          @click="selectProject(project.path)"
+        >
+          <span>{{ project.name }}</span>
+        </button>
       </div>
 
       <div class="sidebar-block runs-block">
-        <div class="sidebar-label">Chats</div>
-        <div v-if="runs.length === 0" class="empty-sidebar">No runs yet.</div>
+        <div class="sidebar-label">{{ activeProject?.name || 'Project' }} chats</div>
+        <div v-if="filteredRuns.length === 0" class="empty-sidebar">No chats in this project.</div>
         <button
-          v-for="run in runs"
+          v-for="run in filteredRuns"
           :key="run.id"
           class="chat-history-item"
           :class="{ active: run.id === activeRunId }"
           @click="selectRun(run)"
         >
           <span>{{ run.title }}</span>
-          <small>{{ statusLabel(run.status) }}</small>
         </button>
       </div>
     </aside>
