@@ -5,10 +5,14 @@ import { renderMarkdown } from '../lib/markdown';
 
 const props = defineProps<{
   plan: Plan | null;
+  showActions?: boolean;
 }>();
 
 defineEmits<{
   (e: 'close'): void;
+  (e: 'start'): void;
+  (e: 'revise'): void;
+  (e: 'reject'): void;
 }>();
 
 const doneCount = computed(() => props.plan?.tasks.filter(t => t.status === 'completed').length ?? 0);
@@ -51,6 +55,12 @@ function statusLabel(status: string): string {
         The assistant's plan will appear here once it drafts one.
       </p>
     </div>
+
+    <footer v-if="showActions && plan" class="plan-panel-actions">
+      <button type="button" class="plan-action start" @click="$emit('start')">Start building</button>
+      <button type="button" class="plan-action" @click="$emit('revise')">Revise</button>
+      <button type="button" class="plan-action reject" @click="$emit('reject')">Reject</button>
+    </footer>
   </aside>
 </template>
 
@@ -307,5 +317,51 @@ function statusLabel(status: string): string {
 
 .plan-task-status.completed {
   color: var(--success);
+}
+
+.plan-panel-actions {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+}
+
+.plan-action {
+  flex: 1 1 auto;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 550;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.plan-action:hover {
+  border-color: var(--muted);
+  background: var(--surface-strong);
+}
+
+.plan-action.start {
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.plan-action.start:hover {
+  background: rgba(136, 168, 144, 0.12);
+}
+
+.plan-action.reject {
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+
+.plan-action.reject:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: rgba(184, 130, 130, 0.1);
 }
 </style>

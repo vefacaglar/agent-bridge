@@ -91,6 +91,41 @@ const planPanelOpen = computed(() =>
 
 // Reset the collapsed state when switching chats so each run's plan shows.
 watch(activeRunId, () => { planPanelCollapsed.value = false; });
+
+// --- Plan approval actions (Start / Revise / Reject) ----------------------
+// While in plan mode, the panel offers three choices once a plan is presented.
+// The decision is tracked per plan version so the buttons reappear if the
+// assistant produces a revised plan.
+const isPlanMode = computed(() => settings.currentMode.value === 'plan');
+const planKey = computed(() =>
+  currentPlan.value ? `${currentPlan.value.id}:${currentPlan.value.version}:${currentPlan.value.updatedAt}` : ''
+);
+const decidedPlanKey = ref('');
+const showPlanActions = computed(() =>
+  isPlanMode.value && !!currentPlan.value && decidedPlanKey.value !== planKey.value
+);
+
+watch(activeRunId, () => { decidedPlanKey.value = ''; });
+
+// Start: approve the plan, switch to build (accept edits) mode, and kick off
+// implementation with a follow-up message.
+function startPlan() {
+  decidedPlanKey.value = planKey.value;
+  settings.currentMode.value = 'accept_edits';
+  chat.sendQuickReply('I approve this plan. Start implementing it step by step.');
+}
+
+// Revise: stay in plan mode and focus the composer so the user can describe the
+// changes they want to the plan.
+function revisePlan() {
+  decidedPlanKey.value = planKey.value;
+  focusSignal.value++;
+}
+
+// Reject: dismiss the choices without acting; the user stays in plan mode.
+function rejectPlan() {
+  decidedPlanKey.value = planKey.value;
+}
 </script>
 
 <template>
@@ -206,7 +241,11 @@ watch(activeRunId, () => { planPanelCollapsed.value = false; });
     <PlanPanel
       v-if="planPanelOpen"
       :plan="currentPlan"
+      :show-actions="showPlanActions"
       @close="planPanelCollapsed = true"
+      @start="startPlan"
+      @revise="revisePlan"
+      @reject="rejectPlan"
     />
 
     <AddProjectModal
