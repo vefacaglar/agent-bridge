@@ -76,6 +76,17 @@ db.exec(`
   );
 `);
 
+// Create Permissions Table
+db.exec(`
+  CREATE TABLE IF NOT EXISTS permissions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    scope TEXT NOT NULL,
+    project_path TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL,
+    UNIQUE(scope, project_path)
+  );
+`);
+
 // Seed default project if empty
 const projectCount = db.prepare("SELECT count(*) as count FROM projects").get() as { count: number };
 if (projectCount.count === 0) {

@@ -4,6 +4,7 @@ import type { Run, RunStatus, RunMessage, ChatMessage } from "@bridgemind/shared
 import { RunRepository, MessageRepository } from "../database/repositories.js";
 import { ProviderRegistry } from "../providers/ProviderRegistry.js";
 import { eventBus } from "./eventBus.js";
+import { db } from "../database/db.js";
 
 const WORKSPACE_TOOLS = [
   {
@@ -89,12 +90,61 @@ IMPORTANT INSTRUCTION FOR PLANNING & CODING:
 
 export class Orchestrator {
   private activeRuns: Set<string> = new Set();
+  private pendingPermissions = new Map<string, {
+    resolve: (decision: "allow_once" | "allow_project" | "allow_always" | "deny") => void;
+    toolCall: any;
+  }>();
 
   constructor(
     private runRepo: RunRepository,
     private messageRepo: MessageRepository,
     private registry: ProviderRegistry
   ) {}
+
+  resolvePermission(runId: string, decision: "allow_once" | "allow_project" | "allow_always" | "deny"): boolean {
+    const pending = this.pendingPermissions.get(runId);
+    if (pending) {
+      pending.resolve(decision);
+      this.pendingPermissions.delete(runId);
+      return true;
+    }
+    return false;
+  }
+
+  getPendingPermission(runId: string) {
+    return this.pendingPermissions.get(runId);
+  }
+
+  private checkPermission(projectPath?: string): boolean {
+    try {
+      // Check global permission
+      const globalPerm = db.prepare("SELECT * FROM permissions WHERE scope = 'global' AND status = 'allowed'").get();
+      if (globalPerm) return true;
+
+      // Check project permission
+      if (projectPath) {
+        const projectPerm = db.prepare("SELECT * FROM permissions WHERE scope = 'project' AND project_path = ? AND status = 'allowed'").get(projectPath);
+        if (projectPerm) return true;
+      }
+    } catch (err) {
+      console.error("[Orchestrator] Error checking permissions:", err);
+    }
+    return false;
+  }
+
+  private async requestPermission(runId: string, toolCall: any): Promise<"allow_once" | "allow_project" | "allow_always" | "deny"> {
+    return new Promise((resolve) => {
+      this.pendingPermissions.set(runId, { resolve, toolCall });
+      
+      this.emitStatus(runId, "awaiting_permission");
+      
+      eventBus.emit(`run:${runId}`, {
+        type: "permission_requested",
+        runId,
+        toolCall
+      });
+    });
+  }
 
   private emitStatus(runId: string, status: RunStatus, extraUpdates?: Partial<Run>) {
     this.runRepo.update(runId, { status, ...extraUpdates });
@@ -218,6 +268,18 @@ export class Orchestrator {
               // Safety check: ensure file path is inside workspace
               if (!absolutePath.startsWith(baseDir)) {
                 throw new Error(`Access denied: path '${relativePath}' is outside of the workspace directory.`);
+              }
+
+              // Check permission if in 'ask_permissions' mode
+              if (run.mode === "ask_permissions") {
+                const allowed = this.checkPermission(run.projectPath);
+                if (!allowed) {
+                  const decision = await this.requestPermission(runId, tc);
+                  if (decision === "deny") {
+                    throw new Error("Permission denied by user.");
+                  }
+                  this.emitStatus(runId, "generating");
+                }
               }
 
               if (tc.function.name === "write_file") {
@@ -418,6 +480,18 @@ export class Orchestrator {
 
               if (!absolutePath.startsWith(baseDir)) {
                 throw new Error(`Access denied: path '${relativePath}' is outside of the workspace directory.`);
+              }
+
+              // Check permission if in 'ask_permissions' mode
+              if (run.mode === "ask_permissions") {
+                const allowed = this.checkPermission(run.projectPath);
+                if (!allowed) {
+                  const decision = await this.requestPermission(runId, tc);
+                  if (decision === "deny") {
+                    throw new Error("Permission denied by user.");
+                  }
+                  this.emitStatus(runId, "generating");
+                }
               }
 
               if (tc.function.name === "write_file") {

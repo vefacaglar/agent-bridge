@@ -20,6 +20,8 @@ const isRunning = ref(false);
 
 const projects = ref<Project[]>([]);
 const showAddProjectModal = ref(false);
+const showPermissionModal = ref(false);
+const pendingPermissionRequest = ref<any>(null);
 const newProjectName = ref('');
 const newProjectPath = ref('');
 
@@ -88,7 +90,7 @@ const isMac = computed(() => {
 
 let eventSource: EventSource | null = null;
 
-const activeStatuses: RunStatus[] = ['created', 'generating'];
+const activeStatuses: RunStatus[] = ['created', 'generating', 'awaiting_permission'];
 
 const modelOptions = computed(() => {
   const options: { value: string; label: string; providerId: string }[] = [];
@@ -175,6 +177,7 @@ function statusLabel(status?: RunStatus): string {
   const labels: Record<RunStatus, string> = {
     created: 'queued',
     generating: 'generating',
+    awaiting_permission: 'waiting permission',
     done: 'completed',
     failed: 'failed',
     cancelled: 'cancelled'
@@ -186,6 +189,7 @@ function statusClass(status?: RunStatus): string {
   if (!status) return 'idle';
   if (status === 'done') return 'success';
   if (status === 'failed' || status === 'cancelled') return 'danger';
+  if (status === 'awaiting_permission') return 'warning';
   if (activeStatuses.includes(status)) return 'active';
   return 'idle';
 }
@@ -262,6 +266,15 @@ function connectEventSource(runId: string) {
 
     if (data.type === 'status_changed') {
       updateRunStatus(runId, data.status);
+      if (data.status !== 'awaiting_permission') {
+        showPermissionModal.value = false;
+        pendingPermissionRequest.value = null;
+      }
+    }
+
+    if (data.type === 'permission_requested' && activeRun.value?.id === runId) {
+      pendingPermissionRequest.value = data;
+      showPermissionModal.value = true;
     }
 
     if (data.type === 'message_created' && activeRun.value?.id === runId) {
@@ -384,6 +397,27 @@ async function cancelActiveRun() {
   if (response.ok) {
     updateRunStatus(activeRunId.value, 'cancelled');
     finishEventStream();
+  }
+}
+
+async function handlePermissionDecision(decision: 'allow_once' | 'allow_project' | 'allow_always' | 'deny') {
+  if (!activeRunId.value) return;
+  try {
+    const response = await fetch(`${API_BASE}/api/runs/${activeRunId.value}/permission`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decision })
+    });
+    if (response.ok) {
+      showPermissionModal.value = false;
+      pendingPermissionRequest.value = null;
+    } else {
+      const err = await response.json();
+      window.alert(err.error || 'Permission decision could not be processed.');
+    }
+  } catch (err) {
+    console.error(err);
+    window.alert('Connection error.');
   }
 }
 
@@ -856,6 +890,50 @@ onBeforeUnmount(() => {
           >
             {{ isSubmittingProject ? 'Adding...' : 'Add Project' }}
           </button>
+        </footer>
+      </div>
+    </div>
+
+    <!-- Permission Request Modal -->
+    <div v-if="showPermissionModal && pendingPermissionRequest" class="modal-overlay">
+      <div class="modal-card permission-modal-card">
+        <header class="modal-header">
+          <h3>📂 Permission Request</h3>
+        </header>
+        
+        <main class="modal-body">
+          <p class="permission-prompt-text">
+            The agent is requesting permission to execute a tool:
+          </p>
+          <div class="tool-call-details-box">
+            <div class="detail-row">
+              <strong>Tool:</strong> <span>{{ pendingPermissionRequest.toolCall?.function?.name }}</span>
+            </div>
+            <div class="detail-row" v-if="pendingPermissionRequest.toolCall?.function?.arguments">
+              <strong>Arguments:</strong>
+              <pre class="permission-args-pre">{{ formatJson(pendingPermissionRequest.toolCall.function.arguments) }}</pre>
+            </div>
+          </div>
+          <p class="permission-warning-info">
+            Please select how you would like to handle this request:
+          </p>
+        </main>
+        
+        <footer class="modal-footer permission-footer">
+          <div class="permission-button-grid">
+            <button class="primary-button perm-btn green" @click="handlePermissionDecision('allow_once')">
+              ✅ Allow now
+            </button>
+            <button class="primary-button perm-btn blue" @click="handlePermissionDecision('allow_project')">
+              💼 Always allow in this project
+            </button>
+            <button class="primary-button perm-btn purple" @click="handlePermissionDecision('allow_always')">
+              🌍 Always allow (Global)
+            </button>
+            <button class="danger-button perm-btn red" @click="handlePermissionDecision('deny')">
+              ❌ Do not allow
+            </button>
+          </div>
         </footer>
       </div>
     </div>

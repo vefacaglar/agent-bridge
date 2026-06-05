@@ -737,3 +737,128 @@ pre {
   to { transform: scale(1); opacity: 1; }
 }
 
+/* Permission Modal Custom Styling */
+.permission-modal-card {
+  width: min(580px, 95%) !important;
+}
+
+.permission-prompt-text {
+  color: var(--text);
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.tool-call-details-box {
+  background: #151515;
+  border: 1px solid #2d2d2d;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.detail-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.9rem;
+}
+
+.detail-row strong {
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.permission-args-pre {
+  background: #0d0d0d;
+  border: 1px solid #222;
+  border-radius: 6px;
+  padding: 10px;
+  color: #a8ffb2;
+  font-family: monospace;
+  font-size: 0.82rem;
+  max-height: 220px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.permission-warning-info {
+  color: var(--faint);
+  font-size: 0.85rem;
+  margin: 0;
+  text-align: center;
+}
+
+.permission-footer {
+  background: #161616 !important;
+  padding: 20px !important;
+}
+
+.permission-button-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  width: 100%;
+}
+
+.perm-btn {
+  justify-content: center;
+  text-align: center;
+  font-size: 0.88rem !important;
+  padding: 10px 14px !important;
+  min-height: 44px !important;
+  border-radius: 8px !important;
+  border: 1px solid transparent;
+}
+
+.perm-btn.green {
+  background: rgba(123, 216, 143, 0.15) !important;
+  color: #a4f4b6 !important;
+  border-color: rgba(123, 216, 143, 0.3) !important;
+}
+
+.perm-btn.green:hover {
+  background: rgba(123, 216, 143, 0.25) !important;
+}
+
+.perm-btn.blue {
+  background: rgba(157, 183, 255, 0.15) !important;
+  color: #c0d1ff !important;
+  border-color: rgba(157, 183, 255, 0.3) !important;
+}
+
+.perm-btn.blue:hover {
+  background: rgba(157, 183, 255, 0.25) !important;
+}
+
+.perm-btn.purple {
+  background: rgba(240, 167, 207, 0.15) !important;
+  color: #ffd2eb !important;
+  border-color: rgba(240, 167, 207, 0.3) !important;
+}
+
+.perm-btn.purple:hover {
+  background: rgba(240, 167, 207, 0.25) !important;
+}
+
+.perm-btn.red {
+  background: rgba(255, 138, 128, 0.15) !important;
+  color: #ffcdd2 !important;
+  border-color: rgba(255, 138, 128, 0.3) !important;
+}
+
+.perm-btn.red:hover {
+  background: rgba(255, 138, 128, 0.25) !important;
+}
+
+/* Status Warning Colors */
+.status-pill.warning {
+  color: #ffd54f !important;
+  border-color: rgba(255, 213, 79, 0.45) !important;
+  background: rgba(255, 213, 79, 0.08) !important;
+}
+

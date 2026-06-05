@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import assert from "node:assert";
+import { db } from "../database/db.js";
 
 // Set test environment so db.ts uses :memory: database
 process.env.NODE_ENV = "test";
@@ -232,5 +233,88 @@ test("Orchestrator Integration Tests", async (t) => {
     // Verify mode system prompt addition was present
     assert.ok(systemPromptUsed.includes("CURRENT OPERATIONAL MODE: PLAN MODE"));
     assert.ok(systemPromptUsed.includes("DO NOT call any file-writing"));
+  });
+
+  await t.test("Orchestrator - pauses for permissions in ask_permissions mode and resumes on approval", async () => {
+    const registry = new ProviderRegistry(testConfigPath);
+    const runRepo = new RunRepository();
+    const messageRepo = new MessageRepository();
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry);
+
+    const runId = "run-test-perm-ask";
+    const runData: Run = {
+      id: runId,
+      title: "Test Perm Task",
+      task: "Create a file",
+      status: "created",
+      providerId: "test-provider",
+      providerDisplayName: "Test Provider",
+      model: "model-1",
+      mode: "ask_permissions",
+      projectPath: process.cwd(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    runRepo.create(runData);
+
+    const createdFilePath = path.join(process.cwd(), "test_perm_file.json");
+    t.after(() => {
+      if (fs.existsSync(createdFilePath)) {
+        fs.unlinkSync(createdFilePath);
+      }
+      db.exec("DELETE FROM permissions");
+    });
+
+    let callCount = 0;
+    globalThis.fetch = async (url: any, options: any) => {
+      callCount++;
+      if (callCount === 1) {
+        return {
+          ok: true,
+          json: async () => ({
+            choices: [{
+              message: {
+                role: "assistant",
+                content: "Proposing a tool call",
+                tool_calls: [{
+                  id: "call_perm_1",
+                  type: "function",
+                  function: {
+                    name: "write_file",
+                    arguments: JSON.stringify({ path: "test_perm_file.json", content: "{}" })
+                  }
+                }]
+              }
+            }]
+          })
+        } as any;
+      } else {
+        return {
+          ok: true,
+          json: async () => ({
+            choices: [{ message: { role: "assistant", content: "File created successfully." } }]
+          })
+        } as any;
+      }
+    };
+
+    const runPromise = orchestrator.run(runId);
+
+    // Wait for the async task loop to process and hit the permission request wait point
+    await new Promise(r => setTimeout(r, 100));
+
+    const pendingRun = runRepo.getById(runId);
+    assert.strictEqual(pendingRun?.status, "awaiting_permission");
+
+    // Resolve decision as allow_once
+    const resolved = orchestrator.resolvePermission(runId, "allow_once");
+    assert.ok(resolved);
+
+    await runPromise;
+
+    const finishedRun = runRepo.getById(runId);
+    assert.strictEqual(finishedRun?.status, "done");
+    assert.ok(fs.existsSync(createdFilePath));
   });
 });

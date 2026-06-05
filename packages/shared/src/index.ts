@@ -1,6 +1,7 @@
 export type RunStatus =
   | "created"
   | "generating"
+  | "awaiting_permission"
   | "done"
   | "failed"
   | "cancelled";
@@ -105,6 +106,11 @@ export type RunEvent =
   | {
       type: "run_failed";
       errorMessage: string;
+    }
+  | {
+      type: "permission_requested";
+      runId: string;
+      toolCall: any;
     };
 
 // Safe Provider Metadata structure returned by GET /api/providers

@@ -10,6 +10,7 @@ import { exec } from "node:child_process";
 import { promisify } from "node:util";
 
 const execAsync = promisify(exec);
+import { db } from "./database/db.js";
 
 
 const server = Fastify({
@@ -239,6 +240,50 @@ server.post("/api/runs/:id/continue", async (request, reply) => {
   orchestrator.continueRun(id, task).catch(err => {
     console.error(`[Orchestrator] Error continuing job ${id}:`, err.message);
   });
+
+  return { success: true };
+});
+
+// Resolve a pending permission request for a running job
+server.post("/api/runs/:id/permission", async (request, reply) => {
+  const { id } = request.params as { id: string };
+  const { decision } = request.body as { decision: "allow_once" | "allow_project" | "allow_always" | "deny" };
+
+  if (!["allow_once", "allow_project", "allow_always", "deny"].includes(decision)) {
+    reply.status(400);
+    return { error: "Invalid decision value. Must be one of: allow_once, allow_project, allow_always, deny" };
+  }
+
+  // Get run to save permissions to DB if needed
+  const run = runRepo.getById(id);
+  if (!run) {
+    reply.status(404);
+    return { error: `Run with id "${id}" not found` };
+  }
+
+  try {
+    // Save permission if needed
+    if (decision === "allow_project" && run.projectPath) {
+      db.prepare(`
+        INSERT OR REPLACE INTO permissions (scope, project_path, status)
+        VALUES ('project', ?, 'allowed')
+      `).run(run.projectPath);
+    } else if (decision === "allow_always") {
+      db.prepare(`
+        INSERT OR REPLACE INTO permissions (scope, project_path, status)
+        VALUES ('global', '', 'allowed')
+      `).run();
+    }
+  } catch (err: any) {
+    console.error("[Server] Error saving permission:", err.message);
+  }
+
+  // Resolve permission in Orchestrator
+  const resolved = orchestrator.resolvePermission(id, decision);
+  if (!resolved) {
+    reply.status(400);
+    return { error: "No pending permission request found for this run" };
+  }
 
   return { success: true };
 });
