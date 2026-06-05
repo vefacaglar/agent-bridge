@@ -1012,16 +1012,26 @@ onBeforeUnmount(() => {
         <div class="composer-container" style="position: relative;">
           <!-- Emerging from behind input box -->
           <transition name="slide-up">
-            <div v-if="activeConfirmationGroup" class="composer-confirmation-actions">
-              <button 
-                v-for="option in getConfirmationOptions(activeConfirmationGroup.message.content)" 
-                :key="option"
-                class="composer-confirm-btn"
-                :class="option.toLowerCase() === 'evet' || option.toLowerCase() === 'yes' ? 'yes' : 'no'"
-                @click="sendQuickReply(option)"
-              >
-                {{ option }}
-              </button>
+            <div v-if="activeConfirmationGroup" class="composer-confirmation-card">
+              <div class="confirm-card-header">
+                <span class="yellow-dot">●</span>
+                <strong>Confirm prompt action?</strong>
+              </div>
+              <div class="confirm-card-footer">
+                <button 
+                  class="composer-confirm-btn no" 
+                  @click="sendQuickReply((getConfirmationOptions(activeConfirmationGroup?.message?.content || '') || []).includes('Hayır') ? 'Hayır' : 'No')"
+                >
+                  {{ (getConfirmationOptions(activeConfirmationGroup?.message?.content || '') || []).includes('Hayır') ? 'Hayır' : 'No' }}
+                </button>
+                
+                <button 
+                  class="composer-confirm-btn yes" 
+                  @click="sendQuickReply((getConfirmationOptions(activeConfirmationGroup?.message?.content || '') || []).includes('Evet') ? 'Evet' : 'Yes')"
+                >
+                  {{ (getConfirmationOptions(activeConfirmationGroup?.message?.content || '') || []).includes('Evet') ? 'Evet' : 'Yes' }} ↵
+                </button>
+              </div>
             </div>
           </transition>
 
@@ -2138,67 +2148,69 @@ onBeforeUnmount(() => {
   animation: pulseDot 1.2s infinite alternate;
 }
 
-.composer-confirmation-actions {
+.composer-confirmation-card {
   position: absolute;
   bottom: calc(100% - 6px);
   left: 12px;
   right: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  background: #1c1c1e;
+  border: 1px solid #2c2c2e;
+  border-radius: 12px;
+  padding: 14px 16px;
   z-index: 1;
   pointer-events: auto;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.confirm-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: #ffffff;
+}
+
+.confirm-card-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  align-items: center;
 }
 
 .composer-confirm-btn {
-  padding: 10px 16px;
-  border-radius: 8px;
-  font-size: 0.85rem;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 0.8rem;
   font-weight: 500;
   cursor: pointer;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  text-align: left;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-}
-
-.composer-confirm-btn::after {
-  content: '↩';
-  opacity: 0.5;
-  font-size: 0.75rem;
-}
-
-.composer-confirm-btn:hover {
-  transform: translateY(-2px);
-}
-
-.composer-confirm-btn.yes {
-  background: rgba(76, 175, 80, 0.15);
-  color: #81c784;
-  border-color: rgba(76, 175, 80, 0.25);
-  backdrop-filter: blur(10px);
-}
-
-.composer-confirm-btn.yes:hover {
-  background: rgba(76, 175, 80, 0.25);
-  border-color: rgba(76, 175, 80, 0.4);
-  box-shadow: 0 6px 16px rgba(76, 175, 80, 0.15);
+  transition: all 0.2s ease;
 }
 
 .composer-confirm-btn.no {
-  background: rgba(244, 67, 54, 0.15);
-  color: #e57373;
-  border-color: rgba(244, 67, 54, 0.25);
-  backdrop-filter: blur(10px);
+  background: rgba(255, 69, 58, 0.1);
+  color: #ff453a;
+  border: 1px solid rgba(255, 69, 58, 0.2);
 }
 
 .composer-confirm-btn.no:hover {
-  background: rgba(244, 67, 54, 0.25);
-  border-color: rgba(244, 67, 54, 0.4);
-  box-shadow: 0 6px 16px rgba(244, 67, 54, 0.15);
+  background: rgba(255, 69, 58, 0.2);
+  border-color: rgba(255, 69, 58, 0.3);
+}
+
+.composer-confirm-btn.yes {
+  background: #ffffff;
+  color: #000000;
+  border: none;
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(255, 255, 255, 0.15);
+}
+
+.composer-confirm-btn.yes:hover {
+  background: #f2f2f7;
+  transform: translateY(-1px);
 }
 
 .slide-up-enter-active, .slide-up-leave-active {
