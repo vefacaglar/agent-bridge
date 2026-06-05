@@ -308,6 +308,15 @@ async function sendQuickReply(option: string) {
   await handleSendTask();
 }
 
+const activeConfirmationGroup = computed(() => {
+  if (groupedMessages.value.length === 0) return null;
+  const lastGroup = groupedMessages.value[groupedMessages.value.length - 1];
+  if (lastGroup && lastGroup.type === 'assistant' && canShowConfirmation(lastGroup)) {
+    return lastGroup;
+  }
+  return null;
+});
+
 
 
 function cleanMessageContent(content: string): string {
@@ -930,18 +939,6 @@ onBeforeUnmount(() => {
               </div>
               <div class="markdown-body" v-html="renderMarkdown(cleanMessageContent(group.message.content))"></div>
 
-              <!-- Quick confirmation buttons -->
-              <div v-if="canShowConfirmation(group)" class="confirmation-actions">
-                <button 
-                  v-for="option in getConfirmationOptions(group.message.content)" 
-                  :key="option"
-                  class="confirm-btn"
-                  :class="option.toLowerCase() === 'evet' || option.toLowerCase() === 'yes' ? 'yes' : 'no'"
-                  @click="sendQuickReply(option)"
-                >
-                  {{ option }}
-                </button>
-              </div>
 
               <button class="copy-button" @click="copyText(group.message.content)">Copy entire response</button>
             </article>
@@ -958,9 +955,24 @@ onBeforeUnmount(() => {
       </section>
 
       <footer class="composer-wrap">
-        <div class="composer-container">
+        <div class="composer-container" style="position: relative;">
+          <!-- Emerging from behind input box -->
+          <transition name="slide-up">
+            <div v-if="activeConfirmationGroup" class="composer-confirmation-actions">
+              <button 
+                v-for="option in getConfirmationOptions(activeConfirmationGroup.message.content)" 
+                :key="option"
+                class="composer-confirm-btn"
+                :class="option.toLowerCase() === 'evet' || option.toLowerCase() === 'yes' ? 'yes' : 'no'"
+                @click="sendQuickReply(option)"
+              >
+                {{ option }}
+              </button>
+            </div>
+          </transition>
+
           <!-- Text Input Box -->
-          <div class="composer-input-box">
+          <div class="composer-input-box" style="position: relative; z-index: 2;">
             <textarea
               ref="composerTextarea"
               v-model="taskInput"
@@ -979,7 +991,7 @@ onBeforeUnmount(() => {
           </div>
 
           <!-- Bottom Menu Row -->
-          <div class="composer-menu-row">
+          <div class="composer-menu-row" style="position: relative; z-index: 2;">
             <!-- Left Side: Mode Pill with Popup Menu -->
             <div class="mode-selector-wrap">
               <button class="mode-pill-btn" @click.stop="showModeMenu = !showModeMenu">
@@ -2082,47 +2094,78 @@ onBeforeUnmount(() => {
   animation: pulseDot 1.2s infinite alternate;
 }
 
-.confirmation-actions {
+.composer-confirmation-actions {
+  position: absolute;
+  bottom: calc(100% - 6px);
+  left: 12px;
+  right: 12px;
   display: flex;
-  gap: 10px;
-  margin-top: 14px;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 1;
+  pointer-events: auto;
 }
 
-.confirm-btn {
-  padding: 8px 16px;
-  border-radius: 6px;
+.composer-confirm-btn {
+  padding: 10px 16px;
+  border-radius: 8px;
   font-size: 0.85rem;
   font-weight: 500;
   cursor: pointer;
-  border: 1px solid transparent;
-  transition: all 0.2s ease;
-  background: rgba(255, 255, 255, 0.05);
-  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  text-align: left;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
-.confirm-btn:hover {
-  transform: translateY(-1px);
+.composer-confirm-btn::after {
+  content: '↩';
+  opacity: 0.5;
+  font-size: 0.75rem;
 }
 
-.confirm-btn.yes {
+.composer-confirm-btn:hover {
+  transform: translateY(-2px);
+}
+
+.composer-confirm-btn.yes {
   background: rgba(76, 175, 80, 0.15);
   color: #81c784;
   border-color: rgba(76, 175, 80, 0.25);
+  backdrop-filter: blur(10px);
 }
 
-.confirm-btn.yes:hover {
+.composer-confirm-btn.yes:hover {
   background: rgba(76, 175, 80, 0.25);
-  box-shadow: 0 0 10px rgba(76, 175, 80, 0.1);
+  border-color: rgba(76, 175, 80, 0.4);
+  box-shadow: 0 6px 16px rgba(76, 175, 80, 0.15);
 }
 
-.confirm-btn.no {
+.composer-confirm-btn.no {
   background: rgba(244, 67, 54, 0.15);
   color: #e57373;
   border-color: rgba(244, 67, 54, 0.25);
+  backdrop-filter: blur(10px);
 }
 
-.confirm-btn.no:hover {
+.composer-confirm-btn.no:hover {
   background: rgba(244, 67, 54, 0.25);
-  box-shadow: 0 0 10px rgba(244, 67, 54, 0.1);
+  border-color: rgba(244, 67, 54, 0.4);
+  box-shadow: 0 6px 16px rgba(244, 67, 54, 0.15);
+}
+
+.slide-up-enter-active, .slide-up-leave-active {
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+}
+.slide-up-enter-from, .slide-up-leave-to {
+  transform: translateY(120%);
+  opacity: 0;
+}
+.slide-up-enter-to, .slide-up-leave-from {
+  transform: translateY(0);
+  opacity: 1;
 }
 </style>
