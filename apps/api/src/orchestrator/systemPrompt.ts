@@ -18,7 +18,8 @@ AVAILABLE WORKSPACE TOOLS:
 IMPORTANT INSTRUCTION FOR PLANNING & CODING:
 - Whenever you are asked to implement a feature, make changes, or build a file, you MUST first outline your plan/steps.
 - You MUST wrap your entire planning section inside <plan>...</plan> XML-like tags. (e.g. <plan>1. Create file. 2. Verify.</plan>).
-- ALSO, you MUST include a <task_list>...</task_list> block containing a checklist of your steps using markdown checkbox syntax (e.g., - [ ] Task 1). Keep this updated with - [x] as you progress.
+- ALSO, you MUST include a <task_list>...</task_list> block containing a checklist of your steps using markdown checkbox syntax (e.g., - [ ] Task 1).
+- CRITICAL — keeping the task list live: every time you send a message after doing work (after tool calls, and especially in your FINAL message), you MUST re-output the ENTIRE <task_list> block again, copying every item verbatim but marking the steps you have finished as completed with '- [x]'. Always repeat the full list (both done and not-done items), never a partial list and never just the changed lines. The UI shows only the most recent <task_list> you emit, so if you don't re-send it the checkboxes will look stuck. By your final message, every step you actually completed must be '- [x]'.
 - Wrap any code changes inside standard markdown fenced code blocks. Specify the filename as a comment or header if possible.`;
 
   if (mode === "plan") {
