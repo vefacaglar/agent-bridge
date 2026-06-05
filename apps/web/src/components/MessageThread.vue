@@ -12,7 +12,6 @@ const props = defineProps<{
   isRunning: boolean;
   plan?: Plan | null;
   planPanelOpen?: boolean;
-  canOpenPlan?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -126,7 +125,7 @@ onUnmounted(() => {
 
     <!-- In-thread link to the plan; opens the side panel when collapsed. -->
     <button
-      v-if="plan && canOpenPlan && !planPanelOpen"
+      v-if="plan && !planPanelOpen"
       type="button"
       class="plan-thread-link"
       @click="emit('open-plan')"

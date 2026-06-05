@@ -78,14 +78,14 @@ const currentTaskList = computed<string | null>(() => {
   return null;
 });
 
-// The plan side panel mirrors Codex / Claude desktop: in plan mode it opens
-// automatically once the assistant has created a plan (via the update_plan
-// tool) for the active run. The user can collapse it and re-open it from the
-// plan link in the thread.
-const isPlanMode = computed(() => settings.currentMode.value === 'plan');
+// The plan side panel mirrors Codex / Claude desktop: it opens automatically as
+// soon as the assistant has created a plan (via the update_plan tool) for the
+// active run, and then stays open regardless of mode until the user closes it.
+// Switching modes (e.g. plan -> accept) never hides it; only the Close button
+// or the plan link in the thread toggle it.
 const planPanelCollapsed = ref(false);
 const planPanelOpen = computed(() =>
-  isPlanMode.value && !!currentPlan.value && !planPanelCollapsed.value
+  !!currentPlan.value && !planPanelCollapsed.value
 );
 
 // Reset the collapsed state when switching chats so each run's plan shows.
@@ -144,7 +144,6 @@ watch(activeRunId, () => { planPanelCollapsed.value = false; });
             :is-running="isRunning"
             :plan="currentPlan"
             :plan-panel-open="planPanelOpen"
-            :can-open-plan="isPlanMode"
             @open-plan="planPanelCollapsed = false"
           />
         </section>
