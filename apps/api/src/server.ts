@@ -4,6 +4,7 @@ import type { RunStatus } from "@bridgemind/shared";
 import { ProviderRegistry } from "./providers/ProviderRegistry.js";
 import { RunRepository, MessageRepository } from "./database/repositories.js";
 import { Orchestrator } from "./orchestrator/Orchestrator.js";
+import { eventBus } from "./orchestrator/eventBus.js";
 
 const server = Fastify({
   logger: true,
@@ -119,6 +120,40 @@ server.get("/api/runs/:id/messages", async (request, reply) => {
     return { error: `Run with id "${id}" not found` };
   }
   return messageRepo.listByRunId(id);
+});
+
+// SSE event streaming for a specific run
+server.get("/api/runs/:id/events", async (request, reply) => {
+  const { id } = request.params as { id: string };
+
+  reply.raw.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    "Connection": "keep-alive"
+  });
+
+  // Write initial connection success event
+  reply.raw.write(`data: ${JSON.stringify({ type: "connected" })}\n\n`);
+
+  const listener = (event: any) => {
+    reply.raw.write(`data: ${JSON.stringify(event)}\n\n`);
+
+    // Disconnect when run finishes
+    if (
+      event.type === "run_completed" ||
+      event.type === "run_failed" ||
+      (event.type === "status_changed" && (event.status === "done" || event.status === "failed" || event.status === "cancelled" || event.status === "max_rounds_reached"))
+    ) {
+      eventBus.off(`run:${id}`, listener);
+      reply.raw.end();
+    }
+  };
+
+  eventBus.on(`run:${id}`, listener);
+
+  request.raw.on("close", () => {
+    eventBus.off(`run:${id}`, listener);
+  });
 });
 
 // Test completion request to check provider configuration

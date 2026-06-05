@@ -20,7 +20,7 @@ const taskInput = ref('Create a simple node script that parses JSON safely.');
 // Runtime States
 const isRunning = ref(false);
 const finalOutputCode = ref('');
-let pollingInterval: any = null;
+let eventSource: EventSource | null = null;
 
 // Formats UTC string to local time representation
 function formatTime(isoString: string): string {
@@ -185,9 +185,9 @@ async function loadMessages(runId: string) {
 
 // Select a run from history sidebar
 async function selectRun(run: Run) {
-  if (pollingInterval) {
-    clearInterval(pollingInterval);
-    pollingInterval = null;
+  if (eventSource) {
+    eventSource.close();
+    eventSource = null;
     isRunning.value = false;
   }
 
@@ -196,50 +196,74 @@ async function selectRun(run: Run) {
   finalOutputCode.value = run.finalOutput || '';
   await loadMessages(run.id);
 
-  // If the selected run is still active, restart polling for it!
+  // If the selected run is still active, connect to the event stream!
   const activeStatuses: RunStatus[] = ['created', 'planning', 'implementing', 'reviewing', 'fixing'];
   if (activeStatuses.includes(run.status)) {
     isRunning.value = true;
-    startPolling(run.id);
+    connectEventSource(run.id);
   }
 }
 
-// Start active polling for a running job
-function startPolling(runId: string) {
-  if (pollingInterval) clearInterval(pollingInterval);
-  pollingInterval = setInterval(async () => {
-    // 1. Fetch run details
-    const runRes = await fetch(`${API_BASE}/api/runs/${runId}`);
-    if (runRes.ok) {
-      const runData = await runRes.json() as Run;
-      
-      // Update active run reference
-      if (activeRunId.value === runId) {
-        activeRun.value = runData;
-        finalOutputCode.value = runData.finalOutput || '';
-      }
+// Establish Server-Sent Events connection for a run
+function connectEventSource(runId: string) {
+  if (eventSource) eventSource.close();
 
-      // Update in history list
-      const idx = runs.value.findIndex(r => r.id === runId);
-      if (idx !== -1) {
-        runs.value[idx] = runData;
-      }
+  eventSource = new EventSource(`${API_BASE}/api/runs/${runId}/events`);
 
-      // Check if termination status reached
-      const activeStatuses: RunStatus[] = ['created', 'planning', 'implementing', 'reviewing', 'fixing'];
-      if (!activeStatuses.includes(runData.status)) {
-        clearInterval(pollingInterval);
-        pollingInterval = null;
+  eventSource.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      if (data.type === 'connected') return;
+
+      if (data.type === 'run_started') {
+        if (activeRun.value && activeRun.value.id === runId) {
+          activeRun.value.status = 'planning';
+        }
+      } else if (data.type === 'status_changed') {
+        if (activeRun.value && activeRun.value.id === runId) {
+          activeRun.value.status = data.status;
+        }
+        // Update runs history list
+        const idx = runs.value.findIndex(r => r.id === runId);
+        if (idx !== -1) {
+          runs.value[idx].status = data.status;
+        }
+      } else if (data.type === 'message_created') {
+        if (activeRun.value && activeRun.value.id === runId) {
+          // Avoid duplicates
+          if (!messages.value.some(m => m.id === data.message.id)) {
+            messages.value.push(data.message);
+          }
+        }
+      } else if (data.type === 'run_completed') {
+        if (activeRun.value && activeRun.value.id === runId) {
+          activeRun.value.finalOutput = data.finalOutput;
+          finalOutputCode.value = data.finalOutput;
+        }
+        eventSource?.close();
+        eventSource = null;
         isRunning.value = false;
-        loadRuns(); // Reload history final state
+        loadRuns(); // Refresh all
+      } else if (data.type === 'run_failed') {
+        if (activeRun.value && activeRun.value.id === runId) {
+          activeRun.value.errorMessage = data.errorMessage;
+        }
+        eventSource?.close();
+        eventSource = null;
+        isRunning.value = false;
+        loadRuns(); // Refresh all
       }
+    } catch (err) {
+      console.error('Failed to parse run event stream data:', err);
     }
+  };
 
-    // 2. Fetch updated messages
-    if (activeRunId.value === runId) {
-      await loadMessages(runId);
-    }
-  }, 1000);
+  eventSource.onerror = (err) => {
+    console.warn('EventSource connection error, closing...', err);
+    eventSource?.close();
+    eventSource = null;
+    isRunning.value = false;
+  };
 }
 
 // Trigger background run creation
@@ -275,8 +299,8 @@ async function handleSendTask() {
       // Add to local runs history list
       runs.value.unshift(runData);
 
-      // Start active polling loop
-      startPolling(runData.id);
+      // Connect EventSource to receive live streaming events
+      connectEventSource(runData.id);
     } else {
       isRunning.value = false;
       const errData = await res.json();
@@ -301,9 +325,10 @@ async function cancelActiveRun() {
       if (activeRun.value) {
         activeRun.value.status = 'cancelled';
       }
-      // Status will stabilize on next poll tick or we reload
-      clearInterval(pollingInterval);
-      pollingInterval = null;
+      if (eventSource) {
+        eventSource.close();
+        eventSource = null;
+      }
       isRunning.value = false;
       loadRuns();
     } else {
@@ -330,8 +355,8 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
-  if (pollingInterval) {
-    clearInterval(pollingInterval);
+  if (eventSource) {
+    eventSource.close();
   }
 });
 </script>

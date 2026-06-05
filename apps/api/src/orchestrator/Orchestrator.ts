@@ -1,6 +1,7 @@
-import type { Run, RunStatus } from "@bridgemind/shared";
+import type { Run, RunStatus, RunMessage } from "@bridgemind/shared";
 import { RunRepository, MessageRepository } from "../database/repositories.js";
 import { ProviderRegistry } from "../providers/ProviderRegistry.js";
+import { eventBus } from "./eventBus.js";
 import {
   PLANNER_SYSTEM_PROMPT,
   CODER_SYSTEM_PROMPT,
@@ -19,10 +20,21 @@ export class Orchestrator {
     private registry: ProviderRegistry
   ) {}
 
+  private emitStatus(runId: string, status: RunStatus, extraUpdates?: Partial<Run>) {
+    this.runRepo.update(runId, { status, ...extraUpdates });
+    eventBus.emit(`run:${runId}`, { type: "status_changed", status });
+  }
+
+  private emitMessage(runId: string, msg: RunMessage) {
+    this.messageRepo.create(msg);
+    eventBus.emit(`run:${runId}`, { type: "message_created", message: msg });
+  }
+
   cancel(runId: string): boolean {
     if (this.activeRuns.has(runId)) {
       this.activeRuns.delete(runId);
-      this.runRepo.update(runId, { status: "cancelled" });
+      this.emitStatus(runId, "cancelled");
+      eventBus.emit(`run:${runId}`, { type: "run_failed", errorMessage: "Orchestration cancelled by user." });
       console.log(`[Orchestrator] Run ${runId} has been cancelled by user.`);
       return true;
     }
@@ -43,6 +55,21 @@ export class Orchestrator {
     console.log(`[Orchestrator] Starting run: ${runId} ("${run.title}")`);
     this.activeRuns.add(runId);
 
+    // Broadcast starting event
+    eventBus.emit(`run:${runId}`, { type: "run_started", runId });
+    eventBus.emit(`run:${runId}`, {
+      type: "model_snapshot_locked",
+      snapshot: {
+        plannerProviderId: run.plannerProviderId,
+        plannerProviderDisplayName: run.plannerProviderDisplayName,
+        plannerModel: run.plannerModel,
+        coderProviderId: run.coderProviderId,
+        coderProviderDisplayName: run.coderProviderDisplayName,
+        coderModel: run.coderModel,
+        maxRounds: run.maxRounds
+      }
+    });
+
     try {
       // Initialize model provider connections
       const plannerProvider = this.registry.getProvider(run.plannerProviderId);
@@ -61,7 +88,7 @@ export class Orchestrator {
       // STEP 1 — Planning Phase
       // ==========================================
       console.log(`[Orchestrator] Run ${runId} - Entering PLANNING state`);
-      this.runRepo.update(runId, { status: "planning", currentRound: 0 });
+      this.emitStatus(runId, "planning", { currentRound: 0 });
 
       const planningMsgs = compilePlanningMessages(run.task);
       const plannerRes = await plannerProvider.complete({
@@ -74,7 +101,7 @@ export class Orchestrator {
 
       // Save plan message
       let planText = plannerRes.content;
-      this.messageRepo.create({
+      this.emitMessage(runId, {
         id: `msg-plan-${Date.now()}`,
         runId,
         role: "assistant",
@@ -97,10 +124,13 @@ export class Orchestrator {
       while (round <= run.maxRounds && !isAccepted) {
         checkCancelled();
 
+        // Broadcast round start
+        eventBus.emit(`run:${runId}`, { type: "round_started", round });
+
         // --- Coder Output ---
         const activeStatus: RunStatus = round === 1 ? "implementing" : "fixing";
         console.log(`[Orchestrator] Run ${runId} - Entering ${activeStatus.toUpperCase()} state (Round ${round}/${run.maxRounds})`);
-        this.runRepo.update(runId, { status: activeStatus, currentRound: round });
+        this.emitStatus(runId, activeStatus, { currentRound: round });
 
         const coderMsgs = round === 1 
           ? compileCoderMessages(run.task, planText)
@@ -115,7 +145,7 @@ export class Orchestrator {
         checkCancelled();
 
         coderOutput = coderRes.content;
-        this.messageRepo.create({
+        this.emitMessage(runId, {
           id: `msg-code-r${round}-${Date.now()}`,
           runId,
           role: "assistant",
@@ -131,7 +161,7 @@ export class Orchestrator {
 
         // --- Reviewer Output ---
         console.log(`[Orchestrator] Run ${runId} - Entering REVIEWING state (Round ${round}/${run.maxRounds})`);
-        this.runRepo.update(runId, { status: "reviewing" });
+        this.emitStatus(runId, "reviewing");
 
         const reviewMsgs = compileReviewMessages(run.task, planText, coderOutput);
         const reviewRes = await plannerProvider.complete({
@@ -143,7 +173,7 @@ export class Orchestrator {
         checkCancelled();
 
         reviewOutput = reviewRes.content;
-        this.messageRepo.create({
+        this.emitMessage(runId, {
           id: `msg-rev-r${round}-${Date.now()}`,
           runId,
           role: "assistant",
@@ -171,20 +201,22 @@ export class Orchestrator {
       // STEP 4 — Loop Termination
       // ==========================================
       if (isAccepted) {
-        this.runRepo.update(runId, { status: "done", finalOutput: coderOutput });
+        this.emitStatus(runId, "done", { finalOutput: coderOutput });
+        eventBus.emit(`run:${runId}`, { type: "run_completed", finalOutput: coderOutput });
         console.log(`[Orchestrator] Run ${runId} - Completed successfully.`);
       } else {
-        this.runRepo.update(runId, { status: "max_rounds_reached", finalOutput: coderOutput });
+        this.emitStatus(runId, "max_rounds_reached", { finalOutput: coderOutput });
+        eventBus.emit(`run:${runId}`, { type: "run_completed", finalOutput: coderOutput });
         console.log(`[Orchestrator] Run ${runId} - Loop stopped due to max rounds reached.`);
       }
 
     } catch (error: any) {
       if (error.message === "ORCHESTRATION_CANCELLED") {
         console.log(`[Orchestrator] Run ${runId} - Process safely stopped by cancellation.`);
-        // Note: Run status is updated to "cancelled" inside cancel() method
       } else {
         console.error(`[Orchestrator] Run ${runId} - Failed with error:`, error.message);
-        this.runRepo.update(runId, { status: "failed", errorMessage: error.message });
+        this.emitStatus(runId, "failed", { errorMessage: error.message });
+        eventBus.emit(`run:${runId}`, { type: "run_failed", errorMessage: error.message });
       }
     } finally {
       this.activeRuns.delete(runId);
