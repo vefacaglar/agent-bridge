@@ -181,7 +181,7 @@ server.post("/api/runs/:id/cancel", async (request, reply) => {
 // Continue a run with follow-up instructions in the same thread
 server.post("/api/runs/:id/continue", async (request, reply) => {
   const { id } = request.params as { id: string };
-  const { task } = request.body as { task: string };
+  const { task, providerId, model } = request.body as { task: string; providerId?: string; model?: string };
 
   if (!task || !task.trim()) {
     reply.status(400);
@@ -192,6 +192,17 @@ server.post("/api/runs/:id/continue", async (request, reply) => {
   if (!run) {
     reply.status(404);
     return { error: `Run with id "${id}" not found` };
+  }
+
+  // Update model if changed mid-conversation
+  if (providerId && model) {
+    const providerMeta = registry.getSafeMetadata().find(p => p.id === providerId);
+    const providerDisplayName = providerMeta ? providerMeta.displayName : providerId;
+    runRepo.update(id, {
+      providerId,
+      providerDisplayName,
+      model
+    });
   }
 
   // Create the user message in the DB

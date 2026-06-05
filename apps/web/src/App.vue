@@ -230,7 +230,9 @@ async function handleSendTask() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        task: currentTask
+        task: currentTask,
+        providerId: modelInfo.providerId,
+        model: modelInfo.model
       })
     });
 
@@ -522,7 +524,7 @@ onBeforeUnmount(() => {
             <div class="model-picks">
               <label class="model-pill">
                 <span>Model</span>
-                <select v-model="selectedModelCombined" :disabled="isRunning || activeRun !== null">
+                <select v-model="selectedModelCombined" :disabled="isRunning">
                   <option v-for="option in modelOptions" :key="option.value" :value="option.value">
                     {{ option.label }}
                   </option>

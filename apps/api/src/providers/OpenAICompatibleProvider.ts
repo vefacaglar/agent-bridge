@@ -18,17 +18,31 @@ export class OpenAICompatibleProvider implements ModelProvider {
     if (request.systemPrompt) {
       messages.push({ role: "system", content: request.systemPrompt });
     }
-    messages.push(...request.messages.map(msg => ({
-      role: msg.role,
-      content: msg.content
-    })));
+    messages.push(...request.messages.map(msg => {
+      const formatted: any = {
+        role: msg.role,
+        content: msg.content
+      };
+      if (msg.role === "tool") {
+        formatted.tool_call_id = msg.tool_call_id;
+        formatted.name = msg.name;
+      }
+      if (msg.toolCalls) {
+        formatted.tool_calls = msg.toolCalls;
+      }
+      return formatted;
+    }));
 
-    const body = {
+    const body: any = {
       model: request.model,
       messages,
       temperature: request.temperature ?? 0.7,
       max_tokens: request.maxTokens
     };
+
+    if (request.tools && request.tools.length > 0) {
+      body.tools = request.tools;
+    }
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
@@ -59,8 +73,9 @@ export class OpenAICompatibleProvider implements ModelProvider {
 
       const choice = data.choices[0];
       const content = choice.message?.content || "";
+      const toolCalls = choice.message?.tool_calls;
 
-      if (!content || !content.trim()) {
+      if ((!content || !content.trim()) && (!toolCalls || toolCalls.length === 0)) {
         throw new Error("Provider returned an empty response");
       }
 
@@ -68,6 +83,14 @@ export class OpenAICompatibleProvider implements ModelProvider {
 
       return {
         content,
+        toolCalls: toolCalls ? toolCalls.map((tc: any) => ({
+          id: tc.id,
+          type: tc.type,
+          function: {
+            name: tc.function.name,
+            arguments: tc.function.arguments
+          }
+        })) : undefined,
         raw: data,
         usage: usage ? {
           inputTokens: usage.prompt_tokens,

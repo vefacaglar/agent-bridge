@@ -5,9 +5,21 @@ export type RunStatus =
   | "failed"
   | "cancelled";
 
+export interface ToolCall {
+  id: string;
+  type: "function";
+  function: {
+    name: string;
+    arguments: string;
+  };
+}
+
 export interface ChatMessage {
-  role: "system" | "user" | "assistant";
+  role: "system" | "user" | "assistant" | "tool";
   content: string;
+  tool_call_id?: string;
+  name?: string;
+  toolCalls?: ToolCall[];
 }
 
 export interface CompletionRequest {
@@ -16,10 +28,12 @@ export interface CompletionRequest {
   messages: ChatMessage[];
   temperature?: number;
   maxTokens?: number;
+  tools?: any[];
 }
 
 export interface CompletionResponse {
   content: string;
+  toolCalls?: ToolCall[];
   raw?: unknown;
   usage?: {
     inputTokens?: number;
@@ -37,7 +51,7 @@ export interface RunModelSnapshot {
 export interface RunMessage {
   id: string;
   runId: string;
-  role: "system" | "user" | "assistant";
+  role: "system" | "user" | "assistant" | "tool";
   agentRole?: "planner" | "coder" | "reviewer" | "user";
   providerId?: string;
   providerDisplayName?: string;

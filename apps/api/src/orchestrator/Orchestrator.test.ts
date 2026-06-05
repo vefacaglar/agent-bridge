@@ -103,4 +103,90 @@ test("Orchestrator Integration Tests", async (t) => {
       "done"
     ]);
   });
+
+  await t.test("Orchestrator - runs tool call write_file and saves results", async () => {
+    const registry = new ProviderRegistry(testConfigPath);
+    const runRepo = new RunRepository();
+    const messageRepo = new MessageRepository();
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry);
+
+    const runId = "run-test-tool-call";
+    const runData: Run = {
+      id: runId,
+      title: "Test Tool Call",
+      task: "Create selam.json with {}",
+      status: "created",
+      providerId: "test-provider",
+      providerDisplayName: "Test Provider",
+      model: "model-1",
+      projectPath: process.cwd(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    runRepo.create(runData);
+
+    const createdFilePath = path.join(process.cwd(), "test_output_file.json");
+    t.after(() => {
+      if (fs.existsSync(createdFilePath)) {
+        fs.unlinkSync(createdFilePath);
+      }
+    });
+
+    let callCount = 0;
+    globalThis.fetch = async (url: any, options: any) => {
+      callCount++;
+      if (callCount === 1) {
+        // Return tool call
+        return {
+          ok: true,
+          json: async () => ({
+            choices: [{
+              message: {
+                role: "assistant",
+                content: "Sure, let me create the file.",
+                tool_calls: [{
+                  id: "call_test_1",
+                  type: "function",
+                  function: {
+                    name: "write_file",
+                    arguments: JSON.stringify({ path: "test_output_file.json", content: "{}" })
+                  }
+                }]
+              }
+            }]
+          })
+        } as any;
+      } else {
+        // Return text response after tool call is processed
+        return {
+          ok: true,
+          json: async () => ({
+            choices: [{
+              message: {
+                role: "assistant",
+                content: "I have successfully created the file."
+              }
+            }]
+          })
+        } as any;
+      }
+    };
+
+    await orchestrator.run(runId);
+
+    // Verify file is actually created
+    assert.ok(fs.existsSync(createdFilePath));
+    assert.strictEqual(fs.readFileSync(createdFilePath, "utf-8"), "{}");
+
+    // Verify messages saved (1 assistant tools, 1 tool output, 1 final assistant text response)
+    const savedMsgs = messageRepo.listByRunId(runId);
+    assert.strictEqual(savedMsgs.length, 3);
+    assert.strictEqual(savedMsgs[0].role, "assistant");
+    assert.ok(savedMsgs[0].rawResponse?.includes("write_file"));
+    assert.strictEqual(savedMsgs[1].role, "tool");
+    assert.ok(savedMsgs[1].content.includes("success"));
+    assert.strictEqual(savedMsgs[2].role, "assistant");
+    assert.strictEqual(savedMsgs[2].content, "I have successfully created the file.");
+  });
 });
