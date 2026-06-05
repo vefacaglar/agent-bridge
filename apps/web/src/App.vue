@@ -51,6 +51,21 @@ const modelOptions = computed(() => {
 
 const visibleTitle = computed(() => activeRun.value?.title || 'New chat');
 
+const visibleMessages = computed(() => {
+  return messages.value.filter(message => {
+    if (message.role === 'tool') return false;
+    if (message.role === 'assistant' && message.rawResponse) {
+      try {
+        const parsed = JSON.parse(message.rawResponse);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return false;
+        }
+      } catch (e) {}
+    }
+    return true;
+  });
+});
+
 const projectOptions = computed(() => {
   return projects.value.map(p => {
     const count = runs.value.filter(run => (run.projectPath || '/Users/vefa/Projects/agent-bridge') === p.path).length;
@@ -480,7 +495,7 @@ onBeforeUnmount(() => {
             <pre>{{ activeRun.task }}</pre>
           </article>
 
-          <template v-for="message in messages" :key="message.id">
+          <template v-for="message in visibleMessages" :key="message.id">
             <!-- User message (continuation) -->
             <article v-if="message.role === 'user'" class="user-bubble">
               <pre>{{ message.content }}</pre>
