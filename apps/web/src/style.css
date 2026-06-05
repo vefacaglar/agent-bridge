@@ -862,3 +862,136 @@ pre {
   background: rgba(255, 213, 79, 0.08) !important;
 }
 
+/* Markdown Formatting */
+.markdown-body {
+  font-size: 0.95rem;
+  line-height: 1.62;
+  color: #deded8;
+}
+
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4 {
+  color: #ffffff;
+  margin-top: 24px;
+  margin-bottom: 12px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.markdown-body h1 { font-size: 1.45rem; border-bottom: 1px solid #303030; padding-bottom: 6px; }
+.markdown-body h2 { font-size: 1.25rem; }
+.markdown-body h3 { font-size: 1.12rem; }
+.markdown-body h4 { font-size: 1rem; }
+
+.markdown-body p {
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
+.markdown-body ul,
+.markdown-body ol {
+  margin-top: 0;
+  margin-bottom: 16px;
+  padding-left: 20px;
+}
+
+.markdown-body li {
+  margin-top: 4px;
+}
+
+.markdown-body code {
+  font-family: monospace;
+  font-size: 0.85rem;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 3px 6px;
+  border-radius: 4px;
+  color: #f0a7cf;
+}
+
+/* Exclude full code blocks from single inline styling */
+.markdown-body pre code {
+  background: transparent !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  color: inherit !important;
+  font-size: 0.9rem;
+}
+
+.markdown-body pre {
+  margin: 0;
+  padding: 14px;
+  overflow-x: auto;
+  background: #141416;
+  border-radius: 0 0 10px 10px;
+}
+
+.markdown-body a {
+  color: #9db7ff;
+  text-decoration: none;
+}
+
+.markdown-body a:hover {
+  text-decoration: underline;
+}
+
+.markdown-body blockquote {
+  margin: 0 0 16px;
+  padding: 0 16px;
+  color: var(--muted);
+  border-left: 4px solid #3e3e3e;
+}
+
+/* Premium Code Block Wrapper */
+.code-block-wrapper {
+  margin: 20px 0;
+  border: 1px solid #2f2f33;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #18181b;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+}
+
+.code-block-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #202024;
+  padding: 8px 16px;
+  border-bottom: 1px solid #28282c;
+}
+
+.code-block-lang {
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  font-family: monospace;
+}
+
+.code-block-copy-btn {
+  background: transparent;
+  color: var(--faint);
+  border: 1px solid #3a3a40;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.code-block-copy-btn:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.05);
+  border-color: #55555d;
+}
+
+.code-block-copy-btn.copied {
+  color: #7bd88f;
+  background: rgba(123, 216, 143, 0.1);
+  border-color: rgba(123, 216, 143, 0.3);
+}
+

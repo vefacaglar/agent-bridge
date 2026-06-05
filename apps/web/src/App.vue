@@ -1,6 +1,55 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { ProviderMetadata, Run, RunMessage, RunStatus, Project } from '@bridgemind/shared';
+import { Marked } from 'marked';
+
+const marked = new Marked({
+  gfm: true,
+  breaks: true
+});
+
+marked.use({
+  renderer: {
+    code(token: { text: string; lang?: string; escaped?: boolean }) {
+      const code = token.text;
+      const lang = token.lang || 'code';
+      
+      // Escape HTML entities to prevent rendering issues in raw code blocks
+      const safeCode = code
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+      
+      return `
+        <div class="code-block-wrapper">
+          <div class="code-block-header">
+            <span class="code-block-lang">${lang}</span>
+            <button class="code-block-copy-btn" onclick="
+              const codeText = this.closest('.code-block-wrapper').querySelector('code').innerText;
+              navigator.clipboard.writeText(codeText);
+              this.innerText = 'Copied!';
+              this.classList.add('copied');
+              setTimeout(() => { this.innerText = 'Copy'; this.classList.remove('copied'); }, 2000);
+            ">Copy</button>
+          </div>
+          <pre><code class="language-${lang}">${safeCode}</code></pre>
+        </div>
+      `;
+    }
+  }
+});
+
+function renderMarkdown(content: string): string {
+  if (!content) return '';
+  try {
+    return marked.parse(content) as string;
+  } catch (err) {
+    console.error('Markdown parsing error:', err);
+    return content;
+  }
+}
 
 const API_BASE = 'http://localhost:3000';
 
@@ -726,8 +775,8 @@ onBeforeUnmount(() => {
                 <span>{{ message.providerDisplayName }} / {{ message.model }}</span>
                 <span>{{ formatTime(message.createdAt) }}</span>
               </div>
-              <pre>{{ cleanMessageContent(message.content) }}</pre>
-              <button class="copy-button" @click="copyText(message.content)">Copy</button>
+              <div class="markdown-body" v-html="renderMarkdown(cleanMessageContent(message.content))"></div>
+              <button class="copy-button" @click="copyText(message.content)">Copy entire response</button>
             </article>
           </template>
 
