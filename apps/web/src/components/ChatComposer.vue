@@ -18,7 +18,6 @@ const props = defineProps<{
   confirmationGroup: MessageGroup | null;
   showPermission: boolean;
   permissionRequest: any;
-  activeProjectPath?: string;
 }>();
 
 const emit = defineEmits<{
@@ -97,7 +96,6 @@ onBeforeUnmount(() => {
 
       <PermissionCard
         :request="showPermission ? permissionRequest : null"
-        :project-path="activeProjectPath"
         @decide="emit('permission-decision', $event)"
       />
 

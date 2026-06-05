@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import type { Run, ToolCall } from "@bridgemind/shared";
+import type { Run, ToolCall, PermissionPreview } from "@bridgemind/shared";
 
 /**
  * Tool schemas advertised to the model. The orchestrator is the only place
@@ -80,6 +80,58 @@ export const WORKSPACE_TOOLS = [
     }
   }
 ];
+
+/**
+ * Builds the preview shown in the permission card before a tool runs.
+ * For file writes it reads the current on-disk content (if any) so the UI can
+ * render a diff; for create it is null, and read/list carry only the path.
+ */
+export function buildPermissionPreview(run: Run, toolCall: ToolCall): PermissionPreview | null {
+  let args: any = {};
+  try {
+    args = JSON.parse(toolCall.function.arguments || "{}");
+  } catch {
+    args = {};
+  }
+
+  const relativePath = typeof args.path === "string" ? args.path : "";
+  const baseDir = path.resolve(run.projectPath || process.cwd());
+  const absolutePath = path.resolve(baseDir, relativePath);
+  const isInside = absolutePath === baseDir || absolutePath.startsWith(baseDir + path.sep);
+
+  const readExisting = (): string | null => {
+    try {
+      if (isInside && fs.existsSync(absolutePath) && fs.statSync(absolutePath).isFile()) {
+        return fs.readFileSync(absolutePath, "utf-8");
+      }
+    } catch {
+      /* ignore unreadable files */
+    }
+    return null;
+  };
+
+  switch (toolCall.function.name) {
+    case "write_file": {
+      const oldContent = readExisting();
+      return {
+        tool: "write_file",
+        action: oldContent === null ? "create" : "edit",
+        path: relativePath,
+        absolutePath,
+        oldContent,
+        newContent: typeof args.content === "string" ? args.content : ""
+      };
+    }
+    case "delete_file":
+      return { tool: "delete_file", action: "delete", path: relativePath, absolutePath, oldContent: readExisting(), newContent: null };
+    case "read_file":
+      return { tool: "read_file", action: "read", path: relativePath, absolutePath, oldContent: null, newContent: null };
+    case "list_directory":
+      return { tool: "list_directory", action: "list", path: relativePath, absolutePath, oldContent: null, newContent: null };
+    default:
+      return null;
+  }
+}
 
 /**
  * Executes a single workspace tool call against the run's project directory.

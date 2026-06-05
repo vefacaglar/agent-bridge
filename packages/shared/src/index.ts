@@ -111,7 +111,19 @@ export type RunEvent =
       type: "permission_requested";
       runId: string;
       toolCall: any;
+      preview?: PermissionPreview | null;
     };
+
+// Context attached to a permission request so the UI can render a preview
+// (e.g. a red/green diff for file edits) instead of just raw arguments.
+export interface PermissionPreview {
+  tool: string;
+  action: "create" | "edit" | "delete" | "read" | "list";
+  path: string;
+  absolutePath: string;
+  oldContent: string | null;
+  newContent: string | null;
+}
 
 // Safe Provider Metadata structure returned by GET /api/providers
 export interface ProviderMetadata {

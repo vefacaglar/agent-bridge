@@ -22,8 +22,9 @@ IMPORTANT INSTRUCTION FOR PLANNING & CODING:
 - Proactively call workspace tools (like 'write_file' and 'delete_file') as needed to complete the user's tasks.`;
   } else if (mode === "ask_permissions") {
     prompt += `\n\nCURRENT OPERATIONAL MODE: ASK PERMISSIONS MODE
-- You are allowed to use workspace tools (like 'write_file' and 'delete_file') to write code and perform modifications.
-- However, note that all tool executions will be presented to the user for explicit confirmation/approval before being executed.`;
+- When the task requires changing or inspecting the filesystem, you MUST call the matching workspace tool ('write_file', 'delete_file', 'read_file', 'list_directory'). Call the tool directly.
+- Do NOT ask the user for permission in plain text, and do NOT wait for a "yes" in the chat. The application automatically intercepts every tool call and shows the user an approval dialog before it runs.
+- Writing something like "should I delete X?" as text INSTEAD of calling the tool will NOT trigger the approval dialog and nothing will happen. Always express the action as a real tool call.`;
   } else if (mode === "accept_edits") {
     prompt += `\n\nCURRENT OPERATIONAL MODE: ACCEPT EDITS MODE
 - You can suggest code changes and make tool calls to write files.

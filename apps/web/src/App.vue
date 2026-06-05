@@ -80,7 +80,6 @@ const {
         :confirmation-group="activeConfirmationGroup"
         :show-permission="showPermissionModal"
         :permission-request="pendingPermissionRequest"
-        :active-project-path="activeRun?.projectPath"
         @send="chat.handleSendTask"
         @quick-reply="chat.sendQuickReply"
         @permission-decision="chat.handlePermissionDecision"

@@ -5,7 +5,7 @@ import { ProviderRegistry } from "../providers/ProviderRegistry.js";
 import { eventBus } from "./eventBus.js";
 import { db } from "../database/db.js";
 import { buildSystemPrompt } from "./systemPrompt.js";
-import { WORKSPACE_TOOLS, executeWorkspaceTool } from "./workspaceTools.js";
+import { WORKSPACE_TOOLS, executeWorkspaceTool, buildPermissionPreview } from "./workspaceTools.js";
 
 type PermissionDecision = "allow_once" | "allow_project" | "allow_always" | "deny";
 
@@ -59,11 +59,16 @@ export class Orchestrator {
     return false;
   }
 
-  private async requestPermission(runId: string, toolCall: any): Promise<PermissionDecision> {
+  private async requestPermission(runId: string, run: Run, toolCall: any): Promise<PermissionDecision> {
     return new Promise((resolve) => {
       this.pendingPermissions.set(runId, { resolve, toolCall });
       this.emitStatus(runId, "awaiting_permission");
-      eventBus.emit(`run:${runId}`, { type: "permission_requested", runId, toolCall });
+      eventBus.emit(`run:${runId}`, {
+        type: "permission_requested",
+        runId,
+        toolCall,
+        preview: buildPermissionPreview(run, toolCall)
+      });
     });
   }
 
@@ -314,7 +319,7 @@ export class Orchestrator {
    */
   private async runToolCall(runId: string, run: Run, toolCall: any): Promise<string> {
     if (run.mode === "ask_permissions" && !this.checkPermission(run.projectPath)) {
-      const decision = await this.requestPermission(runId, toolCall);
+      const decision = await this.requestPermission(runId, run, toolCall);
       if (decision === "deny") {
         return JSON.stringify({ success: false, error: "Permission denied by user." });
       }

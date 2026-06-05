@@ -36,32 +36,3 @@ export function getConfirmationOptions(content: string): string[] | null {
 
   return null;
 }
-
-/** Short label for a pending permission request (the target path or tool name). */
-export function getPermissionPath(toolCall: any): string {
-  if (!toolCall?.function?.arguments) return '';
-  try {
-    const parsed = JSON.parse(toolCall.function.arguments);
-    return parsed.path || toolCall.function.name;
-  } catch (e) {
-    return toolCall.function.name;
-  }
-}
-
-/** Resolves a permission tool call's arguments into a readable absolute path. */
-export function getPermissionArguments(toolCall: any, projectPath?: string): string {
-  if (!toolCall?.function?.arguments) return '';
-  try {
-    const parsed = JSON.parse(toolCall.function.arguments);
-    if (parsed.path && projectPath) {
-      const rel = parsed.path;
-      const combined = projectPath.endsWith('/') || rel.startsWith('/')
-        ? `${projectPath}${rel}`
-        : `${projectPath}/${rel}`;
-      return combined.replace(/([^:]\/)\/+/g, '$1');
-    }
-    return JSON.stringify(parsed);
-  } catch (e) {
-    return toolCall.function.arguments;
-  }
-}

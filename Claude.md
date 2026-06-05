@@ -213,6 +213,11 @@ Only `ask_permissions` currently pauses for approval. The approval flow emits
 decision: `allow_once`, `allow_project`, `allow_always`, or `deny`.
 `allow_project` / `allow_always` are persisted in the `permissions` table.
 
+The `permission_requested` event carries a `PermissionPreview` (built by
+`buildPermissionPreview`): the tool, action (create/edit/delete/read/list),
+path, and the current on-disk content so the UI can render a red/green diff
+(Claude Code-style) in the inline permission card before the tool runs.
+
 ---
 
 ## Workspace Tools
