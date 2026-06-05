@@ -3,9 +3,14 @@ import cors from "@fastify/cors";
 import path from "node:path";
 import type { RunStatus } from "@bridgemind/shared";
 import { ProviderRegistry } from "./providers/ProviderRegistry.js";
-import { RunRepository, MessageRepository } from "./database/repositories.js";
+import { RunRepository, MessageRepository, ProjectRepository } from "./database/repositories.js";
 import { Orchestrator } from "./orchestrator/Orchestrator.js";
 import { eventBus } from "./orchestrator/eventBus.js";
+import { exec } from "node:child_process";
+import { promisify } from "node:util";
+
+const execAsync = promisify(exec);
+
 
 const server = Fastify({
   logger: true,
@@ -19,7 +24,9 @@ await server.register(cors, {
 const registry = new ProviderRegistry();
 const runRepo = new RunRepository();
 const messageRepo = new MessageRepository();
+const projectRepo = new ProjectRepository();
 const orchestrator = new Orchestrator(runRepo, messageRepo, registry);
+
 
 const defaultProjectPath = process.cwd();
 
@@ -40,6 +47,79 @@ server.get("/ping", async (request, reply) => {
 server.get("/api/providers", async (request, reply) => {
   return registry.getSafeMetadata();
 });
+
+// GET /api/projects - list all projects
+server.get("/api/projects", async (request, reply) => {
+  return projectRepo.list();
+});
+
+// POST /api/projects - create/add a project manually
+server.post("/api/projects", async (request, reply) => {
+  const { path: projectPath, name: projectName } = request.body as {
+    path?: string;
+    name?: string;
+  };
+
+  if (!projectPath || !projectPath.trim()) {
+    reply.status(400);
+    return { error: "Missing required field: path" };
+  }
+
+  const resolvedPath = projectPath.trim();
+  const resolvedName = projectName?.trim() || path.basename(resolvedPath) || "Workspace";
+
+  const project = {
+    path: resolvedPath,
+    name: resolvedName,
+    createdAt: new Date().toISOString()
+  };
+
+  projectRepo.create(project);
+  return project;
+});
+
+// DELETE /api/projects - delete/remove a project
+server.delete("/api/projects", async (request, reply) => {
+  const { path: projectPath } = request.query as { path?: string };
+
+  if (!projectPath) {
+    reply.status(400);
+    return { error: "Missing required query parameter: path" };
+  }
+
+  projectRepo.delete(projectPath);
+  return { success: true };
+});
+
+// POST /api/projects/select-dir - trigger macOS native folder selection
+server.post("/api/projects/select-dir", async (request, reply) => {
+  if (process.platform !== "darwin") {
+    reply.status(400);
+    return { error: "Automatic folder picking is only supported on macOS. Please input the path manually." };
+  }
+
+  try {
+    const { stdout } = await execAsync(
+      `osascript -e 'POSIX path of (choose folder with prompt "Select a project folder:")'`
+    );
+    const selectedPath = stdout.trim();
+    if (!selectedPath) {
+      reply.status(400);
+      return { error: "No folder selected" };
+    }
+    const folderName = path.basename(selectedPath) || "Workspace";
+    return { path: selectedPath, name: folderName };
+  } catch (error: any) {
+    // Check if user cancelled
+    if (error.message && (error.message.includes("User canceled") || error.message.includes("-128"))) {
+      reply.status(400);
+      return { error: "Selection cancelled by user." };
+    }
+    reply.status(500);
+    return { error: `Failed to open folder picker: ${error.message}` };
+  }
+});
+
 
 // Create and trigger a new orchestration run
 server.post("/api/runs", async (request, reply) => {

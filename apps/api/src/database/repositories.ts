@@ -1,5 +1,6 @@
-import type { Run, RunMessage, RunStatus } from "@bridgemind/shared";
+import type { Run, RunMessage, RunStatus, Project } from "@bridgemind/shared";
 import { db } from "./db.js";
+
 
 // Mapper from database row to Run model
 function mapRowToRun(row: any): Run {
@@ -173,3 +174,39 @@ export class MessageRepository {
     return rows.map(mapRowToMessage);
   }
 }
+
+function mapRowToProject(row: any): Project {
+  return {
+    path: row.path,
+    name: row.name,
+    createdAt: row.created_at
+  };
+}
+
+export class ProjectRepository {
+  create(project: Project): void {
+    const stmt = db.prepare(`
+      INSERT OR REPLACE INTO projects (path, name, created_at)
+      VALUES (?, ?, ?)
+    `);
+    stmt.run(project.path, project.name, project.createdAt);
+  }
+
+  list(): Project[] {
+    const stmt = db.prepare("SELECT * FROM projects ORDER BY created_at ASC");
+    const rows = stmt.all() as any[];
+    return rows.map(mapRowToProject);
+  }
+
+  delete(path: string): void {
+    const stmt = db.prepare("DELETE FROM projects WHERE path = ?");
+    stmt.run(path);
+  }
+
+  get(path: string): Project | null {
+    const stmt = db.prepare("SELECT * FROM projects WHERE path = ?");
+    const row = stmt.get(path) as any;
+    return row ? mapRowToProject(row) : null;
+  }
+}
+

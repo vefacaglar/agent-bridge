@@ -115,3 +115,10 @@ export interface ProviderMetadata {
   type: "openai-compatible" | "anthropic";
   models: string[];
 }
+
+export interface Project {
+  path: string;
+  name: string;
+  createdAt: string;
+}
+

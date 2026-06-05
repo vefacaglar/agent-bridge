@@ -82,4 +82,23 @@ db.exec(`
   );
 `);
 
+// Create Projects Table
+db.exec(`
+  CREATE TABLE IF NOT EXISTS projects (
+    path TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+`);
+
+// Seed default project if empty
+const projectCount = db.prepare("SELECT count(*) as count FROM projects").get() as { count: number };
+if (projectCount.count === 0) {
+  db.prepare(`
+    INSERT INTO projects (path, name, created_at)
+    VALUES (?, ?, ?)
+  `).run(wsRoot, defaultProjectName, new Date().toISOString());
+}
+
 console.log("[Database] Database initialized and tables verified.");
+

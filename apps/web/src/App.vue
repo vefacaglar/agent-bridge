@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import type { ProviderMetadata, Run, RunMessage, RunStatus } from '@bridgemind/shared';
+import type { ProviderMetadata, Run, RunMessage, RunStatus, Project } from '@bridgemind/shared';
 
 const API_BASE = 'http://localhost:3000';
 
@@ -18,6 +18,16 @@ const activeProjectPath = ref('/Users/vefa/Projects/agent-bridge');
 
 const isRunning = ref(false);
 const finalOutput = ref('');
+
+const projects = ref<Project[]>([]);
+const showAddProjectModal = ref(false);
+const newProjectName = ref('');
+const newProjectPath = ref('');
+const isMac = computed(() => {
+  return navigator.userAgent.toLowerCase().includes('mac') || navigator.platform.toLowerCase().includes('mac');
+});
+const isSubmittingProject = ref(false);
+
 let eventSource: EventSource | null = null;
 
 const activeStatuses: RunStatus[] = ['created', 'planning', 'implementing', 'reviewing', 'fixing'];
@@ -40,25 +50,14 @@ const plannerMessage = computed(() => messages.value.find(message => message.age
 const visibleTitle = computed(() => activeRun.value?.title || 'New chat');
 
 const projectOptions = computed(() => {
-  const projects = new Map<string, { path: string; name: string; count: number }>();
-  projects.set('/Users/vefa/Projects/agent-bridge', {
-    path: '/Users/vefa/Projects/agent-bridge',
-    name: 'agent-bridge',
-    count: 0
-  });
-
-  for (const run of runs.value) {
-    const path = run.projectPath || '/Users/vefa/Projects/agent-bridge';
-    const name = run.projectName || path.split('/').filter(Boolean).at(-1) || 'Workspace';
-    const existing = projects.get(path);
-    if (existing) {
-      existing.count += 1;
-    } else {
-      projects.set(path, { path, name, count: 1 });
-    }
-  }
-
-  return [...projects.values()].sort((a, b) => a.name.localeCompare(b.name));
+  return projects.value.map(p => {
+    const count = runs.value.filter(run => (run.projectPath || '/Users/vefa/Projects/agent-bridge') === p.path).length;
+    return {
+      path: p.path,
+      name: p.name,
+      count
+    };
+  }).sort((a, b) => a.name.localeCompare(b.name));
 });
 
 const filteredRuns = computed(() => {
@@ -344,11 +343,104 @@ function copyText(value: string) {
   navigator.clipboard.writeText(value);
 }
 
+async function loadProjects() {
+  const response = await fetch(`${API_BASE}/api/projects`);
+  if (response.ok) {
+    projects.value = await response.json();
+  }
+}
+
+async function handleBrowseFolder() {
+  try {
+    const response = await fetch(`${API_BASE}/api/projects/select-dir`, {
+      method: 'POST'
+    });
+    if (!response.ok) {
+      const err = await response.json();
+      window.alert(err.error || 'Klasor secilemedi.');
+      return;
+    }
+    const data = await response.json();
+    newProjectPath.value = data.path;
+    newProjectName.value = data.name;
+  } catch (err) {
+    console.error(err);
+    window.alert('Mac klasor secme penceresi acilamadi.');
+  }
+}
+
+async function submitNewProject() {
+  if (!newProjectPath.value.trim()) return;
+  isSubmittingProject.value = true;
+  try {
+    const response = await fetch(`${API_BASE}/api/projects`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        path: newProjectPath.value.trim(),
+        name: newProjectName.value.trim()
+      })
+    });
+    if (!response.ok) {
+      const err = await response.json();
+      window.alert(err.error || 'Proje eklenemedi.');
+      return;
+    }
+    const addedProject = await response.json() as Project;
+    await loadProjects();
+    selectProject(addedProject.path);
+    closeAddProjectModal();
+  } catch (err) {
+    console.error(err);
+    window.alert('Proje kaydedilirken hata olustu.');
+  } finally {
+    isSubmittingProject.value = false;
+  }
+}
+
+async function deleteProject(projectPath: string, event: Event) {
+  event.stopPropagation();
+  if (projectOptions.value.length <= 1) {
+    window.alert('En az bir proje tanimli olmalidir.');
+    return;
+  }
+  if (!window.confirm('Bu projeyi listeden kaldirmak istediginize emin misiniz? (Mevcut sohbet gecmisi silinmeyecektir)')) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`${API_BASE}/api/projects?path=${encodeURIComponent(projectPath)}`, {
+      method: 'DELETE'
+    });
+    if (response.ok) {
+      await loadProjects();
+      if (activeProjectPath.value === projectPath) {
+        selectProject(projectOptions.value[0]?.path || '');
+      }
+    }
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+function openAddProjectModal() {
+  newProjectName.value = '';
+  newProjectPath.value = '';
+  showAddProjectModal.value = true;
+}
+
+function closeAddProjectModal() {
+  showAddProjectModal.value = false;
+}
+
 onMounted(async () => {
   await loadProviders();
+  await loadProjects();
   await loadRuns();
   if (runs.value.length > 0) {
     await selectRun(runs.value[0]);
+  } else if (projectOptions.value.length > 0) {
+    activeProjectPath.value = projectOptions.value[0].path;
   }
 });
 
@@ -370,17 +462,30 @@ onBeforeUnmount(() => {
       <button class="nav-action muted">Search</button>
 
       <div class="sidebar-block">
-        <div class="sidebar-label">Projects</div>
-        <button
-          v-for="project in projectOptions"
-          :key="project.path"
-          class="project-item"
-          :class="{ active: project.path === activeProjectPath }"
-          @click="selectProject(project.path)"
-        >
-          <span>{{ project.name }}</span>
-        </button>
+        <div class="sidebar-label flex-between">
+          <span>Projects</span>
+          <button class="add-project-btn" title="Add Project" @click="openAddProjectModal">+</button>
+        </div>
+        <div class="project-list">
+          <button
+            v-for="project in projectOptions"
+            :key="project.path"
+            class="project-item"
+            :class="{ active: project.path === activeProjectPath }"
+            @click="selectProject(project.path)"
+          >
+            <span class="project-name-text">{{ project.name }}</span>
+            <button 
+              class="delete-project-btn" 
+              title="Remove Project" 
+              @click="deleteProject(project.path, $event)"
+            >
+              ×
+            </button>
+          </button>
+        </div>
       </div>
+
 
       <div class="sidebar-block runs-block">
         <div class="sidebar-label">{{ activeProject?.name || 'Project' }} chats</div>
@@ -505,5 +610,55 @@ onBeforeUnmount(() => {
         </div>
       </footer>
     </main>
+
+    <!-- Add Project Modal -->
+    <div v-if="showAddProjectModal" class="modal-overlay" @click.self="closeAddProjectModal">
+      <div class="modal-card">
+        <header class="modal-header">
+          <h3>Add Project Folder</h3>
+          <button class="close-modal-btn" @click="closeAddProjectModal">×</button>
+        </header>
+        
+        <main class="modal-body">
+          <div class="form-group" v-if="isMac">
+            <button class="primary-button browse-btn" @click="handleBrowseFolder">
+              📂 Select Folder (macOS Finder)
+            </button>
+            <div class="separator-text">or enter path manually</div>
+          </div>
+          
+          <div class="form-group">
+            <label for="project-path">Absolute Folder Path</label>
+            <input 
+              id="project-path" 
+              type="text" 
+              v-model="newProjectPath" 
+              placeholder="/Users/username/Projects/my-app"
+            />
+          </div>
+          
+          <div class="form-group">
+            <label for="project-name">Display Name (Optional)</label>
+            <input 
+              id="project-name" 
+              type="text" 
+              v-model="newProjectName" 
+              placeholder="my-app"
+            />
+          </div>
+        </main>
+        
+        <footer class="modal-footer">
+          <button class="ghost-button" @click="closeAddProjectModal">Cancel</button>
+          <button 
+            class="primary-button" 
+            :disabled="!newProjectPath.trim() || isSubmittingProject" 
+            @click="submitNewProject"
+          >
+            {{ isSubmittingProject ? 'Adding...' : 'Add Project' }}
+          </button>
+        </footer>
+      </div>
+    </div>
   </div>
 </template>
