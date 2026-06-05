@@ -302,17 +302,17 @@ function getToolStatusLabel(response?: RunMessage): string {
 }
 
 .step-badge.success {
-  background: rgba(123, 216, 143, 0.1);
+  background: rgba(136, 168, 144, 0.12);
   color: var(--success);
 }
 
 .step-badge.failed {
-  background: rgba(255, 138, 128, 0.1);
+  background: rgba(184, 130, 130, 0.12);
   color: var(--danger);
 }
 
 .step-badge.pending {
-  background: rgba(255, 209, 138, 0.1);
+  background: rgba(188, 162, 130, 0.12);
   color: var(--warning);
   animation: shimmerPulse 1.5s infinite ease-in-out;
 }

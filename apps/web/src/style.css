@@ -15,12 +15,12 @@
   --text: #e5e5e5;
   --muted: #a3a3a3;
   --faint: #737373;
-  --planner: #cfa293;
-  --executor: #a3b59f;
-  --danger: #d69191;
-  --success: #9cc7a6;
-  --warning: #d6b691;
-  --info: #c8b3ce;
+  --planner: #b88f82;
+  --executor: #8da08b;
+  --danger: #b88282;
+  --success: #88a890;
+  --warning: #bca282;
+  --info: #b0a0b8;
   --radius: 10px;
 }
 
@@ -839,50 +839,50 @@ pre {
 }
 
 .perm-btn.green {
-  background: rgba(123, 216, 143, 0.15) !important;
-  color: #a4f4b6 !important;
-  border-color: rgba(123, 216, 143, 0.3) !important;
+  background: rgba(136, 168, 144, 0.12) !important;
+  color: var(--success) !important;
+  border-color: rgba(136, 168, 144, 0.25) !important;
 }
 
 .perm-btn.green:hover {
-  background: rgba(123, 216, 143, 0.25) !important;
+  background: rgba(136, 168, 144, 0.22) !important;
 }
 
 .perm-btn.blue {
-  background: rgba(157, 183, 255, 0.15) !important;
-  color: #c0d1ff !important;
-  border-color: rgba(157, 183, 255, 0.3) !important;
+  background: rgba(176, 160, 184, 0.12) !important;
+  color: var(--info) !important;
+  border-color: rgba(176, 160, 184, 0.25) !important;
 }
 
 .perm-btn.blue:hover {
-  background: rgba(157, 183, 255, 0.25) !important;
+  background: rgba(176, 160, 184, 0.22) !important;
 }
 
 .perm-btn.purple {
-  background: rgba(240, 167, 207, 0.15) !important;
-  color: #ffd2eb !important;
-  border-color: rgba(240, 167, 207, 0.3) !important;
+  background: rgba(141, 160, 139, 0.12) !important;
+  color: var(--executor) !important;
+  border-color: rgba(141, 160, 139, 0.25) !important;
 }
 
 .perm-btn.purple:hover {
-  background: rgba(240, 167, 207, 0.25) !important;
+  background: rgba(141, 160, 139, 0.22) !important;
 }
 
 .perm-btn.red {
-  background: rgba(255, 138, 128, 0.15) !important;
-  color: #ffcdd2 !important;
-  border-color: rgba(255, 138, 128, 0.3) !important;
+  background: rgba(184, 130, 130, 0.12) !important;
+  color: var(--danger) !important;
+  border-color: rgba(184, 130, 130, 0.25) !important;
 }
 
 .perm-btn.red:hover {
-  background: rgba(255, 138, 128, 0.25) !important;
+  background: rgba(184, 130, 130, 0.22) !important;
 }
 
 /* Status Warning Colors */
 .status-pill.warning {
-  color: #ffd54f !important;
-  border-color: rgba(255, 213, 79, 0.45) !important;
-  background: rgba(255, 213, 79, 0.08) !important;
+  color: var(--warning) !important;
+  border-color: rgba(188, 162, 130, 0.3) !important;
+  background: rgba(188, 162, 130, 0.08) !important;
 }
 
 /* Markdown Formatting */
