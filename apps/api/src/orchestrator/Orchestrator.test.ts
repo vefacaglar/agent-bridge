@@ -189,4 +189,48 @@ test("Orchestrator Integration Tests", async (t) => {
     assert.strictEqual(savedMsgs[2].role, "assistant");
     assert.strictEqual(savedMsgs[2].content, "I have successfully created the file.");
   });
+
+  await t.test("Orchestrator - injects mode instructions into system prompt", async () => {
+    const registry = new ProviderRegistry(testConfigPath);
+    const runRepo = new RunRepository();
+    const messageRepo = new MessageRepository();
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry);
+
+    const runId = "run-test-mode-prompt";
+    const runData: Run = {
+      id: runId,
+      title: "Test Mode task",
+      task: "Tell me a plan",
+      status: "created",
+      providerId: "test-provider",
+      providerDisplayName: "Test Provider",
+      model: "model-1",
+      mode: "plan",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    runRepo.create(runData);
+
+    let systemPromptUsed = "";
+    globalThis.fetch = async (url: any, options: any) => {
+      const parsed = JSON.parse(options.body);
+      const systemMessage = parsed.messages.find((m: any) => m.role === "system");
+      if (systemMessage) {
+        systemPromptUsed = systemMessage.content;
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { role: "assistant", content: "I suggest plan A." } }]
+        })
+      } as any;
+    };
+
+    await orchestrator.run(runId);
+
+    // Verify mode system prompt addition was present
+    assert.ok(systemPromptUsed.includes("CURRENT OPERATIONAL MODE: PLAN MODE"));
+    assert.ok(systemPromptUsed.includes("DO NOT call any file-writing"));
+  });
 });

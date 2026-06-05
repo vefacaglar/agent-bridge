@@ -14,6 +14,7 @@ function mapRowToRun(row: any): Run {
     providerId: row.provider_id,
     providerDisplayName: row.provider_display_name,
     model: row.model,
+    mode: row.mode || "accept_edits",
     errorMessage: row.error_message || undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at
@@ -41,9 +42,9 @@ export class RunRepository {
     const stmt = db.prepare(`
       INSERT INTO runs (
         id, title, task, project_path, project_name, status,
-        provider_id, provider_display_name, model,
+        provider_id, provider_display_name, model, mode,
         error_message, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     
     stmt.run(
@@ -56,6 +57,7 @@ export class RunRepository {
       run.providerId,
       run.providerDisplayName,
       run.model,
+      run.mode || "accept_edits",
       run.errorMessage || null,
       run.createdAt,
       run.updatedAt
@@ -87,6 +89,7 @@ export class RunRepository {
       providerId: "provider_id",
       providerDisplayName: "provider_display_name",
       model: "model",
+      mode: "mode",
       errorMessage: "error_message",
       createdAt: "created_at"
     };

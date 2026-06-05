@@ -124,12 +124,13 @@ server.post("/api/projects/select-dir", async (request, reply) => {
 
 // Create and trigger a new orchestration run
 server.post("/api/runs", async (request, reply) => {
-  const { task, projectPath, projectName, providerId, model } = request.body as {
+  const { task, projectPath, projectName, providerId, model, mode } = request.body as {
     task: string;
     projectPath?: string;
     projectName?: string;
     providerId: string;
     model: string;
+    mode?: string;
   };
 
   if (!task || !providerId || !model) {
@@ -153,6 +154,7 @@ server.post("/api/runs", async (request, reply) => {
     providerId,
     providerDisplayName,
     model,
+    mode: mode || "accept_edits",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
@@ -181,7 +183,12 @@ server.post("/api/runs/:id/cancel", async (request, reply) => {
 // Continue a run with follow-up instructions in the same thread
 server.post("/api/runs/:id/continue", async (request, reply) => {
   const { id } = request.params as { id: string };
-  const { task, providerId, model } = request.body as { task: string; providerId?: string; model?: string };
+  const { task, providerId, model, mode } = request.body as {
+    task: string;
+    providerId?: string;
+    model?: string;
+    mode?: string;
+  };
 
   if (!task || !task.trim()) {
     reply.status(400);
@@ -194,15 +201,20 @@ server.post("/api/runs/:id/continue", async (request, reply) => {
     return { error: `Run with id "${id}" not found` };
   }
 
-  // Update model if changed mid-conversation
+  // Update model or mode if changed mid-conversation
+  const updates: Partial<Run> = {};
   if (providerId && model) {
     const providerMeta = registry.getSafeMetadata().find(p => p.id === providerId);
     const providerDisplayName = providerMeta ? providerMeta.displayName : providerId;
-    runRepo.update(id, {
-      providerId,
-      providerDisplayName,
-      model
-    });
+    updates.providerId = providerId;
+    updates.providerDisplayName = providerDisplayName;
+    updates.model = model;
+  }
+  if (mode) {
+    updates.mode = mode;
+  }
+  if (Object.keys(updates).length > 0) {
+    runRepo.update(id, updates);
   }
 
   // Create the user message in the DB

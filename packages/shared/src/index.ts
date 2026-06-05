@@ -71,6 +71,7 @@ export interface Run {
   providerId: string;
   providerDisplayName: string;
   model: string;
+  mode?: string;
   errorMessage?: string;
   createdAt: string;
   updatedAt: string;

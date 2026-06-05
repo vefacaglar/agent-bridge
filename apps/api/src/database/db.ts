@@ -35,12 +35,20 @@ db.exec(`
     provider_id TEXT NOT NULL,
     provider_display_name TEXT NOT NULL,
     model TEXT NOT NULL,
+    mode TEXT NOT NULL DEFAULT 'accept_edits',
 
     error_message TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );
 `);
+
+// Migration: Add mode column to runs if it doesn't already exist
+try {
+  db.exec("ALTER TABLE runs ADD COLUMN mode TEXT NOT NULL DEFAULT 'accept_edits'");
+} catch (e) {
+  // Ignored if column already exists or runs table schema migration is not needed
+}
 
 // Create Messages Table
 db.exec(`

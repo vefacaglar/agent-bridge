@@ -46,13 +46,33 @@ const WORKSPACE_TOOLS = [
   }
 ];
 
-function buildSystemPrompt(projectName?: string, projectPath?: string): string {
+function buildSystemPrompt(projectName?: string, projectPath?: string, mode?: string): string {
   let prompt = `You are BridgeMind, a helpful local-first AI assistant. You help the user with code development, analysis, and general tasks in their active project workspace. You run locally on their machine, so you should refer to their local workspace directory when helpful.
 
 IMPORTANT INSTRUCTION FOR PLANNING & CODING:
 - Whenever you are asked to implement a feature, make changes, or build a file, you MUST first outline your plan/steps.
 - You MUST wrap your entire planning section inside <plan>...</plan> XML-like tags. (e.g. <plan>1. Create file. 2. Verify.</plan>).
 - Wrap any code changes inside standard markdown fenced code blocks. Specify the filename as a comment or header if possible.`;
+
+  // Inject Mode specific instructions
+  if (mode === "plan") {
+    prompt += `\n\nCURRENT OPERATIONAL MODE: PLAN MODE
+- Focus purely on planning, architecture, design steps, and explaining concepts.
+- You should NOT modify the filesystem or write any files.
+- DO NOT call any file-writing, creating, or deleting tools (like 'write_file' or 'delete_file'). If you feel changes are needed, describe them in text and ask the user to switch to Auto/Build mode.`;
+  } else if (mode === "auto") {
+    prompt += `\n\nCURRENT OPERATIONAL MODE: AUTO/BUILD MODE
+- You have autonomous permission to directly perform file edits, write code, create or delete files.
+- Proactively call workspace tools (like 'write_file' and 'delete_file') as needed to complete the user's tasks.`;
+  } else if (mode === "ask_permissions") {
+    prompt += `\n\nCURRENT OPERATIONAL MODE: ASK PERMISSIONS MODE
+- You are allowed to use workspace tools (like 'write_file' and 'delete_file') to write code and perform modifications.
+- However, note that all tool executions will be presented to the user for explicit confirmation/approval before being executed.`;
+  } else if (mode === "accept_edits") {
+    prompt += `\n\nCURRENT OPERATIONAL MODE: ACCEPT EDITS MODE
+- You can suggest code changes and make tool calls to write files.
+- The user will manually review each proposed file modification before it is applied to their workspace.`;
+  }
 
   if (projectName || projectPath) {
     prompt += `\n\nActive Project Workspace Context:`;
@@ -149,7 +169,7 @@ export class Orchestrator {
         // Request completion
         const response = await provider.complete({
           model: run.model,
-          systemPrompt: buildSystemPrompt(run.projectName, run.projectPath),
+          systemPrompt: buildSystemPrompt(run.projectName, run.projectPath, run.mode),
           messages: currentMessages,
           tools: WORKSPACE_TOOLS
         });
@@ -240,7 +260,7 @@ export class Orchestrator {
         } else {
           // Final assistant message with no tool calls
           const assistantMsg: RunMessage = {
-            id: `msg-res-${Date.now()}`,
+            id: `msg-res-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
             runId,
             role: "assistant",
             providerId: run.providerId,
@@ -352,7 +372,7 @@ export class Orchestrator {
 
         const response = await provider.complete({
           model: run.model,
-          systemPrompt: buildSystemPrompt(run.projectName, run.projectPath),
+          systemPrompt: buildSystemPrompt(run.projectName, run.projectPath, run.mode),
           messages: currentMessages,
           tools: WORKSPACE_TOOLS
         });
@@ -437,7 +457,7 @@ export class Orchestrator {
         } else {
           // Final assistant message
           const assistantMsg: RunMessage = {
-            id: `msg-res-${Date.now()}`,
+            id: `msg-res-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
             runId,
             role: "assistant",
             providerId: run.providerId,
