@@ -54,6 +54,7 @@ interface FeedItem {
   text?: string;
   time: string;
   message?: RunMessage;
+  status?: string;
 }
 
 const feedItems = computed<FeedItem[]>(() => {
@@ -108,28 +109,32 @@ const feedItems = computed<FeedItem[]>(() => {
       type: 'system',
       id: 'sys-done',
       text: 'Orchestration completed successfully.',
-      time: formatTime(activeRun.value.updatedAt)
+      time: formatTime(activeRun.value.updatedAt),
+      status: 'done'
     });
   } else if (activeRun.value.status === 'failed') {
     items.push({
       type: 'system',
       id: 'sys-failed',
       text: `Run failed: ${activeRun.value.errorMessage || 'Unknown error'}`,
-      time: formatTime(activeRun.value.updatedAt)
+      time: formatTime(activeRun.value.updatedAt),
+      status: 'failed'
     });
   } else if (activeRun.value.status === 'cancelled') {
     items.push({
       type: 'system',
       id: 'sys-cancelled',
       text: 'Orchestration cancelled by user.',
-      time: formatTime(activeRun.value.updatedAt)
+      time: formatTime(activeRun.value.updatedAt),
+      status: 'cancelled'
     });
   } else if (activeRun.value.status === 'max_rounds_reached') {
     items.push({
       type: 'system',
       id: 'sys-max',
       text: 'Loop stopped: Maximum rounds reached without acceptance.',
-      time: formatTime(activeRun.value.updatedAt)
+      time: formatTime(activeRun.value.updatedAt),
+      status: 'max_rounds_reached'
     });
   }
 
@@ -543,6 +548,18 @@ onBeforeUnmount(() => {
         </div>
       </header>
 
+      <!-- Error banner if run failed -->
+      <div v-if="activeRun && activeRun.status === 'failed'" class="error-banner">
+        <svg class="error-banner-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        <div class="error-banner-content">
+          <strong>Run Failed:</strong> {{ activeRun.errorMessage || 'An error occurred during execution.' }}
+        </div>
+      </div>
+
       <!-- Chat Messages Timeline -->
       <div class="chat-feed">
         <div v-if="!activeRun" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--text-muted); text-align: center; gap: 0.5rem;">
@@ -559,7 +576,7 @@ onBeforeUnmount(() => {
           class="chat-feed-row"
         >
           <!-- System logs/notifications -->
-          <div v-if="item.type === 'system'" class="system-event">
+          <div v-if="item.type === 'system'" class="system-event" :class="item.status">
             <span class="system-event-indicator"></span>
             <span>{{ item.text }}</span>
           </div>

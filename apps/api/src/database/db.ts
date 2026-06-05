@@ -15,7 +15,8 @@ function findWorkspaceRoot(): string {
 }
 
 const wsRoot = findWorkspaceRoot();
-const dbPath = path.join(wsRoot, "bridgemind.db");
+const isTest = process.env.NODE_ENV === "test";
+const dbPath = isTest ? ":memory:" : (process.env.BRIDGEMIND_DB_PATH || path.join(wsRoot, "bridgemind.db"));
 
 console.log(`[Database] Connecting to SQLite database at: ${dbPath}`);
 export const db = new DatabaseSync(dbPath);

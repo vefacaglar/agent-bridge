@@ -30,6 +30,11 @@ export class OpenAICompatibleProvider implements ModelProvider {
       max_tokens: request.maxTokens
     };
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, 60000); // 60s timeout
+
     try {
       const response = await fetch(url, {
         method: "POST",
@@ -37,7 +42,8 @@ export class OpenAICompatibleProvider implements ModelProvider {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${this.apiKey}`
         },
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
+        signal: controller.signal
       });
 
       if (!response.ok) {
@@ -53,6 +59,11 @@ export class OpenAICompatibleProvider implements ModelProvider {
 
       const choice = data.choices[0];
       const content = choice.message?.content || "";
+
+      if (!content || !content.trim()) {
+        throw new Error("Provider returned an empty response");
+      }
+
       const usage = data.usage;
 
       return {
@@ -65,7 +76,12 @@ export class OpenAICompatibleProvider implements ModelProvider {
         } : undefined
       };
     } catch (error: any) {
+      if (error.name === "AbortError" || error.message?.includes("aborted")) {
+        throw new Error("Request to provider timed out after 60000ms");
+      }
       throw new Error(`Failed to query OpenAI-compatible provider: ${error.message}`);
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 }

@@ -365,6 +365,43 @@ body {
   align-self: center;
   max-width: 80%;
   animation: fadeIn 0.3s ease-out;
+  transition: all var(--transition-fast);
+}
+
+.system-event.failed {
+  background-color: rgba(239, 68, 68, 0.06);
+  border-color: rgba(239, 68, 68, 0.25);
+  color: #fca5a5;
+}
+.system-event.failed .system-event-indicator {
+  background-color: var(--error-color);
+}
+
+.system-event.done {
+  background-color: rgba(16, 185, 129, 0.06);
+  border-color: rgba(16, 185, 129, 0.25);
+  color: #a7f3d0;
+}
+.system-event.done .system-event-indicator {
+  background-color: var(--success-color);
+}
+
+.system-event.cancelled {
+  background-color: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: var(--text-muted);
+}
+.system-event.cancelled .system-event-indicator {
+  background-color: var(--text-muted);
+}
+
+.system-event.max_rounds_reached {
+  background-color: rgba(245, 158, 11, 0.06);
+  border-color: rgba(245, 158, 11, 0.25);
+  color: #fde68a;
+}
+.system-event.max_rounds_reached .system-event-indicator {
+  background-color: #f59e0b;
 }
 
 .system-event-indicator {
@@ -372,6 +409,41 @@ body {
   height: 6px;
   border-radius: 50%;
   background-color: var(--accent-color);
+  flex-shrink: 0;
+}
+
+/* Error Banner at Top of Chat Feed */
+.error-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  background-color: rgba(239, 68, 68, 0.07);
+  border-bottom: 1px solid rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+  animation: slideDown 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.error-banner-icon {
+  color: var(--error-color);
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+}
+
+.error-banner-content {
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Drawer / Pinned Output (Right) */

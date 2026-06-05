@@ -20,8 +20,8 @@ export class ProviderRegistry {
   private configs: Record<string, ProviderConfigBlock> = {};
   private providers: Map<string, ModelProvider> = new Map();
 
-  constructor() {
-    this.loadConfiguration();
+  constructor(configPathOverride?: string) {
+    this.loadConfiguration(configPathOverride);
   }
 
   private findWorkspaceRoot(): string {
@@ -37,9 +37,9 @@ export class ProviderRegistry {
     return process.cwd(); // Fallback to current working directory
   }
 
-  private loadConfiguration() {
+  private loadConfiguration(configPathOverride?: string) {
     const wsRoot = this.findWorkspaceRoot();
-    const localPath = path.join(wsRoot, "providers.local.json");
+    const localPath = configPathOverride || path.join(wsRoot, "providers.local.json");
     const examplePath = path.join(wsRoot, "providers.example.json");
 
     let configPath = "";

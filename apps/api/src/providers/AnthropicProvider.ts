@@ -34,6 +34,11 @@ export class AnthropicProvider implements ModelProvider {
       body.system = request.systemPrompt;
     }
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, 60000); // 60s timeout
+
     try {
       const response = await fetch(url, {
         method: "POST",
@@ -42,7 +47,8 @@ export class AnthropicProvider implements ModelProvider {
           "x-api-key": this.apiKey,
           "anthropic-version": "2023-06-01"
         },
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
+        signal: controller.signal
       });
 
       if (!response.ok) {
@@ -62,6 +68,10 @@ export class AnthropicProvider implements ModelProvider {
         .map((block: any) => block.text)
         .join("\n");
 
+      if (!content || !content.trim()) {
+        throw new Error("Provider returned an empty response");
+      }
+
       const usage = data.usage;
 
       return {
@@ -74,7 +84,12 @@ export class AnthropicProvider implements ModelProvider {
         } : undefined
       };
     } catch (error: any) {
+      if (error.name === "AbortError" || error.message?.includes("aborted")) {
+        throw new Error("Request to provider timed out after 60000ms");
+      }
       throw new Error(`Failed to query Anthropic provider: ${error.message}`);
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 }
