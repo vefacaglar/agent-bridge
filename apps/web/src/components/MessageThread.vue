@@ -5,7 +5,6 @@ import type { MessageGroup } from '../lib/messageGroups';
 import { renderMarkdown, cleanMessageContent } from '../lib/markdown';
 import { formatTime } from '../lib/format';
 import ToolGroup from './ToolGroup.vue';
-import AgentTaskList from './AgentTaskList.vue';
 
 const props = defineProps<{
   activeRun: Run | null;
@@ -53,11 +52,6 @@ function isPlanExpanded(messageId: string): boolean {
 
 function extractPlan(content: string): string | null {
   const match = content.match(/<plan>([\s\S]*?)<\/plan>/);
-  return match ? match[1].trim() : null;
-}
-
-function extractTaskList(content: string): string | null {
-  const match = content.match(/<task_list>([\s\S]*?)<\/task_list>/);
   return match ? match[1].trim() : null;
 }
 
@@ -184,12 +178,6 @@ onUnmounted(() => {
             <pre class="plan-text">{{ group.message.reasoningContent }}</pre>
           </div>
         </div>
-
-        <!-- AI Task List -->
-        <AgentTaskList 
-          v-if="extractTaskList(group.message.content)" 
-          :taskListText="extractTaskList(group.message.content)!" 
-        />
 
         <div class="markdown-body" v-html="renderMarkdown(cleanMessageContent(group.message.content))"></div>
         <div class="assistant-response-footer" style="display: flex; align-items: center; gap: 8px; margin-top: 10px;">

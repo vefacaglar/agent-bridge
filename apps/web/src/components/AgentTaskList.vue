@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 const props = defineProps<{
   taskListText: string;
@@ -10,12 +10,14 @@ interface Task {
   completed: boolean;
 }
 
+const collapsed = ref(false);
+
 const tasks = computed<Task[]>(() => {
   if (!props.taskListText) return [];
-  
+
   const lines = props.taskListText.split('\n');
   const parsedTasks: Task[] = [];
-  
+
   for (const line of lines) {
     const trimmed = line.trim();
     if (trimmed.startsWith('- [ ]') || trimmed.startsWith('- [x]') || trimmed.startsWith('- [X]')) {
@@ -26,28 +28,29 @@ const tasks = computed<Task[]>(() => {
       }
     }
   }
-  
+
   return parsedTasks;
 });
+
+const doneCount = computed(() => tasks.value.filter(t => t.completed).length);
+const allDone = computed(() => tasks.value.length > 0 && doneCount.value === tasks.value.length);
 </script>
 
 <template>
-  <div v-if="tasks.length > 0" class="agent-task-list">
-    <div class="task-list-header">
-      <svg class="task-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 20h9"/>
-        <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
-      </svg>
-      <span class="task-title">Agent Tasks</span>
-      <span class="task-count">{{ tasks.filter(t => t.completed).length }} / {{ tasks.length }}</span>
-    </div>
-    <ul class="task-items">
-      <li v-for="(task, index) in tasks" :key="index" class="task-item" :class="{ completed: task.completed }">
-        <div class="checkbox-wrapper">
-          <svg v-if="task.completed" class="check-icon" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="20 6 9 17 4 12"/>
-          </svg>
-        </div>
+  <div v-if="tasks.length > 0" class="agent-task-list" :class="{ 'all-done': allDone }">
+    <header class="task-list-header" @click="collapsed = !collapsed">
+      <span class="task-title">Tasks</span>
+      <span class="task-count">{{ doneCount }} / {{ tasks.length }}</span>
+      <button type="button" class="task-toggle">{{ collapsed ? 'Show' : 'Hide' }}</button>
+    </header>
+    <ul v-if="!collapsed" class="task-items">
+      <li
+        v-for="(task, index) in tasks"
+        :key="index"
+        class="task-item"
+        :class="{ completed: task.completed }"
+      >
+        <span class="task-box" :class="{ checked: task.completed }"></span>
         <span class="task-text">{{ task.text }}</span>
       </li>
     </ul>
@@ -56,90 +59,103 @@ const tasks = computed<Task[]>(() => {
 
 <style scoped>
 .agent-task-list {
-  margin: 12px 0;
-  background: rgba(20, 20, 22, 0.4);
+  width: min(800px, 100%);
+  margin: 0 auto 8px;
+  background: var(--surface-strong);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 12px;
   overflow: hidden;
 }
 
 .task-list-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.02);
-  border-bottom: 1px solid var(--border);
-  font-size: 0.8rem;
+  gap: 10px;
+  padding: 8px 14px;
+  font-size: 0.78rem;
   color: var(--muted);
   font-weight: 500;
+  cursor: pointer;
+  user-select: none;
 }
 
-.task-icon {
-  color: var(--planner);
+.task-list-header:hover {
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .task-title {
-  flex: 1;
+  letter-spacing: 0.02em;
 }
 
 .task-count {
   font-variant-numeric: tabular-nums;
-  background: rgba(255, 255, 255, 0.05);
-  padding: 2px 6px;
-  border-radius: 12px;
-  font-size: 0.7rem;
+  font-family: monospace;
+  font-size: 0.72rem;
+  color: var(--faint);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1px 8px;
+}
+
+.all-done .task-count {
+  color: var(--success);
+  border-color: var(--success);
+}
+
+.task-toggle {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--faint);
+  font-size: 0.72rem;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.task-toggle:hover {
+  color: var(--muted);
 }
 
 .task-items {
   list-style: none;
-  padding: 8px;
+  padding: 6px 8px 10px;
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
+  border-top: 1px solid var(--border);
+  max-height: 220px;
+  overflow-y: auto;
 }
 
 .task-item {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  padding: 6px 8px;
+  padding: 5px 8px;
   border-radius: 6px;
-  transition: background 0.2s ease;
 }
 
-.task-item:hover {
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.checkbox-wrapper {
+.task-box {
   flex-shrink: 0;
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   border-radius: 4px;
   border: 1.5px solid var(--faint);
-  display: flex;
-  align-items: center;
-  justify-content: center;
   margin-top: 2px;
-  transition: all 0.2s ease;
+  transition: background 0.18s ease, border-color 0.18s ease;
 }
 
-.task-item.completed .checkbox-wrapper {
+.task-box.checked {
   background: var(--success);
   border-color: var(--success);
 }
 
-.check-icon {
-  color: var(--bg);
-}
-
 .task-text {
-  font-size: 0.85rem;
+  font-size: 0.84rem;
   color: var(--text);
-  line-height: 1.4;
-  transition: color 0.2s ease;
+  line-height: 1.45;
 }
 
 .task-item.completed .task-text {

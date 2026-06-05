@@ -5,6 +5,7 @@ import MessageThread from './components/MessageThread.vue';
 import ChatComposer from './components/ChatComposer.vue';
 import AddProjectModal from './components/AddProjectModal.vue';
 import SettingsScreen from './components/settings/SettingsScreen.vue';
+import AgentTaskList from './components/AgentTaskList.vue';
 
 const {
   runs,
@@ -58,6 +59,20 @@ function toggleSidebar() {
 const currentProjectName = computed(() => {
   const current = projects.projectOptions.value.find(p => p.path === projects.activeProjectPath.value);
   return current ? current.name : 'Unknown Project';
+});
+
+// The most recent <task_list> the assistant emitted in the active run, shown
+// pinned above the composer so progress stays visible as the thread scrolls.
+const currentTaskList = computed<string | null>(() => {
+  const list = messages.value;
+  if (!list) return null;
+  for (let i = list.length - 1; i >= 0; i--) {
+    const msg = list[i];
+    if (msg.role !== 'assistant') continue;
+    const match = msg.content.match(/<task_list>([\s\S]*?)<\/task_list>/);
+    if (match) return match[1].trim();
+  }
+  return null;
 });
 </script>
 
@@ -113,6 +128,8 @@ const currentProjectName = computed(() => {
             :is-running="isRunning"
           />
         </section>
+
+        <AgentTaskList v-if="currentTaskList" :task-list-text="currentTaskList" class="pinned-task-list" />
 
         <ChatComposer
           v-model:task-input="taskInput"
@@ -223,6 +240,12 @@ const currentProjectName = computed(() => {
 </template>
 
 <style scoped>
+/* Align the pinned task list with the composer below it (same inset). */
+.pinned-task-list {
+  flex: 0 0 auto;
+  padding: 0 24px;
+}
+
 .landing-center-wrap {
   flex: 1;
   display: flex;
