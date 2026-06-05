@@ -243,4 +243,68 @@ test("Provider Registry and Model Providers Unit Tests", async (t) => {
       /Provider returned an empty response/
     );
   });
+
+  await t.test("AnthropicProvider - maps tools, tool_use and tool_result", async () => {
+    const provider = new AnthropicProvider("http://localhost:9999", "ant-key");
+
+    let sentBody: any;
+    globalThis.fetch = async (_url: any, options: any) => {
+      sentBody = JSON.parse(options.body);
+      return {
+        ok: true,
+        json: async () => ({
+          content: [
+            { type: "text", text: "Writing the file." },
+            { type: "tool_use", id: "toolu_1", name: "write_file", input: { path: "a.txt", content: "hi" } }
+          ],
+          usage: { input_tokens: 5, output_tokens: 3 }
+        })
+      } as any;
+    };
+
+    const res = await provider.complete({
+      model: "claude-model",
+      messages: [
+        { role: "user", content: "create a.txt" },
+        {
+          role: "assistant",
+          content: "",
+          toolCalls: [
+            { id: "toolu_0", type: "function", function: { name: "read_file", arguments: '{"path":"a.txt"}' } }
+          ]
+        },
+        { role: "tool", content: '{"success":false}', tool_call_id: "toolu_0", name: "read_file" }
+      ],
+      tools: [
+        {
+          type: "function",
+          function: {
+            name: "write_file",
+            description: "Writes a file",
+            parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"] }
+          }
+        }
+      ]
+    });
+
+    // Tools are mapped to Anthropic schema.
+    assert.strictEqual(sentBody.tools[0].name, "write_file");
+    assert.strictEqual(sentBody.tools[0].description, "Writes a file");
+    assert.deepStrictEqual(sentBody.tools[0].input_schema.required, ["path"]);
+
+    // Assistant tool call becomes a tool_use block.
+    assert.strictEqual(sentBody.messages[1].role, "assistant");
+    assert.strictEqual(sentBody.messages[1].content[0].type, "tool_use");
+    assert.deepStrictEqual(sentBody.messages[1].content[0].input, { path: "a.txt" });
+
+    // Tool result becomes a tool_result block on a user turn.
+    assert.strictEqual(sentBody.messages[2].role, "user");
+    assert.strictEqual(sentBody.messages[2].content[0].type, "tool_result");
+    assert.strictEqual(sentBody.messages[2].content[0].tool_use_id, "toolu_0");
+
+    // Response tool_use is mapped back to our toolCalls shape.
+    assert.strictEqual(res.content, "Writing the file.");
+    assert.strictEqual(res.toolCalls?.[0].function.name, "write_file");
+    assert.deepStrictEqual(JSON.parse(res.toolCalls![0].function.arguments), { path: "a.txt", content: "hi" });
+  });
 });

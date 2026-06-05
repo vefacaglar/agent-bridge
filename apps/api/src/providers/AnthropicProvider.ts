@@ -1,5 +1,74 @@
-import type { CompletionRequest, CompletionResponse } from "@bridgemind/shared";
+import type { CompletionRequest, CompletionResponse, ChatMessage } from "@bridgemind/shared";
 import type { ModelProvider } from "./ModelProvider.js";
+
+/**
+ * Converts OpenAI-style tool definitions into Anthropic's tool schema.
+ * (function.parameters -> input_schema)
+ */
+function toAnthropicTools(tools?: any[]) {
+  if (!tools || tools.length === 0) return undefined;
+  return tools.map(tool => ({
+    name: tool.function.name,
+    description: tool.function.description,
+    input_schema: tool.function.parameters
+  }));
+}
+
+/**
+ * Maps the internal (OpenAI-shaped) message list to the Anthropic Messages
+ * format. Plain text turns use string content; tool calls become `tool_use`
+ * blocks on the assistant turn and `tool_result` blocks on a following user
+ * turn. Consecutive tool results are merged into a single user message so the
+ * conversation keeps alternating user/assistant turns.
+ */
+function toAnthropicMessages(messages: ChatMessage[]): any[] {
+  const out: any[] = [];
+  let i = 0;
+
+  while (i < messages.length) {
+    const m = messages[i];
+
+    if (m.role === "system") {
+      // System content is sent via the top-level `system` field instead.
+      i++;
+    } else if (m.role === "user") {
+      out.push({ role: "user", content: m.content });
+      i++;
+    } else if (m.role === "assistant") {
+      if (m.toolCalls && m.toolCalls.length > 0) {
+        const blocks: any[] = [];
+        if (m.content && m.content.trim()) {
+          blocks.push({ type: "text", text: m.content });
+        }
+        for (const tc of m.toolCalls) {
+          let input: unknown = {};
+          try {
+            input = JSON.parse(tc.function.arguments || "{}");
+          } catch {
+            input = {};
+          }
+          blocks.push({ type: "tool_use", id: tc.id, name: tc.function.name, input });
+        }
+        out.push({ role: "assistant", content: blocks });
+      } else {
+        out.push({ role: "assistant", content: m.content });
+      }
+      i++;
+    } else if (m.role === "tool") {
+      const blocks: any[] = [];
+      while (i < messages.length && messages[i].role === "tool") {
+        const t = messages[i];
+        blocks.push({ type: "tool_result", tool_use_id: t.tool_call_id, content: t.content });
+        i++;
+      }
+      out.push({ role: "user", content: blocks });
+    } else {
+      i++;
+    }
+  }
+
+  return out;
+}
 
 export class AnthropicProvider implements ModelProvider {
   private baseUrl: string;
@@ -13,25 +82,20 @@ export class AnthropicProvider implements ModelProvider {
   async complete(request: CompletionRequest): Promise<CompletionResponse> {
     const url = `${this.baseUrl}/v1/messages`;
 
-    // Filter and map messages to conform to Anthropic Messages API
-    // Anthropic only allows "user" and "assistant" roles in messages.
-    const messages = request.messages
-      .filter(msg => msg.role === "user" || msg.role === "assistant")
-      .map(msg => ({
-        role: msg.role as "user" | "assistant",
-        content: msg.content
-      }));
-
     const body: any = {
       model: request.model,
-      messages,
+      messages: toAnthropicMessages(request.messages),
       max_tokens: request.maxTokens ?? 4096, // Anthropic requires max_tokens
       temperature: request.temperature ?? 0.7
     };
 
-    // Anthropic accepts system prompt as a top-level field
     if (request.systemPrompt) {
       body.system = request.systemPrompt;
+    }
+
+    const tools = toAnthropicTools(request.tools);
+    if (tools) {
+      body.tools = tools;
     }
 
     const controller = new AbortController();
@@ -62,13 +126,25 @@ export class AnthropicProvider implements ModelProvider {
         throw new Error("Anthropic API returned invalid response shape");
       }
 
-      // Join all text blocks in the content array
+      // Join all text blocks; collect tool_use blocks as tool calls.
       const content = data.content
         .filter((block: any) => block.type === "text")
         .map((block: any) => block.text)
         .join("\n");
 
-      if (!content || !content.trim()) {
+      const toolUseBlocks = data.content.filter((block: any) => block.type === "tool_use");
+      const toolCalls = toolUseBlocks.length > 0
+        ? toolUseBlocks.map((block: any) => ({
+            id: block.id,
+            type: "function" as const,
+            function: {
+              name: block.name,
+              arguments: JSON.stringify(block.input ?? {})
+            }
+          }))
+        : undefined;
+
+      if ((!content || !content.trim()) && (!toolCalls || toolCalls.length === 0)) {
         throw new Error("Provider returned an empty response");
       }
 
@@ -76,6 +152,7 @@ export class AnthropicProvider implements ModelProvider {
 
       return {
         content,
+        toolCalls,
         raw: data,
         usage: usage ? {
           inputTokens: usage.input_tokens,

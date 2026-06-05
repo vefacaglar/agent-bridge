@@ -154,18 +154,19 @@ export interface ModelProvider {
 Adapters:
 
 ```txt
-OpenAICompatibleProvider   /chat/completions, supports tools/tool_calls
-AnthropicProvider          /v1/messages, separate request/response shape
+OpenAICompatibleProvider   /chat/completions, OpenAI tools/tool_calls shape
+AnthropicProvider          /v1/messages, tool_use/tool_result blocks
 ```
 
 OpenAI-compatible providers (OpenAI, OpenCode, CommandCode, etc.) share
 `OpenAICompatibleProvider`. Anthropic uses its own adapter because the
 Messages API differs.
 
-> Known gap: `AnthropicProvider` does not yet forward `tools` or tool/assistant
-> tool-call messages, so workspace tools are inert when an Anthropic model is
-> selected. Treat adding tool support there as a real backend task, not a
-> formatting tweak.
+Both adapters support workspace tools. The orchestrator always passes the
+OpenAI-shaped `WORKSPACE_TOOLS`; each adapter maps to/from its own wire format
+so the orchestrator only ever sees the common `ToolCall` shape. The Anthropic
+adapter converts tool definitions to `input_schema`, assistant tool calls to
+`tool_use` blocks, and tool results to `tool_result` blocks on a user turn.
 
 ---
 
@@ -338,7 +339,6 @@ Not implemented today; do not build without an explicit request:
 
 ```txt
 two-model planner -> coder -> review bridge (the original BridgeMind concept)
-Anthropic tool/function calling
 terminal execution / git integration
 manual approval checkpoints beyond ask_permissions
 token cost tracking

@@ -197,16 +197,14 @@ editing files the user did not ask about
 Supported provider types:
 
 ```txt
-openai-compatible   (OpenAI, OpenCode, CommandCode, ... — full tool support)
-anthropic           (Messages API)
+openai-compatible   (OpenAI, OpenCode, CommandCode, ... — tools/tool_calls)
+anthropic           (Messages API — tool_use/tool_result blocks)
 ```
 
 Provider-specific request/response details live inside the adapters, never in
-the orchestrator.
-
-> The Anthropic adapter does not yet send tool definitions, so the agent's
-> workspace tools currently work only with OpenAI-compatible providers. Adding
-> Anthropic tool support is a known, real task.
+the orchestrator. Both adapters support the workspace tools: the orchestrator
+passes one OpenAI-shaped tool list, and each adapter maps it to/from its own
+wire format, returning the common `ToolCall` shape.
 
 ---
 
