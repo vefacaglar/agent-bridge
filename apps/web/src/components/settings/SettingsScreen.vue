@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue';
-import type { PermissionRule, ProviderMetadata } from '@bridgemind/shared';
+import type { PermissionRule, ProviderMetadata } from '@agent-bridge/shared';
 import PermissionsTab from './PermissionsTab.vue';
 import ProvidersTab from './ProvidersTab.vue';
 

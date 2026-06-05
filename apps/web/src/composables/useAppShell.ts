@@ -1,5 +1,5 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import type { ProviderMetadata, Run } from '@bridgemind/shared';
+import type { ProviderMetadata, Run } from '@agent-bridge/shared';
 import { useChatAutoScroll } from './useChatAutoScroll';
 import { useChatSession } from './useChatSession';
 import { useComposerSettings } from './useComposerSettings';

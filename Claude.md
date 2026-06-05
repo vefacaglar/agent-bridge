@@ -2,7 +2,7 @@
 
 ## Project
 
-BridgeMind is a local-first AI orchestration tool. The user picks one provider
+Agent Bridge is a local-first AI orchestration tool. The user picks one provider
 and model, gives it a task, and the assistant works inside a selected project
 folder on the local machine.
 
@@ -19,7 +19,7 @@ User Task
   -> Run is marked done; messages are streamed live and saved
 ```
 
-> The original BridgeMind vision was a two-model planner → coder → review
+> The original Agent Bridge vision was a two-model planner → coder → review
 > bridge. That is **not** what the code does today; it is a possible future
 > direction (see "Future Features"). Document and build against the
 > single-model reality described here.
@@ -100,7 +100,7 @@ packages/
 
 providers.example.json         Template (committed)
 providers.local.json           Real credentials (git-ignored, never committed)
-bridgemind.db                  Local SQLite file (git-ignored)
+agent-bridge.db                Local SQLite file (git-ignored)
 ```
 
 ---
@@ -361,7 +361,7 @@ Avoid vague names like `helper`, `manager`, `processor`, `data`, `stuff`.
 Not implemented today; do not build without an explicit request:
 
 ```txt
-two-model planner -> coder -> review bridge (the original BridgeMind concept)
+two-model planner -> coder -> review bridge (the original Agent Bridge concept)
 terminal execution / git integration
 manual approval checkpoints beyond ask_permissions
 token cost tracking

@@ -1,5 +1,5 @@
 import { nextTick, watch, type Ref } from 'vue';
-import type { RunMessage } from '@bridgemind/shared';
+import type { RunMessage } from '@agent-bridge/shared';
 
 export function useChatAutoScroll(
   container: Ref<HTMLElement | null>,

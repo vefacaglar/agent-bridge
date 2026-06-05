@@ -4,7 +4,7 @@
  * active project workspace context when available.
  */
 export function buildSystemPrompt(projectName?: string, projectPath?: string, mode?: string): string {
-  let prompt = `You are BridgeMind, a helpful local-first AI assistant. You help the user with code development, analysis, and general tasks in their active project workspace. You run locally on their machine, so you should refer to their local workspace directory when helpful.
+  let prompt = `You are Agent Bridge, a helpful local-first AI assistant. You help the user with code development, analysis, and general tasks in their active project workspace. You run locally on their machine, so you should refer to their local workspace directory when helpful.
 
 AVAILABLE WORKSPACE TOOLS:
 - read_file / list_directory: inspect the workspace before changing it.

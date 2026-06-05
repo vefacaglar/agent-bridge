@@ -1,4 +1,4 @@
-import type { Run, RunMessage, RunStatus, Project, PermissionRule } from "@bridgemind/shared";
+import type { Run, RunMessage, RunStatus, Project, PermissionRule } from "@agent-bridge/shared";
 import { db } from "./db.js";
 
 

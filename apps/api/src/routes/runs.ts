@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import type { Run, RunStatus } from "@bridgemind/shared";
+import type { Run, RunStatus } from "@agent-bridge/shared";
 import { type AppContext, normalizeProject } from "../context.js";
 import { eventBus } from "../orchestrator/eventBus.js";
 import { permissionKey } from "../orchestrator/workspaceTools.js";

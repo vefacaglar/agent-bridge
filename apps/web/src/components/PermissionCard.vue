@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import type { PermissionPreview } from '@bridgemind/shared';
+import type { PermissionPreview } from '@agent-bridge/shared';
 import type { PermissionDecision } from '../api/client';
 import {
   PERMISSION_OPTIONS,

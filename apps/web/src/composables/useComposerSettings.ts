@@ -1,5 +1,5 @@
 import { computed, ref, watch, type Ref } from 'vue';
-import type { ProviderMetadata } from '@bridgemind/shared';
+import type { ProviderMetadata } from '@agent-bridge/shared';
 
 export type ChatMode = 'ask_permissions' | 'accept_edits' | 'plan' | 'auto';
 

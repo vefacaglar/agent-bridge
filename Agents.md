@@ -2,9 +2,9 @@
 
 ## Purpose
 
-This file defines how the AI agent works inside the BridgeMind project.
+This file defines how the AI agent works inside the Agent Bridge project.
 
-BridgeMind currently runs a **single workspace agent**: one provider/model
+Agent Bridge currently runs a **single workspace agent**: one provider/model
 chosen by the user, given a task, operating inside a selected local project
 folder. The agent reasons, optionally calls workspace filesystem tools, reads
 the results, and continues until it produces a final answer.

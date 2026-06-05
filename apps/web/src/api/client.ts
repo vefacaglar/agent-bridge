@@ -1,4 +1,4 @@
-import type { ProviderMetadata, Run, RunMessage, Project, PermissionRule } from '@bridgemind/shared';
+import type { ProviderMetadata, Run, RunMessage, Project, PermissionRule } from '@agent-bridge/shared';
 
 export const API_BASE = 'http://localhost:3000';
 

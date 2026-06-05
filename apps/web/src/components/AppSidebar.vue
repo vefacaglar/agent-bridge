@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { Run } from '@bridgemind/shared';
+import type { Run } from '@agent-bridge/shared';
 import { DEFAULT_PROJECT_PATH } from '../lib/format';
 
 interface ProjectOption {

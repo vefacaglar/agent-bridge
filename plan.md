@@ -1,8 +1,8 @@
-# BridgeMind Plan
+# Agent Bridge Plan
 
 ## 1. Project Summary
 
-BridgeMind is a local-first AI orchestration tool that connects two AI models in one controlled workflow.
+Agent Bridge is a local-first AI orchestration tool that connects two AI models in one controlled workflow.
 
 The main purpose is to remove the manual copy-paste bridge between different AI tools. One model acts as the planner, architect, or reviewer. The other model acts as the coder or implementation agent.
 
@@ -17,7 +17,7 @@ User Task
   -> Final Output
 ```
 
-BridgeMind should not try to become a full autonomous coding agent in the MVP. The first milestone is a clean two-model orchestration system with a simple Vue interface, provider adapters, local configuration, run history, and live message streaming.
+Agent Bridge should not try to become a full autonomous coding agent in the MVP. The first milestone is a clean two-model orchestration system with a simple Vue interface, provider adapters, local configuration, run history, and live message streaming.
 
 ---
 
@@ -39,7 +39,7 @@ Coder:
 
 The user should be able to see both models' messages in the same screen.
 
-BridgeMind owns the message flow. The user should not manually copy messages from one model to another.
+Agent Bridge owns the message flow. The user should not manually copy messages from one model to another.
 
 ---
 
@@ -110,7 +110,7 @@ SSE is enough for the first version because the backend mainly streams run event
 ## 6. Suggested Project Structure
 
 ```txt
-bridgemind/
+agent-bridge/
   apps/
     web/
       src/
@@ -236,7 +236,7 @@ raw provider secrets
 
 ## 8. Provider Adapter Pattern
 
-Different providers use different request/response formats. BridgeMind should hide those differences behind adapters.
+Different providers use different request/response formats. Agent Bridge should hide those differences behind adapters.
 
 The orchestrator should depend only on this interface:
 
@@ -307,7 +307,7 @@ apps/api/src/providers/
 
 ## 9. Agent Roles
 
-BridgeMind has two main agent roles.
+Agent Bridge has two main agent roles.
 
 ## Planner Agent
 
@@ -524,7 +524,7 @@ pending
 
 ## 15. Orchestrator Responsibilities
 
-The orchestrator is the core of BridgeMind.
+The orchestrator is the core of Agent Bridge.
 
 It should:
 
@@ -969,7 +969,7 @@ Multi-user mode
 
 ## 26. Design Principle
 
-BridgeMind should stay focused.
+Agent Bridge should stay focused.
 
 The first version should solve one problem well:
 

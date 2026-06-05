@@ -1,4 +1,4 @@
-import type { CompletionRequest, CompletionResponse, ChatMessage } from "@bridgemind/shared";
+import type { CompletionRequest, CompletionResponse, ChatMessage } from "@agent-bridge/shared";
 import type { ModelProvider } from "./ModelProvider.js";
 
 /**

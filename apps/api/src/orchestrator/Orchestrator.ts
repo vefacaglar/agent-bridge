@@ -1,4 +1,4 @@
-import type { Run, RunStatus, RunMessage, ChatMessage } from "@bridgemind/shared";
+import type { Run, RunStatus, RunMessage, ChatMessage } from "@agent-bridge/shared";
 import type { ModelProvider } from "../providers/ModelProvider.js";
 import { RunRepository, MessageRepository } from "../database/repositories.js";
 import { ProviderRegistry } from "../providers/ProviderRegistry.js";

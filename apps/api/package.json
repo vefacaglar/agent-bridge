@@ -1,5 +1,5 @@
 {
-  "name": "@bridgemind/api",
+  "name": "@agent-bridge/api",
   "version": "0.1.0",
   "private": true,
   "main": "./dist/server.js",
@@ -10,7 +10,7 @@
     "test": "NODE_ENV=test node --import tsx --test src/**/*.test.ts"
   },
   "dependencies": {
-    "@bridgemind/shared": "workspace:*",
+    "@agent-bridge/shared": "workspace:*",
     "fastify": "^4.26.2",
     "@fastify/cors": "^9.0.1"
   },

@@ -11,7 +11,7 @@ import { ProviderRegistry } from "../providers/ProviderRegistry.js";
 import { RunRepository, MessageRepository } from "../database/repositories.js";
 import { Orchestrator } from "./Orchestrator.js";
 import { eventBus } from "./eventBus.js";
-import type { Run, RunStatus } from "@bridgemind/shared";
+import type { Run, RunStatus } from "@agent-bridge/shared";
 
 // Mock config content
 const mockConfig = {

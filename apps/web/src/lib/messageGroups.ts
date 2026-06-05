@@ -1,4 +1,4 @@
-import type { RunMessage } from '@bridgemind/shared';
+import type { RunMessage } from '@agent-bridge/shared';
 import { formatJson } from './format';
 
 export interface MessageGroup {

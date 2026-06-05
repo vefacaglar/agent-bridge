@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { PermissionRule } from '@bridgemind/shared';
+import type { PermissionRule } from '@agent-bridge/shared';
 
 defineProps<{
   permissions: PermissionRule[];

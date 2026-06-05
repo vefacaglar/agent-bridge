@@ -1,5 +1,5 @@
 import { computed, ref, type ComputedRef, type Ref } from 'vue';
-import type { ProviderMetadata, Run, RunMessage, RunStatus } from '@bridgemind/shared';
+import type { ProviderMetadata, Run, RunMessage, RunStatus } from '@agent-bridge/shared';
 import { api, type PermissionDecision } from '../api/client';
 import { ACTIVE_STATUSES, splitCombined } from '../lib/format';
 import { groupMessages, type MessageGroup } from '../lib/messageGroups';

@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import type { ProviderMetadata } from "@bridgemind/shared";
+import type { ProviderMetadata } from "@agent-bridge/shared";
 import type { ModelProvider } from "./ModelProvider.js";
 import { ProviderFactory } from "./ProviderFactory.js";
 

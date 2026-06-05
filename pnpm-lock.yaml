@@ -14,7 +14,7 @@ importers:
 
   apps/api:
     dependencies:
-      '@bridgemind/shared':
+      '@agent-bridge/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@fastify/cors':
@@ -36,7 +36,7 @@ importers:
 
   apps/web:
     dependencies:
-      '@bridgemind/shared':
+      '@agent-bridge/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       marked:

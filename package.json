@@ -1,14 +1,14 @@
 {
-  "name": "bridgemind",
+  "name": "agent-bridge",
   "private": true,
   "engines": {
     "node": ">=18.0.0",
     "pnpm": ">=8.0.0"
   },
   "scripts": {
-    "dev:shared": "pnpm --filter @bridgemind/shared dev",
-    "dev:api": "pnpm --filter @bridgemind/api dev",
-    "dev:web": "pnpm --filter @bridgemind/web dev",
+    "dev:shared": "pnpm --filter @agent-bridge/shared dev",
+    "dev:api": "pnpm --filter @agent-bridge/api dev",
+    "dev:web": "pnpm --filter @agent-bridge/web dev",
     "dev": "pnpm --recursive --parallel dev",
     "build": "pnpm --recursive build",
     "clean": "pnpm --recursive exec rm -rf dist node_modules"

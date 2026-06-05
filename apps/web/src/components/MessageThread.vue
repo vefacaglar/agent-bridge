@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, onUnmounted } from 'vue';
-import type { Run } from '@bridgemind/shared';
+import type { Run } from '@agent-bridge/shared';
 import type { MessageGroup } from '../lib/messageGroups';
 import { renderMarkdown, cleanMessageContent } from '../lib/markdown';
 import { formatTime } from '../lib/format';

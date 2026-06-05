@@ -1,5 +1,5 @@
 import { computed, ref, type Ref } from 'vue';
-import type { Run, Project } from '@bridgemind/shared';
+import type { Run, Project } from '@agent-bridge/shared';
 import { api } from '../api/client';
 import { DEFAULT_PROJECT_PATH } from '../lib/format';
 import { useCustomDialog } from './useCustomDialog';

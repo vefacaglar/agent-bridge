@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { execSync } from "node:child_process";
-import type { Run, ToolCall, PermissionPreview } from "@bridgemind/shared";
+import type { Run, ToolCall, PermissionPreview } from "@agent-bridge/shared";
 
 /**
  * Tool schemas advertised to the model. The orchestrator is the only place

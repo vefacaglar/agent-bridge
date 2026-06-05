@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import type { RunMessage } from '@bridgemind/shared';
+import type { RunMessage } from '@agent-bridge/shared';
 import { isToolSuccess, getToolStatusClass } from '../lib/messageGroups';
 import { cleanMessageContent, renderMarkdown } from '../lib/markdown';
 

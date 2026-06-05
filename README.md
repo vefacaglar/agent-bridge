@@ -1,10 +1,10 @@
-# BridgeMind
+# Agent Bridge
 
-BridgeMind is a local-first AI orchestration tool that connects two AI models in a single structured workflow.
+Agent Bridge is a local-first AI orchestration tool that connects two AI models in a single structured workflow.
 
 The goal is simple: stop manually copying messages between different AI tools.
 
-One model can act as the planner, architect, or reviewer. Another model can act as the coder or implementation agent. BridgeMind manages the flow between them, stores the conversation, and shows both agents in one interface.
+One model can act as the planner, architect, or reviewer. Another model can act as the coder or implementation agent. Agent Bridge manages the flow between them, stores the conversation, and shows both agents in one interface.
 
 ```txt
 User Task
@@ -19,7 +19,7 @@ User Task
 
 When working with AI models, it is common to use one strong reasoning model for planning and another model for implementation. Doing this manually requires copying outputs between tools.
 
-BridgeMind automates that bridge.
+Agent Bridge automates that bridge.
 
 It lets you:
 
@@ -86,7 +86,7 @@ Repository style: monorepo
 ## Project Structure
 
 ```txt
-bridgemind/
+agent-bridge/
   apps/
     web/
       src/
@@ -191,7 +191,7 @@ The backend may read API keys. The frontend must never receive API keys.
 
 ## Provider Adapter Design
 
-Different providers use different APIs. BridgeMind hides those differences behind a common interface.
+Different providers use different APIs. Agent Bridge hides those differences behind a common interface.
 
 ```ts
 export interface ModelProvider {
@@ -212,7 +212,7 @@ Anthropic should use a separate adapter because its Messages API has a different
 
 ## Agent Roles
 
-BridgeMind uses two core agent roles.
+Agent Bridge uses two core agent roles.
 
 ### Planner Agent
 
@@ -373,7 +373,7 @@ providers.example.json provider config example
 
 ## Design Principle
 
-BridgeMind should stay simple.
+Agent Bridge should stay simple.
 
 The first version should solve one clear problem:
 

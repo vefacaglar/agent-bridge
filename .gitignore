@@ -41,7 +41,7 @@ vite.config.*.mtime-*
 !.env.example
 !.env.template
 
-# bridgeMind local provider config
+# agent-bridge local provider config
 
 providers.local.json
 providers.*.local.json

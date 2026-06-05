@@ -1,4 +1,4 @@
-import type { CompletionRequest, CompletionResponse } from "@bridgemind/shared";
+import type { CompletionRequest, CompletionResponse } from "@agent-bridge/shared";
 import type { ModelProvider } from "./ModelProvider.js";
 
 function parseOpenAIMessageContent(content: string): any {
