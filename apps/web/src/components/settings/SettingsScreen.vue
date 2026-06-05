@@ -66,19 +66,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
         </aside>
 
         <main class="chat-shell">
-          <header class="chat-header">
-            <div class="chat-header-inner">
-              <div class="thread-title">
-                <span class="breadcrumb-chat-title" style="font-size: 1.05rem; font-weight: 600; color: var(--text);">
-                  {{ activeTab === 'permissions' ? 'Permissions' : 'Providers' }}
-                </span>
-              </div>
-              <div class="header-actions">
-                <button class="ghost-button" title="Close Settings (Esc)" @click="emit('close')">Close</button>
-              </div>
-            </div>
-          </header>
-
           <section class="messages-scroll">
             <div class="settings-container-wrap">
               <PermissionsTab
@@ -114,9 +101,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
 }
 
 .settings-container-wrap {
-  max-width: 720px;
+  width: min(1080px, 100%);
   margin: 0 auto;
-  width: 100%;
 }
 
 /* Shared panel style overrides for tab components */

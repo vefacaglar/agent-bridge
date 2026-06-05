@@ -33,4 +33,26 @@ export function registerProviderRoutes(server: FastifyInstance, ctx: AppContext)
       return { success: false, error: error.message };
     }
   });
+
+  // Get full configurations including API keys.
+  server.get("/api/providers/config", async () => {
+    ctx.registry.reload();
+    return ctx.registry.getFullConfigs();
+  });
+
+  // Save new configurations.
+  server.post("/api/providers/config", async (request, reply) => {
+    const configs = request.body as Record<string, any>;
+    if (!configs || typeof configs !== "object") {
+      reply.status(400);
+      return { error: "Invalid configuration object." };
+    }
+    try {
+      ctx.registry.saveConfigs(configs);
+      return { success: true };
+    } catch (err: any) {
+      reply.status(500);
+      return { error: `Failed to save configuration: ${err.message}` };
+    }
+  });
 }

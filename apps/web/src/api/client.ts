@@ -36,6 +36,15 @@ async function getJson<T>(path: string): Promise<T | null> {
 
 export const api = {
   getProviders: () => getJson<ProviderMetadata[]>('/api/providers'),
+  getProvidersConfig: () => getJson<Record<string, any>>('/api/providers/config'),
+  async saveProvidersConfig(configs: Record<string, any>): Promise<void> {
+    const response = await fetch(`${API_BASE}/api/providers/config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(configs)
+    });
+    if (!response.ok) throw new Error(await errorMessage(response, 'Provider ayarları kaydedilemedi.'));
+  },
   getRuns: () => getJson<Run[]>('/api/runs'),
   getMessages: (runId: string) => getJson<RunMessage[]>(`/api/runs/${runId}/messages`),
   getProjects: () => getJson<Project[]>('/api/projects'),

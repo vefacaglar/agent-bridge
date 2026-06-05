@@ -89,6 +89,18 @@ export class ProviderRegistry {
     return provider;
   }
 
+  getFullConfigs(): Record<string, ProviderConfigBlock> {
+    return this.configs;
+  }
+
+  saveConfigs(configs: Record<string, ProviderConfigBlock>) {
+    const wsRoot = this.findWorkspaceRoot();
+    const localPath = path.join(wsRoot, "providers.local.json");
+    fs.writeFileSync(localPath, JSON.stringify({ providers: configs }, null, 2), "utf-8");
+    this.configs = configs;
+    this.providers.clear();
+  }
+
   // Reload config for testing purposes
   reload() {
     this.providers.clear();
