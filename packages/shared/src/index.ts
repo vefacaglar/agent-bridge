@@ -120,11 +120,15 @@ export type RunEvent =
 // (e.g. a red/green diff for file edits) instead of just raw arguments.
 export interface PermissionPreview {
   tool: string;
-  action: "create" | "edit" | "delete" | "read" | "list";
+  action: "create" | "edit" | "delete" | "read" | "list" | "mkdir" | "move" | "search" | "command";
   path: string;
   absolutePath: string;
   oldContent: string | null;
   newContent: string | null;
+  // Extra display context for tools that are not plain file edits.
+  command?: string;   // run_command: the shell command to execute
+  destPath?: string;  // move_file: the destination path
+  query?: string;     // search_files: the search query
 }
 
 // Safe Provider Metadata structure returned by GET /api/providers

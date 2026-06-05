@@ -26,6 +26,16 @@ const question = computed(() => actionQuestion(preview.value, toolName.value));
 const diffRows = computed(() => previewDiff(preview.value));
 const hasDiff = computed(() => diffRows.value.length > 0);
 
+// For non-file tools, show the most relevant detail instead of a path.
+const previewDetail = computed(() => {
+  const p = preview.value;
+  if (!p) return '';
+  if (p.action === 'command') return p.command ?? '';
+  if (p.action === 'move') return `${p.path || p.absolutePath} → ${p.destPath ?? ''}`;
+  if (p.action === 'search') return p.query ?? '';
+  return p.absolutePath;
+});
+
 // Raw arguments fallback when there is no structured preview (unknown tools).
 const rawArgs = computed(() => {
   const args = props.request?.toolCall?.function?.arguments;
@@ -96,9 +106,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeyDown, true));
         </div>
       </div>
 
-      <!-- Path-only preview (read / list) -->
+      <!-- Detail preview (read / list / mkdir / move / search / command) -->
       <div v-else-if="preview" class="cc-perm-pathbox">
-        <code>{{ preview.absolutePath }}</code>
+        <code>{{ previewDetail }}</code>
       </div>
 
       <!-- Fallback for tools without a structured preview -->

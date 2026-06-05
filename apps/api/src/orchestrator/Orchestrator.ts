@@ -5,7 +5,7 @@ import { ProviderRegistry } from "../providers/ProviderRegistry.js";
 import { eventBus } from "./eventBus.js";
 import { db } from "../database/db.js";
 import { buildSystemPrompt } from "./systemPrompt.js";
-import { WORKSPACE_TOOLS, executeWorkspaceTool, buildPermissionPreview } from "./workspaceTools.js";
+import { WORKSPACE_TOOLS, executeWorkspaceTool, buildPermissionPreview, DANGEROUS_TOOLS } from "./workspaceTools.js";
 
 type PermissionDecision = "allow_once" | "allow_project" | "allow_always" | "deny";
 
@@ -357,10 +357,15 @@ export class Orchestrator {
 
   /**
    * Resolves a single tool call: gates it behind the permission flow when the
-   * run is in ask_permissions mode, then runs it against the workspace.
+   * run is in ask_permissions mode or the tool is inherently dangerous (e.g.
+   * run_command always asks before executing), then runs it.
    */
   private async runToolCall(runId: string, run: Run, toolCall: any): Promise<string> {
-    if (run.mode === "ask_permissions" && !this.checkPermission(run.projectPath)) {
+    const isDangerous = DANGEROUS_TOOLS.has(toolCall.function?.name);
+    const needsPermission =
+      (run.mode === "ask_permissions" || isDangerous) && !this.checkPermission(run.projectPath);
+
+    if (needsPermission) {
       const decision = await this.requestPermission(runId, run, toolCall);
       if (decision === "deny") {
         return JSON.stringify({ success: false, error: "Permission denied by user." });

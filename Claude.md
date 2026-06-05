@@ -234,17 +234,27 @@ Tools are defined and executed in `workspaceTools.ts`:
 
 ```txt
 write_file(path, content)
+edit_file(path, old_string, new_string, replace_all?)
 delete_file(path)
 read_file(path)
 list_directory(path)
+create_directory(path)
+move_file(source_path, destination_path)
+search_files(query, path?)
+run_command(command)
 ```
 
 Safety: every path resolves against the run's project directory and must stay
 inside it. Access outside the workspace is denied. Tool failures are returned
 to the model as JSON `{ success: false, error }` rather than thrown.
 
-Do not add terminal execution, git operations, or network tools without an
-explicit request.
+`run_command` runs a shell command with the workspace as the working directory
+(timeout 120s, output truncated). It is listed in `DANGEROUS_TOOLS` and is
+therefore **always** routed through the permission flow before it executes,
+regardless of the run's mode — the model can build/compile/test, but only after
+the user approves. Standing `allow_project` / `allow_always` grants still apply.
+
+Do not add git integration or network tools without an explicit request.
 
 ---
 

@@ -23,6 +23,10 @@ export function actionLabel(action?: string): string {
     case 'delete': return 'Delete';
     case 'read': return 'Read';
     case 'list': return 'List';
+    case 'mkdir': return 'New folder';
+    case 'move': return 'Move';
+    case 'search': return 'Search';
+    case 'command': return 'Run command';
     default: return 'Run';
   }
 }
@@ -36,6 +40,10 @@ export function actionQuestion(preview: PermissionPreview | null | undefined, to
     case 'delete': return `Do you want to delete ${target}?`;
     case 'read': return `Do you want to read ${target}?`;
     case 'list': return `Do you want to list ${target}?`;
+    case 'mkdir': return `Do you want to create the folder ${target}?`;
+    case 'move': return `Do you want to move ${target} to ${preview.destPath ?? ''}?`;
+    case 'search': return `Do you want to search for "${preview.query ?? ''}"?`;
+    case 'command': return `Do you want to run "${preview.command ?? ''}"?`;
     default: return 'Do you want to proceed?';
   }
 }

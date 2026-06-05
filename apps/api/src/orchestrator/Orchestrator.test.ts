@@ -232,7 +232,7 @@ test("Orchestrator Integration Tests", async (t) => {
 
     // Verify mode system prompt addition was present
     assert.ok(systemPromptUsed.includes("CURRENT OPERATIONAL MODE: PLAN MODE"));
-    assert.ok(systemPromptUsed.includes("DO NOT call any file-writing"));
+    assert.ok(systemPromptUsed.includes("DO NOT call any file-mutating tools"));
   });
 
   await t.test("Orchestrator - pauses for permissions in ask_permissions mode and resumes on approval", async () => {
