@@ -6,23 +6,26 @@ Agent Bridge is a local-first AI orchestration tool. The user picks one provider
 and model, gives it a task, and the assistant works inside a selected project
 folder on the local machine.
 
-The current implementation is a **single-model workspace assistant** with
-filesystem tools and explicit permission modes:
+The default implementation is a **single-model workspace assistant** with
+filesystem tools and explicit permission modes. A run can also use an optional
+agent preset: the selected main model acts as an architect, delegates
+implementation to coder sub-agents, and may delegate tiny mechanical tasks to a
+utility model.
 
 ```txt
 User Task
   -> Orchestrator creates a run
-  -> Model generates a response (optionally calling workspace tools)
+  -> Main model generates a response (optionally calling workspace tools)
   -> Tool calls are gated by the active mode / permissions
+  -> If a preset is active, architect can delegate to coder / utility sub-agents
   -> Tool results are fed back to the model
-  -> Loop until the model returns a final answer with no tool calls
+  -> Loop until the main model returns a final answer with no tool calls
   -> Run is marked done; messages are streamed live and saved
 ```
 
-> The original Agent Bridge vision was a two-model planner → coder → review
-> bridge. That is **not** what the code does today; it is a possible future
-> direction (see "Future Features"). Document and build against the
-> single-model reality described here.
+The current code supports the architect → coder preset path. It does not support
+an additional reviewer loop or a separate planner/coder/reviewer acceptance
+protocol.
 
 ---
 
@@ -63,10 +66,10 @@ apps/
         OpenAICompatibleProvider.ts
         AnthropicProvider.ts
         ProviderFactory.ts     type -> adapter
-        ProviderRegistry.ts    loads providers.local.json, exposes safe metadata
+        ProviderRegistry.ts    loads providers.local.json, provider configs, presets
       database/
         db.ts                  Connection + schema + migrations + startup cleanup
-        repositories.ts        RunRepository, MessageRepository, ProjectRepository
+        repositories.ts        Run/Message/Project/Permission/Plan repositories
 
   web/                         Vue frontend
     src/
@@ -78,7 +81,7 @@ apps/
         useChatSession.ts      Runs/messages/SSE/send/continue/cancel/permission
         useProjects.ts         Project list + active project + add/remove flow
         usePermissions.ts      Standing-permissions list + settings modal
-        useComposerSettings.ts Mode / model settings (persisted to localStorage)
+        useComposerSettings.ts Mode / model / preset settings (localStorage)
         useChatAutoScroll.ts   Scroll-to-bottom watchers
       lib/                     Pure helpers (no state)
         markdown.ts            Marked setup + renderMarkdown + cleanMessageContent
@@ -89,11 +92,13 @@ apps/
         AppSidebar.vue         Projects accordion + chat history
         MessageThread.vue      Message list (user / assistant / tool groups)
         ToolGroup.vue          Collapsible tool-call/response block
+        CoderGroup.vue         Collapsible coder/utility sub-agent windows
         ChatComposer.vue       Input + mode menu + model menu + cards
         ConfirmationCard.vue   Inline yes/no quick reply
         PermissionCard.vue     Inline tool permission request (diff + options)
         AddProjectModal.vue
-        settings/              Provider and permission settings screens
+        PlanPanel.vue          Right-hand stable plan panel
+        settings/              Provider, permission, and agent preset settings
 
 packages/
   shared/src/index.ts          Shared TS contracts (Run, RunMessage, events, ...)
@@ -131,7 +136,8 @@ providers.example.json   (template, committed)
 providers.local.json     (real keys, never committed)
 ```
 
-The backend may read API keys. The frontend must never receive them.
+Provider secrets live in `providers.local.json`. Public provider metadata must
+not include secrets.
 
 `GET /api/providers` returns only safe metadata:
 
@@ -139,13 +145,19 @@ The backend may read API keys. The frontend must never receive them.
 id, displayName, type, models
 ```
 
-Never expose `apiKey`, authorization headers, or raw secrets to the browser.
+Never expose `apiKey`, authorization headers, or raw secrets through public
+provider metadata.
 
-Optionally, `providers.local.json` may also define an `agentPresets` block: named
-dual-model pairings (an **architect** model + a **coder** model + `maxSubAgents`).
-`GET /api/agent-presets` returns this as safe metadata (only provider ids + model
-names, already public). `PUT /api/agent-presets` saves the full set back via
-`ProviderRegistry.saveAgentPresets`. See "Dual-Model Agent Presets" below.
+The local settings API is the exception by design: `GET /api/providers/config`
+and `POST /api/providers/config` read and save full provider config for this
+local-first desktop app. Treat those routes as trusted local settings surfaces,
+not public provider metadata.
+
+`providers.local.json` may also define an `agentPresets` block: named pairings
+with an **architect** model, a **coder** model, `maxSubAgents`, and optionally a
+**utility** model. `GET /api/agent-presets` returns this as safe metadata (only
+provider ids + model names, already public). `PUT /api/agent-presets` saves the
+full set back via `ProviderRegistry.saveAgentPresets`. See "Agent Presets" below.
 
 ---
 
@@ -181,14 +193,16 @@ adapter converts tool definitions to `input_schema`, assistant tool calls to
 
 ## Orchestrator Rules
 
-The orchestrator (`Orchestrator.ts`) owns a single-model conversation loop.
+The orchestrator (`Orchestrator.ts`) owns one run driver and a shared
+provider-facing generation loop.
 
 It should:
 
 ```txt
 load the run
 build a mode-aware system prompt (systemPrompt.ts)
-call the model with WORKSPACE_TOOLS available
+choose tools from mode + preset configuration
+call the model with those tools available
 if the model returns tool calls:
   gate each call by mode/permissions, execute it, feed the result back
 otherwise:
@@ -197,10 +211,11 @@ stream every state change and message over SSE
 ```
 
 `run()` starts a fresh run; `continueRun()` replays persisted history and
-continues the same thread. Both share one private `drive()` loop — do not
-re-introduce duplicated tool-execution code across the two paths.
+continues the same thread. Both share one private `drive()` method, which uses
+`runAgentLoop()` for the main model and for delegated coder/utility sub-agents.
+Do not re-introduce duplicated tool-execution code across those paths.
 
-The loop terminates when the model responds with no tool calls, on
+The run terminates when the main model responds with no tool calls, on
 cancellation, or on error. Cancellation is cooperative (`checkCancelled`) and
 also resolves any pending permission request so the loop can unwind.
 
@@ -271,6 +286,10 @@ move_file(source_path, destination_path)
 search_files(query, path?)
 run_command(command)
 fetch_url(url)
+set_chat_title(title)
+update_plan(title, tasks, body?, start_new?)   plan mode only
+delegate_tasks(tasks, parallel?)               preset build modes only
+delegate_to_utility(tasks, parallel?)          preset build modes only
 ```
 
 Safety: every path resolves against the run's project directory and must stay
@@ -289,6 +308,11 @@ an API response. It is also in `DANGEROUS_TOOLS`, so it **always** asks before
 running. Its standing grants are scoped per host (approving one site does not
 approve the whole web). Because it is the only async tool, the orchestrator
 executes tools through `executeWorkspaceToolAsync`.
+
+`set_chat_title`, `update_plan`, `delegate_tasks`, and `delegate_to_utility` are
+orchestrator tools. They do not execute through the filesystem helper directly:
+title and plan update local run/plan state, while delegation starts nested
+`runAgentLoop()` calls in the same run.
 
 Do not add git integration or further network tools without an explicit request.
 
@@ -326,7 +350,7 @@ loaded on run select via `GET /api/runs/:id/plan`.
 
 ---
 
-## Dual-Model Agent Presets (`delegate_tasks`)
+## Agent Presets (`delegate_tasks`)
 
 A run can optionally use **two models**: an **architect** (the run's normal
 `providerId`/`model`) that plans and coordinates, and a **coder** (the run's
@@ -453,6 +477,7 @@ message_updated
 model_snapshot_locked
 permission_requested
 plan_updated
+run_title_changed
 run_completed
 run_failed
 ```
@@ -482,7 +507,8 @@ Failed runs keep their messages; the error is stored in `error_message`.
 
 ```txt
 Never commit real API keys (providers.local.json is ignored).
-Never return provider secrets to the browser.
+Never return provider secrets from public metadata endpoints.
+Only the trusted local settings API should read or save full provider config.
 Never log secrets.
 Keep the local SQLite file out of git.
 Constrain all file access to the active project workspace.
@@ -511,10 +537,9 @@ Avoid vague names like `helper`, `manager`, `processor`, `data`, `stuff`.
 Not implemented today; do not build without an explicit request:
 
 ```txt
-two-model planner -> coder -> review bridge (the original Agent Bridge concept)
+separate reviewer/acceptance loop after coder delegation
 direct git integration
 manual approval checkpoints beyond the existing permission flow
 token cost tracking
-agent presets
 multi-user auth / cloud deployment
 ```

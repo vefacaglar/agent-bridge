@@ -7,13 +7,15 @@ the backend orchestrator runs a tool-calling chat loop. The assistant can read,
 edit, create, move, delete, and search files inside the selected workspace. It
 can also ask for permission to run commands or fetch URLs.
 
-The current product is a **single-model workspace agent**. The original
-two-model planner/coder bridge is only a future direction.
+The default product is a **single-model workspace agent**. Optionally, the user
+can select an agent preset that splits the run into an architect model plus coder
+sub-agents, with an optional utility model for small read/search/rename tasks.
 
 ```txt
 User Task
-  -> Selected Model
+  -> Selected Model or Preset Architect
   -> Optional Workspace Tool Calls
+  -> Optional Coder / Utility Delegation
   -> Tool Results Back To Model
   -> Final Assistant Response
 ```
@@ -28,6 +30,7 @@ OpenAI-compatible provider adapter
 Anthropic provider adapter
 local providers.local.json configuration
 single provider/model run creation
+optional architect/coder/utility agent presets
 chat, build, and plan modes
 workspace filesystem tools
 permission flow for commands and URL fetches
@@ -106,7 +109,13 @@ Example:
 }
 ```
 
-The backend may read API keys. The frontend must never receive them.
+Provider secrets live in local config. Public provider metadata omits API keys;
+the local settings API can read and save full provider config for this
+local-first app.
+
+`providers.local.json` may also include `agentPresets`, which define an
+architect provider/model, coder provider/model, `maxSubAgents`, and optionally a
+utility provider/model.
 
 ## Modes
 
@@ -119,6 +128,11 @@ Plan   writes a stable plan to the plan panel; no file mutations
 The backend also supports `ask_permissions` and `auto` for older runs or direct
 API use. `run_command` and `fetch_url` always require permission unless a
 matching standing grant exists.
+
+When an agent preset is active in Build mode, the architect receives read-only
+workspace tools and delegates mutations through `delegate_tasks`. Coder
+sub-agents receive the normal workspace tools. Utility sub-agents receive read,
+list, search, and move tools.
 
 ## Workspace Tools
 
@@ -136,6 +150,9 @@ search_files
 run_command
 fetch_url
 update_plan
+set_chat_title
+delegate_tasks
+delegate_to_utility
 ```
 
 All file paths are resolved relative to the selected project folder and cannot

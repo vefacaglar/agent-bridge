@@ -4,14 +4,16 @@
 
 This file describes how the agent currently works inside Agent Bridge.
 
-Agent Bridge runs a **single workspace agent**. The user selects one
+Agent Bridge normally runs a **single workspace agent**. The user selects one
 provider/model, chooses a local project folder, sends a task, and the
 orchestrator lets that model respond, call workspace tools when appropriate,
 read tool results, and continue until it returns a final answer.
 
-The original two-agent planner/coder bridge is a future direction only. Do not
-document or implement against that model unless the code is explicitly changed
-back to it.
+Agent Bridge also supports optional **agent presets**. A preset turns the main
+model into an architect/planner and gives it a separate coder model for
+implementation through `delegate_tasks`. Presets may also include a lightweight
+utility model for small read/search/rename chores through `delegate_to_utility`.
+When no preset is selected, the run stays plain single-model.
 
 ---
 
@@ -46,12 +48,17 @@ hide tool failures
 ## System Prompt
 
 The system prompt is built per run by `buildSystemPrompt(projectName,
-projectPath, mode)` in `apps/api/src/orchestrator/systemPrompt.ts`.
+projectPath, mode, shouldReadProjectGuidance, delegation)` in
+`apps/api/src/orchestrator/systemPrompt.ts`.
 
 The prompt always includes the active project context when available. Non-chat
 modes include the workspace tool catalog and planning/checklist instructions.
 Chat mode intentionally stays lightweight and tells the model not to scan or
 modify the workspace unless the user explicitly asks.
+
+When a coder preset is active, the main prompt is architect-oriented and the
+main model receives read-only workspace tools plus delegation tools. Coder and
+utility sub-agents use their own prompts from the same file.
 
 ---
 
@@ -88,6 +95,9 @@ search_files(query, path?)
 run_command(command)
 fetch_url(url)
 update_plan(title, tasks, body?, start_new?)   plan mode only
+set_chat_title(title)
+delegate_tasks(tasks, parallel?)               preset build modes only
+delegate_to_utility(tasks, parallel?)          preset build modes only
 ```
 
 Rules:
@@ -103,7 +113,12 @@ prefer edit_file for targeted changes to existing files
 `run_command` and `fetch_url` are dangerous tools. They always route through the
 permission flow unless a matching standing grant exists. `update_plan` is
 internal bookkeeping only; it does not touch files or network and runs without a
-permission prompt.
+permission prompt. `set_chat_title` also runs silently because it only renames
+the run.
+
+In preset runs, the architect cannot mutate files or run commands directly. It
+delegates code-writing to coder sub-agents. Utility sub-agents receive read,
+list, search, and move tools only.
 
 ---
 
@@ -126,7 +141,7 @@ command string; `fetch_url` grants are scoped to the host.
 
 ## Generation Loop
 
-The orchestrator drives one loop in `Orchestrator.ts`:
+The orchestrator drives the run in `Orchestrator.ts`:
 
 ```txt
 1. build the mode-aware system prompt
@@ -138,8 +153,13 @@ The orchestrator drives one loop in `Orchestrator.ts`:
 ```
 
 `run()` starts a fresh thread. `continueRun()` replays stored history and
-continues the same thread. The loop ends when the model stops calling tools, the
-user cancels, or an error occurs.
+continues the same thread. Both use `drive()`, which delegates actual model
+turns to the shared `runAgentLoop()`.
+
+In a preset run, the main loop is the architect. `delegate_tasks` and
+`delegate_to_utility` start additional `runAgentLoop()` calls inside the same
+run and workspace, tagged as coder or utility messages. The loop ends when the
+main model stops calling tools, the user cancels, or an error occurs.
 
 ---
 
@@ -151,13 +171,14 @@ The orchestrator enforces:
 workspace path containment
 permission gating for dangerous tools and ask_permissions mode
 cooperative cancellation between steps
-provider timeout (60s per request)
+provider timeout per request
 startup cleanup for runs left in active states
 error persistence without discarding prior messages
 ```
 
-Provider secrets stay server-side. The frontend receives only safe provider
-metadata.
+Provider secrets live in local configuration. Public provider lists expose only
+safe metadata; the local settings API can read and save full provider config for
+this local-first app.
 
 ---
 
@@ -167,11 +188,13 @@ The current agent system is working when:
 
 ```txt
 the user can choose one provider/model and one project folder
+the user can optionally choose an architect/coder/utility preset
 chat/build/plan modes behave differently and predictably
 the agent can read/write workspace files through tools
+the architect delegates mutations when a coder preset is active
 all filesystem access stays inside the selected workspace
 dangerous tools pause for approval and resume correctly
 messages, status changes, permissions, and plans stream live and persist
 runs can be reopened after restart
-provider secrets never reach the browser
+provider secrets stay in local config and are only exposed through local settings
 ```
