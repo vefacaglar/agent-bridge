@@ -318,19 +318,19 @@ const formattedElapsedTime = computed(() => {
       <div v-else-if="group.type === 'coder_group'" class="coder-shortcut-row" :data-agent-group-id="group.id">
         <button
           type="button"
-          class="coder-shortcut-btn"
+          class="coder-shortcut-btn step-row"
           @click="emit('view-agent', group.id)"
         >
-          <svg class="arrow-right-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <svg class="arrow-right-icon step-row-toggle" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <path d="m9 18 6-6-6-6"></path>
           </svg>
-          <svg class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg class="step-row-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
             <circle cx="9" cy="7" r="4"></circle>
             <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
             <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
           </svg>
-          <span class="coder-shortcut-label">
+          <span class="step-row-label">
             {{ group.children?.[0]?.message.agentRole === 'utility' ? 'Utility' : 'Coder' }}: {{ group.title }}
           </span>
           <template v-if="isRunning && idx > lastNonCoderIdx">
@@ -947,52 +947,8 @@ const formattedElapsedTime = computed(() => {
   width: 100%;
 }
 
-.coder-shortcut-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 0;
-  background: transparent;
-  border: none;
-  font-size: 0.82rem;
-  font-style: italic;
-  color: var(--faint);
-  width: 100%;
-  text-align: left;
-  cursor: pointer;
-  user-select: none;
-  transition: color 0.2s ease;
-}
-
-.coder-shortcut-btn:hover {
-  color: var(--muted);
-}
-
-.coder-shortcut-label {
-  font-weight: 300;
-  color: inherit;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
-  flex-shrink: 1;
-}
-
-/* Navigate-to-transcript chevron sits just to the right of the label. */
-.coder-shortcut-btn .arrow-right-icon {
-  order: 1;
-}
-
-.arrow-right-icon,
-.step-icon {
-  color: inherit;
-  flex-shrink: 0;
-}
-
-.arrow-right-icon {
-  transition: transform 0.15s ease;
-}
-
+/* The row, label, icon and right-aligned toggle all come from the shared
+   .step-row classes (style.css). Only the navigate nudge stays component-local. */
 .coder-shortcut-btn:hover .arrow-right-icon {
   transform: translateX(1px);
 }

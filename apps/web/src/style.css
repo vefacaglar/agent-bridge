@@ -345,6 +345,60 @@ pre {
   gap: 0;
 }
 
+/* Shared "step row": the inline, expandable rows for tool calls, reasoning, and
+   delegated sub-agents. Defined once so their layout, spacing and the
+   right-aligned toggle stay in lockstep instead of being re-declared (and
+   drifting) in each component. Components keep only their own bits: the rotated
+   state, status icons, and the specific identity icon. */
+.step-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 0;
+  background: transparent;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+  font-size: 0.82rem;
+  font-style: italic;
+  color: var(--faint);
+  transition: color 0.2s ease;
+}
+
+.step-row:hover {
+  color: var(--muted);
+}
+
+.step-row-label {
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 300;
+  color: inherit;
+}
+
+/* Identity icon on the left (tool type / reasoning dot / sub-agent). */
+.step-row-icon {
+  flex-shrink: 0;
+  color: inherit;
+}
+
+/* Toggle / navigate chevron — sits just to the right of the label. */
+.step-row-toggle {
+  order: 1;
+  flex-shrink: 0;
+  color: inherit;
+  transition: transform 0.2s ease;
+}
+
+.step-row-toggle.rotated {
+  transform: rotate(180deg);
+}
+
 .empty-chat {
   display: grid;
   min-height: 100%;

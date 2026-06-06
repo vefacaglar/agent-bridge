@@ -470,54 +470,54 @@ function formatToolResult(name: string, contentJson: string): string {
         class="tool-call-accordion"
         :class="{ 'is-expanded': detailsExpanded[idx] }"
       >
-        <header class="tool-call-header" @click="toggleDetails(idx)">
-          <svg class="chevron-icon" :class="{ rotated: detailsExpanded[idx] }" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <header class="step-row" @click="toggleDetails(idx)">
+          <svg class="step-row-toggle" :class="{ rotated: detailsExpanded[idx] }" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="m6 9 6 6 6-6"></path>
           </svg>
           
           <!-- Icon -->
-          <svg v-if="tc.function?.name === 'read_file'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg v-if="tc.function?.name === 'read_file'" class="step-row-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path>
             <path d="M14 2v4a2 2 0 0 0 2 2h4"></path>
           </svg>
-          <svg v-else-if="tc.function?.name === 'write_file'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg v-else-if="tc.function?.name === 'write_file'" class="step-row-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 20h9"></path>
             <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
           </svg>
-          <svg v-else-if="tc.function?.name === 'delete_file'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg v-else-if="tc.function?.name === 'delete_file'" class="step-row-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M3 6h18"></path>
             <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
             <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
           </svg>
-          <svg v-else-if="tc.function?.name === 'list_directory'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg v-else-if="tc.function?.name === 'list_directory'" class="step-row-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"></path>
           </svg>
-          <svg v-else-if="tc.function?.name === 'edit_file'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg v-else-if="tc.function?.name === 'edit_file'" class="step-row-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
             <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z"></path>
           </svg>
-          <svg v-else-if="tc.function?.name === 'create_directory'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg v-else-if="tc.function?.name === 'create_directory'" class="step-row-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"></path>
             <path d="M12 10v6M9 13h6"></path>
           </svg>
-          <svg v-else-if="tc.function?.name === 'move_file'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg v-else-if="tc.function?.name === 'move_file'" class="step-row-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M5 12h14"></path>
             <path d="m13 6 6 6-6 6"></path>
           </svg>
-          <svg v-else-if="tc.function?.name === 'search_files'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg v-else-if="tc.function?.name === 'search_files'" class="step-row-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="11" cy="11" r="8"></circle>
             <path d="m21 21-4.3-4.3"></path>
           </svg>
-          <svg v-else-if="tc.function?.name === 'run_command'" class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg v-else-if="tc.function?.name === 'run_command'" class="step-row-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="m4 17 6-6-6-6"></path>
             <path d="M12 19h8"></path>
           </svg>
-          <svg v-else class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg v-else class="step-row-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
             <circle cx="12" cy="12" r="3"></circle>
           </svg>
           
-          <span class="tool-call-label">{{ getStepLabel(tc.function?.name, tc.function?.arguments, idx) }}</span>
+          <span class="step-row-label">{{ getStepLabel(tc.function?.name, tc.function?.arguments, idx) }}</span>
           
           <template v-if="toolResponses[idx]">
             <svg v-if="isToolSuccess(toolResponses[idx].content)" class="status-icon success" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" title="Success">
@@ -547,13 +547,12 @@ function formatToolResult(name: string, contentJson: string): string {
                 </button>
               </div>
               <pre class="faint-code"><code>{{ formatToolParams(tc.function?.name, tc.function?.arguments) }}</code></pre>
-            </div>
-            
-            <!-- Custom Result Cards (outside wrapper) -->
-            <div
-              v-if="shouldRenderAskAnswers(tc.function?.name, toolResponses[idx].content)"
-              class="ask-answer-list"
-            >
+
+              <!-- Answer rendered inside the same params box. -->
+              <div
+                v-if="shouldRenderAskAnswers(tc.function?.name, toolResponses[idx].content)"
+                class="ask-answer-list"
+              >
               <section
                 v-for="(ans, aIdx) in parseAskAnswers(toolResponses[idx].content)"
                 :key="aIdx"
@@ -561,15 +560,25 @@ function formatToolResult(name: string, contentJson: string): string {
               >
                 <div v-if="ans.header" class="ask-answer-header">{{ ans.header }}</div>
                 <div class="ask-answer-question">{{ ans.question }}</div>
+
                 <ul v-if="ans.selected.length" class="ask-answer-choices">
                   <li v-for="(choice, cIdx) in ans.selected" :key="cIdx">{{ choice }}</li>
                 </ul>
-                <div v-else class="ask-answer-empty">Seçim yapılmadı</div>
-                <div v-if="ans.note" class="ask-answer-note">“{{ ans.note }}”</div>
+
+                <!-- Free-text answer: when nothing was picked from the list it IS
+                     the answer (checkmark); otherwise it's an added note. -->
+                <ul v-if="ans.note && !ans.selected.length" class="ask-answer-choices">
+                  <li>{{ ans.note }}</li>
+                </ul>
+                <div v-else-if="ans.note" class="ask-answer-note">{{ ans.note }}</div>
+
+                <div v-if="!ans.selected.length && !ans.note" class="ask-answer-empty">Seçim yapılmadı</div>
               </section>
+              </div>
             </div>
+
             <div
-              v-else-if="shouldRenderDelegatedResult(tc.function?.name, toolResponses[idx].content)"
+              v-if="shouldRenderDelegatedResult(tc.function?.name, toolResponses[idx].content)"
               class="delegated-result-list"
             >
               <section
@@ -725,51 +734,11 @@ function formatToolResult(name: string, contentJson: string): string {
   gap: 8px;
 }
 
+/* Layout only — the row look + label + toggle come from the shared .step-row
+   classes in style.css. */
 .tool-call-accordion {
-  border-radius: 8px;
-  background: transparent;
-  border: none;
-  font-size: 0.82rem;
   width: 100%;
   overflow: hidden;
-  box-shadow: none;
-  font-style: italic;
-  color: var(--faint);
-  transition: color 0.2s ease;
-}
-
-.tool-call-accordion:hover {
-  background: transparent;
-  color: var(--muted);
-}
-
-.tool-call-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 0;
-  cursor: pointer;
-  user-select: none;
-}
-
-.step-icon {
-  color: inherit;
-  flex-shrink: 0;
-}
-
-.tool-call-label {
-  font-weight: 300;
-  color: inherit;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
-  flex-shrink: 1;
-}
-
-/* Accordion toggle sits just to the right of the label, not pushed to the edge. */
-.tool-call-header .chevron-icon {
-  order: 1;
 }
 
 .status-icon {
@@ -798,16 +767,6 @@ function formatToolResult(name: string, contentJson: string): string {
 @keyframes shimmerPulse {
   0%, 100% { opacity: 0.6; }
   50% { opacity: 1; }
-}
-
-.chevron-icon {
-  color: inherit;
-  transition: transform 0.2s ease;
-  flex-shrink: 0;
-}
-
-.chevron-icon.rotated {
-  transform: rotate(180deg);
 }
 
 .tool-call-details {
@@ -901,15 +860,19 @@ function formatToolResult(name: string, contentJson: string): string {
   gap: 10px;
 }
 
+/* The answer lives inside the params box: a divider + padding separate it from
+   the params above, sharing one container. */
+.code-block-wrapper .ask-answer-list {
+  padding: 14px;
+  border-top: 1px solid var(--border);
+  /* Match the params (faint-code) above — same monospace font. */
+  font-family: monospace;
+}
+
 .ask-answer-card {
   border: none;
   background: transparent;
   padding: 0;
-}
-
-.ask-answer-card + .ask-answer-card {
-  border-top: 1px solid var(--border-soft);
-  padding-top: 10px;
 }
 
 .ask-answer-header {
@@ -961,11 +924,10 @@ function formatToolResult(name: string, contentJson: string): string {
 
 .ask-answer-note {
   margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
   color: var(--muted);
   font-size: 0.82rem;
   line-height: 1.5;
+  font-style: italic;
 }
 
 .tool-running-shimmer {
