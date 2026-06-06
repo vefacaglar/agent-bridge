@@ -5,7 +5,7 @@ import { ProviderRegistry } from "../providers/ProviderRegistry.js";
 import { eventBus } from "./eventBus.js";
 import { db } from "../database/db.js";
 import { buildSystemPrompt, buildCoderSystemPrompt, buildUtilitySystemPrompt } from "./systemPrompt.js";
-import { WORKSPACE_TOOLS, UPDATE_PLAN_TOOL, DELEGATE_TASKS_TOOL, DELEGATE_UTILITY_TOOL, UTILITY_TOOLS, SET_TITLE_TOOL, executeWorkspaceToolAsync, buildPermissionPreview, DANGEROUS_TOOLS, READONLY_TOOLS, permissionKey } from "./workspaceTools.js";
+import { WORKSPACE_TOOLS, UPDATE_PLAN_TOOL, DELEGATE_TASKS_TOOL, DELEGATE_UTILITY_TOOL, UTILITY_TOOLS, SET_TITLE_TOOL, executeWorkspaceToolAsync, buildPermissionPreview, DANGEROUS_TOOLS, READONLY_TOOLS, MODIFYING_TOOLS, permissionKey } from "./workspaceTools.js";
 
 type PermissionDecision = "allow_once" | "allow_project" | "allow_always" | "deny";
 
@@ -293,9 +293,11 @@ export class Orchestrator {
       const readonlyTools = WORKSPACE_TOOLS.filter(t => READONLY_TOOLS.has(t.function.name));
       const baseTools = run.mode === "plan"
         ? [...readonlyTools, UPDATE_PLAN_TOOL]
-        : delegation
-          ? [...readonlyTools]
-          : [...WORKSPACE_TOOLS];
+        : run.mode === "chat"
+          ? WORKSPACE_TOOLS.filter(t => !MODIFYING_TOOLS.has(t.function.name))
+          : delegation
+            ? [...readonlyTools]
+            : [...WORKSPACE_TOOLS];
       const withDelegate = delegation ? [...baseTools, DELEGATE_TASKS_TOOL] : baseTools;
       // The utility-delegation tool is offered only when a utility model is
       // configured (and the run can delegate at all).
@@ -652,6 +654,14 @@ export class Orchestrator {
     // fetch_url — even if the user approves. The model must switch to Build mode
     // before anything changes. We block here regardless of any permission grant.
     const toolName = toolCall.function?.name;
+    const isBuildMode = run.mode === "accept_edits" || run.mode === "auto" || run.mode === "ask_permissions";
+    if (!isBuildMode && MODIFYING_TOOLS.has(toolName)) {
+      return JSON.stringify({
+        success: false,
+        error: `Blocked: "${toolName}" is not allowed in ${run.mode} mode. ${run.mode === "chat" ? "Chat" : "Plan"} mode makes NO changes to the workspace and runs NO commands. Ask the user to switch to Build mode to implement.`
+      });
+    }
+
     if (run.mode === "plan" && !READONLY_TOOLS.has(toolName)) {
       return JSON.stringify({
         success: false,

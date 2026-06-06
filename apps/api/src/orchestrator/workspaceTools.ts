@@ -367,6 +367,12 @@ export const DANGEROUS_TOOLS = new Set(["run_command", "fetch_url"]);
 export const READONLY_TOOLS = new Set(["read_file", "list_directory", "search_files"]);
 
 /**
+ * Modifying tools — tools that create, modify, move, or delete files or directories,
+ * or run shell commands. These are blocked in non-build modes.
+ */
+export const MODIFYING_TOOLS = new Set(["write_file", "edit_file", "delete_file", "create_directory", "move_file", "run_command"]);
+
+/**
  * Tools available to a utility sub-agent: read-only inspection plus move_file
  * (rename/move). No write/edit/delete/create — utility work is lookups + safe
  * renames only.

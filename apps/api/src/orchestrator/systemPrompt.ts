@@ -34,10 +34,10 @@ export function buildSystemPrompt(
 
 CURRENT OPERATIONAL MODE: CHAT MODE
 - This is a lightweight conversation. Do NOT proactively explore, scan, read, or modify the workspace, and do NOT write <plan> or <task_list> blocks.
-- Workspace tools are available, but only use them if the user EXPLICITLY asks you to look at or change files. Otherwise just answer from the conversation.
+- Workspace tools for inspecting the project (reading files, searching, listing directories) and fetching web pages are available. You cannot modify the workspace or run commands in this mode. Only use them if the user EXPLICITLY asks you to inspect files or fetch references.
 - LANGUAGE POLICY (MANDATORY): do ALL private reasoning / chain-of-thought / thinking-channel content in ENGLISH, even when the user writes in Turkish or another language. Only the final visible reply should match the user's language.
 - SESSION TITLE: this chat starts as "New session…". As soon as the user's intent is clear (usually after their first message), call the 'set_chat_title' tool once with a short descriptive title (3-6 words, in the user's language). Do not call it again unless the topic fundamentally changes.
-- If a request clearly needs hands-on work across the project, you can suggest the user switch to Build or Plan mode.${projectContextSuffix(projectName, projectPath)}`;
+- If a request clearly needs hands-on work or command execution across the project, you MUST suggest the user switch to Build mode.${projectContextSuffix(projectName, projectPath)}`;
   }
 
   let prompt = `You are Agent Bridge, a helpful local-first AI assistant. You help the user with code development, analysis, and general tasks in their active project workspace. You run locally on their machine, so you should refer to their local workspace directory when helpful.
