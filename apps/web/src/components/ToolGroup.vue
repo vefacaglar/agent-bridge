@@ -94,6 +94,10 @@ function getStepLabel(name: string, args: string, idx: number): string {
   if (name === 'Workspace Tool Output') {
     const res = props.toolResponses[idx];
     if (res) {
+      const delegated = parseDelegatedResult(res.content);
+      if (delegated?.length) {
+        return delegated.length === 1 ? `Utility result: ${delegated[0].title}` : `${delegated.length} utility results`;
+      }
       try {
         const parsed = JSON.parse(res.content);
         if (parsed.error) return `Error: ${parsed.error}`;
@@ -133,6 +137,10 @@ function getToolLabel(name: string, args: string): string {
       const count = Array.isArray(parsed.tasks) ? parsed.tasks.length : 0;
       return `Delegated ${count} task${count === 1 ? '' : 's'} to coder${parsed.parallel ? ' (parallel)' : ''}`;
     }
+    case 'delegate_to_utility': {
+      const count = Array.isArray(parsed.tasks) ? parsed.tasks.length : 0;
+      return `Delegated ${count} task${count === 1 ? '' : 's'} to utility${parsed.parallel ? ' (parallel)' : ''}`;
+    }
     default:
       return `Tool ${name} executed`;
   }
@@ -157,6 +165,8 @@ function formatToolParams(name: string, argumentsJson: string): string {
   try {
     const args = JSON.parse(argumentsJson);
     switch (name) {
+      case 'Workspace Tool Output':
+        return '';
       case 'run_command':
         return args.command || '';
       case 'read_file':
@@ -172,12 +182,49 @@ function formatToolParams(name: string, argumentsJson: string): string {
         return `Source: ${args.source_path || ''}\nDestination: ${args.destination_path || ''}`;
       case 'search_files':
         return `Query: "${args.query || ''}"${args.path ? `\nIn path: ${args.path}` : ''}`;
+      case 'delegate_tasks':
+      case 'delegate_to_utility': {
+        if (!Array.isArray(args.tasks) || args.tasks.length === 0) return '';
+        return args.tasks
+          .map((task: any, idx: number) => {
+            const title = typeof task?.title === 'string' && task.title.trim() ? task.title.trim() : `Task ${idx + 1}`;
+            const body = typeof task?.task === 'string' && task.task.trim() ? `\n${task.task.trim()}` : '';
+            return `${idx + 1}. ${title}${body}`;
+          })
+          .join('\n\n');
+      }
       default:
         return JSON.stringify(args, null, 2);
     }
   } catch (e) {
     return argumentsJson;
   }
+}
+
+function hasToolParams(name: string, argumentsJson: string): boolean {
+  return !!formatToolParams(name, argumentsJson).trim();
+}
+
+function parseDelegatedResult(contentJson: string): { title: string; summary: string }[] | null {
+  if (!contentJson) return null;
+  try {
+    const res = JSON.parse(contentJson);
+    if (!Array.isArray(res.results)) return null;
+    const sections = res.results
+      .map((item: any, idx: number) => ({
+        title: typeof item?.title === 'string' && item.title.trim() ? item.title.trim() : `Result ${idx + 1}`,
+        summary: typeof item?.summary === 'string' ? item.summary.trim() : ''
+      }))
+      .filter((item: { title: string; summary: string }) => item.summary);
+    return sections.length ? sections : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function shouldRenderDelegatedResult(name: string, contentJson: string): boolean {
+  if (name !== 'delegate_tasks' && name !== 'delegate_to_utility' && name !== 'Workspace Tool Output') return false;
+  return !!parseDelegatedResult(contentJson)?.length;
 }
 
 function formatToolResult(name: string, contentJson: string): string {
@@ -366,13 +413,26 @@ function formatToolResult(name: string, contentJson: string): string {
         </header>
 
         <div v-if="detailsExpanded[idx]" class="tool-call-details">
-          <div class="detail-section">
+          <div v-if="hasToolParams(tc.function?.name, tc.function?.arguments)" class="detail-section">
             <div class="detail-label">Parameters:</div>
             <pre class="faint-code">{{ formatToolParams(tc.function?.name, tc.function?.arguments) }}</pre>
           </div>
           <div class="detail-section response-section">
             <div class="detail-label">Result:</div>
-            <pre v-if="toolResponses[idx]" class="faint-code">{{ formatToolResult(tc.function?.name, toolResponses[idx].content) }}</pre>
+            <div
+              v-if="toolResponses[idx] && shouldRenderDelegatedResult(tc.function?.name, toolResponses[idx].content)"
+              class="delegated-result-list"
+            >
+              <section
+                v-for="section in parseDelegatedResult(toolResponses[idx].content)"
+                :key="section.title"
+                class="delegated-result-card"
+              >
+                <div class="delegated-result-title">{{ section.title }}</div>
+                <div class="delegated-result-body markdown-body" v-html="renderMarkdown(section.summary)"></div>
+              </section>
+            </div>
+            <pre v-else-if="toolResponses[idx]" class="faint-code">{{ formatToolResult(tc.function?.name, toolResponses[idx].content) }}</pre>
             <div v-else class="tool-running-shimmer">
               <div class="shimmer-bar"></div>
             </div>
@@ -621,6 +681,43 @@ function formatToolResult(name: string, contentJson: string): string {
   padding: 6px 10px;
   border-radius: 4px;
   border: 1px solid rgba(255, 255, 255, 0.02);
+}
+
+.delegated-result-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.delegated-result-card {
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.18);
+  padding: 12px 14px;
+}
+
+.delegated-result-title {
+  margin-bottom: 8px;
+  color: var(--text);
+  font-size: 0.86rem;
+  font-weight: 600;
+  font-style: normal;
+}
+
+.delegated-result-body {
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+
+:deep(.delegated-result-body pre) {
+  white-space: pre-wrap;
+}
+
+:deep(.delegated-result-body table) {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 .tool-running-shimmer {
