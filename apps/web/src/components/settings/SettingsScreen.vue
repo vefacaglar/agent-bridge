@@ -79,6 +79,20 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
         </aside>
 
         <main class="chat-shell">
+          <header class="chat-header">
+            <div class="chat-header-inner">
+              <div class="thread-title">
+                <div class="project-breadcrumb">
+                  <span class="breadcrumb-project">Settings</span>
+                  <span class="breadcrumb-separator">/</span>
+                  <span class="breadcrumb-chat-title">{{ TABS.find(t => t.id === activeTab)?.label }}</span>
+                </div>
+              </div>
+              <div class="header-actions">
+              </div>
+            </div>
+          </header>
+
           <section class="messages-scroll">
             <div class="settings-container-wrap">
               <PermissionsTab
@@ -174,6 +188,69 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
   color: var(--faint);
   font-size: 0.88rem;
   font-style: italic;
+}
+
+.messages-scroll :deep(.settings-section-title) {
+  display: none;
+}
+
+.chat-header {
+  display: block;
+  padding: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.chat-header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 58px;
+  width: 100%;
+  padding: 0 24px;
+  box-sizing: border-box;
+}
+
+.thread-title {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.project-breadcrumb {
+  display: flex;
+  align-items: center;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text);
+  min-width: 0;
+  flex: 1;
+}
+
+.breadcrumb-project {
+  color: var(--muted);
+  font-weight: 400;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 180px;
+  flex-shrink: 0;
+}
+
+.breadcrumb-separator {
+  margin: 0 8px;
+  color: var(--faint);
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.breadcrumb-chat-title {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
 }
 
 .settings-fade-enter-active,
