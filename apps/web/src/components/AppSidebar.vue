@@ -318,8 +318,8 @@ function onDeleteProject(path: string, event: Event) {
 }
 
 .project-header.active {
-  background: linear-gradient(90deg, rgba(158, 184, 173, 0.13), rgba(255, 255, 255, 0.035));
-  box-shadow: inset 0 0 0 1px rgba(158, 184, 173, 0.08);
+  background: linear-gradient(90deg, rgba(164, 164, 162, 0.085), rgba(255, 255, 255, 0.035));
+  box-shadow: inset 0 0 0 1px rgba(164, 164, 162, 0.055);
   color: var(--text);
   font-weight: 500;
 }

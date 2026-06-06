@@ -467,7 +467,7 @@ async function rejectPlan() {
 }
 
 .breadcrumb-project {
-  color: rgba(170, 165, 154, 0.82);
+  color: rgba(164, 164, 162, 0.82);
   font-weight: 400;
   overflow: hidden;
   text-overflow: ellipsis;

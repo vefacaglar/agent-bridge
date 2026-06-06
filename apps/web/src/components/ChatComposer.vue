@@ -383,7 +383,7 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="composer-menu-row" style="position: relative; z-index: 2;">
-        <div class="composer-menu-left" style="display: flex; gap: 8px; align-items: center;">
+        <div class="composer-menu-left">
           <div class="mode-selector-wrap">
             <button class="mode-pill-btn" @click.stop="showModeMenu = !showModeMenu">
               <span class="mode-pill-text">{{ getModeLabel(currentMode) }}</span>
@@ -542,7 +542,7 @@ onBeforeUnmount(() => {
 .composer-input-box {
   position: relative;
   background:
-    linear-gradient(180deg, rgba(38, 37, 34, 0.96), rgba(27, 26, 24, 0.98));
+    linear-gradient(180deg, rgba(36, 36, 35, 0.96), rgba(27, 27, 26, 0.98));
   border: 1px solid rgba(255, 255, 255, 0.11);
   border-radius: 14px;
   padding: 13px 88px 13px 16px;
@@ -553,10 +553,10 @@ onBeforeUnmount(() => {
 }
 
 .composer-input-box:focus-within {
-  border-color: rgba(158, 184, 173, 0.42);
+  border-color: rgba(164, 164, 162, 0.26);
   box-shadow:
     0 20px 55px rgba(0, 0, 0, 0.38),
-    0 0 0 1px rgba(158, 184, 173, 0.08),
+    0 0 0 1px rgba(164, 164, 162, 0.05),
     inset 0 1px 0 rgba(255, 255, 255, 0.055);
 }
 
@@ -602,7 +602,7 @@ onBeforeUnmount(() => {
 }
 
 .context-tokens {
-  color: rgba(170, 165, 154, 0.78);
+  color: rgba(164, 164, 162, 0.78);
   font-weight: 500;
 }
 
@@ -669,7 +669,7 @@ onBeforeUnmount(() => {
   justify-content: center;
   width: 32px;
   height: 32px;
-  background: #e6e7df;
+  background: #e3e3e2;
   color: #11110f;
   border: none;
   border-radius: 9px;
@@ -707,7 +707,20 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   align-items: center;
   margin-top: 11px;
-  padding: 0 6px;
+  padding: 6px;
+  gap: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.018);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.018);
+}
+
+.composer-menu-left {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 auto;
 }
 
 .mode-selector-wrap,
@@ -722,12 +735,13 @@ onBeforeUnmount(() => {
 .mode-pill-btn {
   display: flex;
   align-items: center;
-  background: rgba(255, 255, 255, 0.025);
-  border: 1px solid var(--border-soft);
+  min-height: 30px;
+  background: transparent;
+  border: 1px solid transparent;
   border-radius: 8px;
-  padding: 6px 12px;
+  padding: 5px 10px;
   color: var(--muted);
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   cursor: pointer;
   transition: all 0.2s ease;
   user-select: none;
@@ -735,9 +749,9 @@ onBeforeUnmount(() => {
 }
 
 .mode-pill-btn:hover {
-  border-color: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.11);
   color: var(--text);
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.045);
 }
 
 .mode-pill-text {
@@ -853,7 +867,10 @@ onBeforeUnmount(() => {
 .composer-status-section {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+  flex: 0 1 auto;
   color: var(--faint);
   font-size: 0.8rem;
 }
@@ -863,20 +880,24 @@ onBeforeUnmount(() => {
 }
 
 .model-select-display-btn {
-  background: rgba(255, 255, 255, 0.025);
+  max-width: 220px;
+  background: transparent;
   color: var(--muted);
   font-size: 0.8rem;
   cursor: pointer;
-  transition: color 0.2s ease;
-  padding: 4px 8px;
+  transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+  padding: 5px 8px;
   border-radius: 7px;
   border: 1px solid transparent;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .model-select-display-btn:hover {
   color: var(--text);
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.045);
+  border-color: rgba(255, 255, 255, 0.11);
 }
 
 .model-select-display-btn:disabled {
@@ -892,7 +913,8 @@ onBeforeUnmount(() => {
 /* Dual-model preset selector: emphasize when a preset (not single model) is on. */
 .preset-select-btn.preset-active {
   color: var(--text);
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(164, 164, 162, 0.06);
+  border-color: rgba(164, 164, 162, 0.085);
   font-weight: 600;
 }
 
@@ -972,21 +994,23 @@ onBeforeUnmount(() => {
 }
 
 .status-divider {
-  color: #2d2d30;
+  color: rgba(255, 255, 255, 0.12);
   user-select: none;
 }
 
 .parameter-pill {
   color: var(--muted);
-  padding: 2px 6px;
-  border-radius: 4px;
+  padding: 5px 7px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid transparent;
 }
 
 .status-indicator-ring {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
-  border: 1.5px solid #333;
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -998,8 +1022,8 @@ onBeforeUnmount(() => {
 }
 
 .ring-dot {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   background: #444;
   transition: background 0.3s ease;

@@ -948,12 +948,12 @@ const formattedElapsedTime = computed(() => {
 }
 
 .assistant-message {
-  color: rgba(232, 230, 223, 0.9);
+  color: rgba(227, 227, 226, 0.9);
   line-height: 1.65;
 }
 
 .assistant-meta {
-  color: rgba(118, 111, 99, 0.84);
+  color: rgba(117, 117, 116, 0.84);
 }
 
 .coder-shortcut-row {
