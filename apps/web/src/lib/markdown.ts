@@ -33,6 +33,13 @@ marked.use({
         }
       }
 
+      if (hasHighlighting) {
+        highlightedCode = highlightedCode.replace(
+          /<span class="hljs-string">(?:&quot;&quot;&quot;|&#x27;&#x27;&#x27;|&#x39;&#x39;&#x39;|&#39;&#39;&#39;)[\s\S]*?(?:&quot;&quot;&quot;|&#x27;&#x27;&#x27;|&#x39;&#x39;&#x39;|&#39;&#39;&#39;)<\/span>/g,
+          (match) => match.replace('hljs-string', 'hljs-comment')
+        );
+      }
+
       // Escape HTML entities as fallback to prevent rendering issues in raw code blocks.
       if (!hasHighlighting) {
         highlightedCode = code

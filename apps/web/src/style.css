@@ -987,6 +987,14 @@ pre {
   filter: saturate(55%);
 }
 
+.hljs-comment,
+.hljs-comment *,
+.hljs-quote,
+.hljs-quote * {
+  color: var(--success) !important;
+  font-style: italic !important;
+}
+
 .markdown-body pre {
   margin: 0;
   padding: 14px;
