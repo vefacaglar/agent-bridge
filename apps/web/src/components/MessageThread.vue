@@ -307,30 +307,32 @@ const formattedElapsedTime = computed(() => {
         />
       </template>
 
-      <div v-else-if="group.type === 'coder_group'" class="coder-shortcut-card-wrap" :data-agent-group-id="group.id">
+      <div v-else-if="group.type === 'coder_group'" class="coder-shortcut-row" :data-agent-group-id="group.id">
         <button
           type="button"
-          class="coder-shortcut-card"
+          class="coder-shortcut-btn"
           @click="emit('view-agent', group.id)"
         >
-          <div class="coder-shortcut-head">
-            <span class="agent-badge coder-badge">
-              {{ group.children?.[0]?.message.agentRole === 'utility' ? 'Utility' : 'Coder' }}
-            </span>
-            <div class="coder-shortcut-meta">
-              <span class="coder-shortcut-status-dot" :class="isRunning && idx > lastNonCoderIdx ? 'running' : 'done'"></span>
-              <span class="coder-shortcut-status-text">
-                {{ isRunning && idx > lastNonCoderIdx ? 'working…' : 'completed' }}
-              </span>
-            </div>
-          </div>
-          <span class="coder-shortcut-title">{{ group.title }}</span>
-          <div class="coder-shortcut-foot">
-            <span class="coder-shortcut-action">View transcript</span>
-            <svg class="arrow-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M5 12h14M12 5l7 7-7 7"/>
+          <svg class="arrow-right-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m9 18 6-6-6-6"></path>
+          </svg>
+          <svg class="step-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+          <span class="coder-shortcut-label">
+            {{ group.children?.[0]?.message.agentRole === 'utility' ? 'Utility' : 'Coder' }}: {{ group.title }}
+          </span>
+          <template v-if="isRunning && idx > lastNonCoderIdx">
+            <span class="status-dot pending" title="Running..."></span>
+          </template>
+          <template v-else>
+            <svg class="status-icon success" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" title="Success">
+              <polyline points="20 6 9 17 4 12"></polyline>
             </svg>
-          </div>
+          </template>
         </button>
       </div>
 
@@ -465,7 +467,7 @@ const formattedElapsedTime = computed(() => {
 </template>
 
 <style scoped>
-.messages-inner > :deep(.coder-shortcut-card-wrap + .coder-shortcut-card-wrap),
+.messages-inner > :deep(.coder-shortcut-row + .coder-shortcut-row),
 .messages-inner > :deep(.tool-group-wrap + .tool-group-wrap),
 .messages-inner > :deep(.plan-terminal-container + .tool-group-wrap),
 .messages-inner > :deep(.tool-group-wrap + .plan-terminal-container),
@@ -915,111 +917,60 @@ const formattedElapsedTime = computed(() => {
 .user-message-container,
 .assistant-message,
 .plan-thread-link,
-.coder-shortcut-card-wrap,
+.coder-shortcut-row,
 :deep(.tool-group-wrap),
 :deep(.reasoning-terminal-container) {
   animation: messageEnter 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-.coder-shortcut-card-wrap {
+.coder-shortcut-row {
   margin: 1px 0;
   width: 100%;
 }
 
-.coder-shortcut-card {
+.coder-shortcut-btn {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px;
+  padding: 6px 0;
+  background: transparent;
+  border: none;
+  font-size: 0.82rem;
+  font-style: italic;
+  color: var(--faint);
   width: 100%;
   text-align: left;
-  padding: 12px 14px;
-  border: 1px solid var(--border);
-  border-left: 2.5px solid var(--muted);
-  border-radius: 10px;
-  background: var(--surface);
-  color: var(--text);
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease, transform 0.1s ease;
+  user-select: none;
+  transition: color 0.2s ease;
 }
 
-.coder-shortcut-card:hover {
-  border-color: var(--muted);
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.coder-shortcut-card:active {
-  transform: scale(0.995);
-}
-
-.coder-shortcut-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-}
-
-.coder-shortcut-meta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.coder-shortcut-status-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-}
-
-.coder-shortcut-status-dot.running {
-  background: #5ea2eb;
-  animation: shimmerPulse 1.5s infinite ease-in-out;
-}
-
-.coder-shortcut-status-dot.done {
-  background: var(--success);
-}
-
-.coder-shortcut-status-text {
-  font-size: 0.72rem;
+.coder-shortcut-btn:hover {
   color: var(--muted);
-  font-style: italic;
 }
 
-.coder-shortcut-title {
-  font-size: 0.88rem;
-  font-weight: 600;
-  color: var(--text);
+.coder-shortcut-label {
+  font-weight: 300;
+  color: inherit;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  width: 100%;
+  min-width: 0;
+  flex-shrink: 1;
 }
 
-.coder-shortcut-foot {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.74rem;
-  color: var(--muted);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 2px 8px;
-  align-self: flex-start;
-  transition: color 0.15s ease, border-color 0.15s ease;
+.arrow-right-icon,
+.step-icon {
+  color: inherit;
+  flex-shrink: 0;
 }
 
-.coder-shortcut-card:hover .coder-shortcut-foot {
-  color: var(--text);
-  border-color: var(--muted);
-}
-
-.arrow-icon {
+.arrow-right-icon {
   transition: transform 0.15s ease;
 }
 
-.coder-shortcut-card:hover .arrow-icon {
-  transform: translateX(2px);
+.coder-shortcut-btn:hover .arrow-right-icon {
+  transform: translateX(1px);
 }
 
 </style>
