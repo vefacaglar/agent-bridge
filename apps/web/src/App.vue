@@ -128,9 +128,18 @@ function revisePlan() {
   focusSignal.value++;
 }
 
-// Reject: dismiss the choices without acting; the user stays in plan mode.
-function rejectPlan() {
+// Reject: tell the model the plan is turned down so it does NOT implement it,
+// and stay in plan mode. Without sending this message the model never learns it
+// was rejected and may go ahead and build the plan anyway.
+async function rejectPlan() {
   decidedPlanKey.value = planKey.value;
+  if (settings.currentMode.value !== 'plan') {
+    settings.currentMode.value = 'plan';
+    await nextTick();
+  }
+  chat.sendQuickReply(
+    "I reject this plan. Do NOT implement it or make any changes. Stay in Plan mode and wait for my further instructions."
+  );
 }
 </script>
 
@@ -141,7 +150,6 @@ function rejectPlan() {
       :active-project-path="projects.activeProjectPath.value"
       :runs="runs"
       :active-run-id="activeRunId"
-      :is-running="isRunning"
       :is-sidebar-collapsed="isSidebarCollapsed"
       @new-chat="chat.startNewRunSetup"
       @add-project="projects.openAddProjectModal"

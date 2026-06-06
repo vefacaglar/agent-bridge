@@ -112,7 +112,12 @@ export function useChatSession(options: ChatSessionOptions) {
   }
 
   function startNewRunSetup() {
-    if (isRunning.value) return;
+    // Starting a new chat while another run is still generating must NOT cancel
+    // that run — it keeps going on the backend. We just stop watching its live
+    // stream here; selecting it again later reconnects and reloads its history.
+    eventSource?.close();
+    eventSource = null;
+    isRunning.value = false;
     activeRunId.value = null;
     activeRun.value = null;
     messages.value = [];
