@@ -127,6 +127,25 @@ function compactNumber(value: number): string {
 // Inline accordion collapse states
 const expandedTranscripts = ref<Record<string, boolean>>({});
 const expandedReasoning = ref<Record<string, boolean>>({});
+const panelBody = ref<HTMLElement | null>(null);
+
+watch(
+  agents,
+  () => {
+    const el = panelBody.value;
+    if (!el) return;
+
+    // Check if the scroll position is within 180px of the bottom
+    const wasAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 180;
+    
+    if (wasAtBottom) {
+      nextTick(() => {
+        el.scrollTop = el.scrollHeight;
+      });
+    }
+  },
+  { deep: true }
+);
 
 function isReasoningExpanded(childId: string, children: any[]): boolean {
   const explicit = expandedReasoning.value[childId];
@@ -198,7 +217,7 @@ defineExpose({
       <button type="button" class="workspace-panel-close" title="Hide side panel" @click="$emit('close')">Close</button>
     </header>
 
-    <div class="workspace-panel-body">
+    <div ref="panelBody" class="workspace-panel-body">
       <section v-if="activeTab === 'plan'" class="panel-section">
         <div class="panel-section-heading">
           <div>
