@@ -1,5 +1,7 @@
 <script setup lang="ts">
-defineProps<{
+import { ref } from 'vue';
+
+const props = defineProps<{
   content: string;
   expanded: boolean;
 }>();
@@ -7,6 +9,16 @@ defineProps<{
 const emit = defineEmits<{
   (e: 'toggle'): void;
 }>();
+
+const copied = ref(false);
+
+function copyContent() {
+  navigator.clipboard.writeText(props.content);
+  copied.value = true;
+  setTimeout(() => {
+    copied.value = false;
+  }, 2000);
+}
 </script>
 
 <template>
@@ -29,7 +41,19 @@ const emit = defineEmits<{
       <span class="reasoning-label">Reasoning</span>
     </header>
     <div v-if="expanded" class="reasoning-details">
-      <pre class="reasoning-text plan-body">{{ content }}</pre>
+      <div class="code-block-wrapper">
+        <div class="code-block-header">
+          <span class="code-block-lang">reasoning</span>
+          <button 
+            class="code-block-copy-btn" 
+            :class="{ copied }" 
+            @click.stop="copyContent"
+          >
+            {{ copied ? 'Copied!' : 'Copy' }}
+          </button>
+        </div>
+        <pre class="reasoning-text plan-body"><code>{{ content }}</code></pre>
+      </div>
     </div>
   </div>
 </template>
@@ -87,6 +111,10 @@ const emit = defineEmits<{
   font-style: normal;
 }
 
+.reasoning-details .code-block-wrapper {
+  margin: 8px 0 0;
+}
+
 /* The expanded body, styled like a tool result block (faint-code). */
 .reasoning-text {
   margin: 0;
@@ -99,9 +127,9 @@ const emit = defineEmits<{
   color: var(--muted);
   white-space: pre-wrap;
   word-break: break-word;
-  background: rgba(0, 0, 0, 0.3);
-  padding: 6px 10px;
-  border-radius: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.02);
+  background: transparent;
+  padding: 14px;
+  border-radius: 0;
+  border: none;
 }
 </style>

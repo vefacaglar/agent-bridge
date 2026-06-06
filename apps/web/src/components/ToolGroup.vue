@@ -20,6 +20,39 @@ const emit = defineEmits<{
 
 const detailsExpanded = ref<Record<number, boolean>>({});
 
+const copiedParameters = ref<Record<number, boolean>>({});
+const copiedResults = ref<Record<number, boolean>>({});
+
+function copyParameters(idx: number, text: string) {
+  navigator.clipboard.writeText(text);
+  copiedParameters.value[idx] = true;
+  setTimeout(() => {
+    copiedParameters.value[idx] = false;
+  }, 2000);
+}
+
+function copyResult(idx: number, text: string) {
+  navigator.clipboard.writeText(text);
+  copiedResults.value[idx] = true;
+  setTimeout(() => {
+    copiedResults.value[idx] = false;
+  }, 2000);
+}
+
+function getParamsHeaderLabel(name: string): string {
+  if (name === 'run_command') return 'bash';
+  return 'parameters';
+}
+
+function getResultHeaderLabel(name: string, argumentsJson: string): string {
+  if (name === 'run_command') return 'output';
+  if (name === 'read_file') {
+    const path = getToolPath(argumentsJson);
+    return path.split('/').pop() || 'result';
+  }
+  return 'result';
+}
+
 /** Title of an update_plan call, for the clickable plan card. */
 function getPlanTitle(argumentsJson: string): string {
   const parsed = parseArgs(argumentsJson);
@@ -456,7 +489,19 @@ function formatToolResult(name: string, contentJson: string): string {
         <div v-if="detailsExpanded[idx]" class="tool-call-details">
           <div v-if="hasToolParams(tc.function?.name, tc.function?.arguments)" class="detail-section">
             <div class="detail-label">Parameters:</div>
-            <pre class="faint-code">{{ formatToolParams(tc.function?.name, tc.function?.arguments) }}</pre>
+            <div class="code-block-wrapper">
+              <div class="code-block-header">
+                <span class="code-block-lang">{{ getParamsHeaderLabel(tc.function?.name) }}</span>
+                <button 
+                  class="code-block-copy-btn" 
+                  :class="{ copied: copiedParameters[idx] }" 
+                  @click.stop="copyParameters(idx, formatToolParams(tc.function?.name, tc.function?.arguments))"
+                >
+                  {{ copiedParameters[idx] ? 'Copied!' : 'Copy' }}
+                </button>
+              </div>
+              <pre class="faint-code"><code>{{ formatToolParams(tc.function?.name, tc.function?.arguments) }}</code></pre>
+            </div>
           </div>
           <div class="detail-section response-section">
             <div class="detail-label">Result:</div>
@@ -491,7 +536,19 @@ function formatToolResult(name: string, contentJson: string): string {
                 <div class="delegated-result-body markdown-body" v-html="renderMarkdown(section.summary)"></div>
               </section>
             </div>
-            <pre v-else-if="toolResponses[idx]" class="faint-code">{{ formatToolResult(tc.function?.name, toolResponses[idx].content) }}</pre>
+            <div v-else-if="toolResponses[idx]" class="code-block-wrapper">
+              <div class="code-block-header">
+                <span class="code-block-lang">{{ getResultHeaderLabel(tc.function?.name, tc.function?.arguments) }}</span>
+                <button 
+                  class="code-block-copy-btn" 
+                  :class="{ copied: copiedResults[idx] }" 
+                  @click.stop="copyResult(idx, formatToolResult(tc.function?.name, toolResponses[idx].content))"
+                >
+                  {{ copiedResults[idx] ? 'Copied!' : 'Copy' }}
+                </button>
+              </div>
+              <pre class="faint-code"><code>{{ formatToolResult(tc.function?.name, toolResponses[idx].content) }}</code></pre>
+            </div>
             <div v-else class="tool-running-shimmer">
               <div class="shimmer-bar"></div>
             </div>
@@ -729,6 +786,10 @@ function formatToolResult(name: string, contentJson: string): string {
   font-weight: 500;
 }
 
+.tool-call-details .code-block-wrapper {
+  margin: 6px 0 0;
+}
+
 .faint-code {
   font-family: monospace;
   font-size: 0.75rem;
@@ -736,10 +797,10 @@ function formatToolResult(name: string, contentJson: string): string {
   white-space: pre-wrap;
   word-break: break-all;
   margin: 0;
-  background: rgba(0, 0, 0, 0.3);
-  padding: 6px 10px;
-  border-radius: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.02);
+  background: transparent;
+  padding: 14px;
+  border-radius: 0;
+  border: none;
 }
 
 .delegated-result-list {
