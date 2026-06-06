@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import type { Plan } from '@agent-bridge/shared';
 import { renderMarkdown } from '../lib/markdown';
+import { changeDiffRows, type WorkspaceChange } from '../lib/workspaceChanges';
 
 const props = defineProps<{
   plan: Plan | null;
+  changes?: WorkspaceChange[];
   showActions?: boolean;
 }>();
 
@@ -15,48 +17,224 @@ defineEmits<{
   (e: 'reject'): void;
 }>();
 
+type StaticTab = 'plan' | 'review';
+type PanelTab = StaticTab | `file:${string}`;
+
+const activeTab = ref<PanelTab>('plan');
+const openFileTabs = ref<string[]>([]);
+
+const changes = computed(() => props.changes ?? []);
 const doneCount = computed(() => props.plan?.tasks.filter(t => t.status === 'completed').length ?? 0);
 const totalCount = computed(() => props.plan?.tasks.length ?? 0);
+const totalAdded = computed(() => changes.value.reduce((sum, c) => sum + c.added, 0));
+const totalDeleted = computed(() => changes.value.reduce((sum, c) => sum + c.deleted, 0));
+
+const tabs = computed(() => {
+  const list: { id: PanelTab; label: string }[] = [];
+  if (props.plan) list.push({ id: 'plan', label: 'Plan' });
+  if (changes.value.length) list.push({ id: 'review', label: 'Review' });
+  for (const id of openFileTabs.value) {
+    const change = changes.value.find(c => c.id === id);
+    if (change) list.push({ id: `file:${id}`, label: shortPath(change.path) });
+  }
+  return list;
+});
+
+const activeChange = computed(() => {
+  if (!activeTab.value.startsWith('file:')) return null;
+  const id = activeTab.value.slice(5);
+  return changes.value.find(c => c.id === id) ?? null;
+});
+
+const activeDiffRows = computed(() => activeChange.value ? changeDiffRows(activeChange.value) : []);
+
+watch(
+  () => [props.plan?.id, changes.value.length] as const,
+  () => {
+    openFileTabs.value = openFileTabs.value.filter(id => changes.value.some(c => c.id === id));
+    if (tabs.value.some(tab => tab.id === activeTab.value)) return;
+    activeTab.value = props.plan ? 'plan' : 'review';
+  },
+  { immediate: true }
+);
+
+function openFile(change: WorkspaceChange) {
+  if (!openFileTabs.value.includes(change.id)) {
+    openFileTabs.value.push(change.id);
+  }
+  activeTab.value = `file:${change.id}`;
+}
+
+function closeFileTab(id: string) {
+  openFileTabs.value = openFileTabs.value.filter(x => x !== id);
+  if (activeTab.value === `file:${id}`) {
+    activeTab.value = changes.value.length ? 'review' : 'plan';
+  }
+}
+
+function shortPath(path: string): string {
+  const parts = path.split('/').filter(Boolean);
+  return parts[parts.length - 1] || path || 'File';
+}
+
+function compactReviewPath(path: string): string {
+  if (path.includes(' -> ')) {
+    return path
+      .split(' -> ')
+      .map(part => compactReviewPath(part))
+      .join(' -> ');
+  }
+  const normalized = path.replace(/\\/g, '/');
+  const parts = normalized.split('/').filter(Boolean);
+  if (parts.length <= 2) return normalized;
+  return `.../${parts.slice(-2).join('/')}`;
+}
 
 function statusLabel(status: string): string {
   if (status === 'completed') return 'Done';
   if (status === 'in_progress') return 'Doing';
   return 'To do';
 }
+
+function changeKindLabel(kind: WorkspaceChange['kind']): string {
+  if (kind === 'created') return 'Created';
+  if (kind === 'edited') return 'Edited';
+  if (kind === 'deleted') return 'Deleted';
+  if (kind === 'moved') return 'Moved';
+  return 'Changed';
+}
 </script>
 
 <template>
-  <aside class="plan-panel">
-    <header class="plan-panel-header">
-      <div class="plan-panel-heading">
-        <span class="plan-panel-title">{{ plan?.title || 'Plan' }}</span>
-        <span v-if="totalCount" class="plan-panel-count">{{ doneCount }} / {{ totalCount }}</span>
+  <aside class="workspace-panel">
+    <header class="workspace-panel-header">
+      <div class="panel-tabs" role="tablist" aria-label="Workspace panel">
+        <button
+          v-for="tab in tabs"
+          :key="tab.id"
+          type="button"
+          class="panel-tab"
+          :class="{ active: activeTab === tab.id }"
+          @click="activeTab = tab.id"
+        >
+          <span>{{ tab.label }}</span>
+          <span
+            v-if="tab.id.startsWith('file:')"
+            class="panel-tab-close"
+            title="Close file tab"
+            @click.stop="closeFileTab(tab.id.slice(5))"
+          >
+            x
+          </span>
+        </button>
       </div>
-      <button type="button" class="plan-panel-close" title="Hide plan panel" @click="$emit('close')">Close</button>
+      <button type="button" class="workspace-panel-close" title="Hide side panel" @click="$emit('close')">Close</button>
     </header>
 
-    <div class="plan-panel-body">
-      <div v-if="plan?.body" class="plan-panel-prose" v-html="renderMarkdown(plan.body)"></div>
+    <div class="workspace-panel-body">
+      <section v-if="activeTab === 'plan'" class="panel-section">
+        <div class="panel-section-heading">
+          <div>
+            <h2>{{ plan?.title || 'Plan' }}</h2>
+            <p v-if="totalCount">{{ doneCount }} / {{ totalCount }} completed</p>
+          </div>
+        </div>
 
-      <ul v-if="plan && plan.tasks.length" class="plan-tasks">
-        <li
-          v-for="(task, index) in plan.tasks"
-          :key="index"
-          class="plan-task"
-          :class="task.status"
-        >
-          <span class="plan-task-box" :class="task.status"></span>
-          <span class="plan-task-text">{{ task.text }}</span>
-          <span class="plan-task-status" :class="task.status">{{ statusLabel(task.status) }}</span>
-        </li>
-      </ul>
+        <div v-if="plan?.body" class="plan-panel-prose" v-html="renderMarkdown(plan.body)"></div>
 
-      <p v-else-if="!plan?.body" class="plan-panel-empty">
-        The assistant's plan will appear here once it drafts one.
-      </p>
+        <ul v-if="plan && plan.tasks.length" class="plan-tasks">
+          <li
+            v-for="(task, index) in plan.tasks"
+            :key="index"
+            class="plan-task"
+            :class="task.status"
+          >
+            <span class="plan-task-box" :class="task.status"></span>
+            <span class="plan-task-text">{{ task.text }}</span>
+            <span class="plan-task-status" :class="task.status">{{ statusLabel(task.status) }}</span>
+          </li>
+        </ul>
+
+        <p v-else-if="!plan?.body" class="panel-empty">
+          The assistant's plan will appear here once it drafts one.
+        </p>
+      </section>
+
+      <section v-else-if="activeTab === 'review'" class="panel-section">
+        <div class="panel-section-heading">
+          <div>
+            <h2>Review</h2>
+            <p>{{ changes.length }} changed {{ changes.length === 1 ? 'item' : 'items' }}</p>
+          </div>
+          <div v-if="changes.length" class="change-total">
+            <span class="add">+{{ totalAdded }}</span>
+            <span class="del">-{{ totalDeleted }}</span>
+          </div>
+        </div>
+
+        <div v-if="changes.length" class="change-list">
+          <button
+            v-for="change in changes"
+            :key="change.id"
+            type="button"
+            class="change-row"
+            @click="openFile(change)"
+          >
+            <span class="change-main">
+              <span class="change-path" :title="change.displayPath">{{ compactReviewPath(change.displayPath) }}</span>
+              <span class="change-kind">{{ changeKindLabel(change.kind) }}</span>
+            </span>
+            <span class="change-stats">
+              <span v-if="change.added" class="add">+{{ change.added }}</span>
+              <span v-if="change.deleted" class="del">-{{ change.deleted }}</span>
+            </span>
+          </button>
+        </div>
+
+        <p v-else class="panel-empty">
+          File changes will appear here after the assistant edits the workspace.
+        </p>
+      </section>
+
+      <section v-else-if="activeChange" class="panel-section file-section">
+        <div class="panel-section-heading file-heading">
+          <div>
+            <h2>{{ activeChange.path }}</h2>
+            <p>{{ changeKindLabel(activeChange.kind) }} by {{ activeChange.tool }}</p>
+          </div>
+          <div class="change-total">
+            <span v-if="activeChange.added" class="add">+{{ activeChange.added }}</span>
+            <span v-if="activeChange.deleted" class="del">-{{ activeChange.deleted }}</span>
+          </div>
+        </div>
+
+        <div v-if="activeChange.kind === 'moved'" class="rename-block">
+          <span>{{ activeChange.oldText }}</span>
+          <span>-></span>
+          <span>{{ activeChange.newText }}</span>
+        </div>
+
+        <div v-else-if="activeDiffRows.length" class="diff-view">
+          <div
+            v-for="(row, index) in activeDiffRows"
+            :key="index"
+            class="diff-row"
+            :class="row.type"
+          >
+            <span class="diff-line old">{{ row.oldNo ?? '' }}</span>
+            <span class="diff-line new">{{ row.newNo ?? '' }}</span>
+            <span class="diff-mark">{{ row.type === 'add' ? '+' : row.type === 'del' ? '-' : ' ' }}</span>
+            <code>{{ row.text || ' ' }}</code>
+          </div>
+        </div>
+
+        <p v-else class="panel-empty">
+          No inline diff is available for this change.
+        </p>
+      </section>
     </div>
 
-    <footer v-if="showActions && plan" class="plan-panel-actions">
+    <footer v-if="showActions && plan && activeTab === 'plan'" class="plan-panel-actions">
       <button type="button" class="plan-action start" @click="$emit('start')">Start building</button>
       <button type="button" class="plan-action" @click="$emit('revise')">Revise</button>
       <button type="button" class="plan-action reject" @click="$emit('reject')">Reject</button>
@@ -65,7 +243,7 @@ function statusLabel(status: string): string {
 </template>
 
 <style scoped>
-.plan-panel {
+.workspace-panel {
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -77,44 +255,77 @@ function statusLabel(status: string): string {
   overflow: hidden;
 }
 
-.plan-panel-header {
+.workspace-panel-header {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 14px 16px;
+  padding: 10px;
   border-bottom: 1px solid var(--border);
   flex: 0 0 auto;
 }
 
-.plan-panel-heading {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
+.panel-tabs {
   min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
 }
 
-.plan-panel-title {
-  font-size: 0.95rem;
-  font-weight: 650;
-  color: var(--text);
+.panel-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.panel-tab {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 150px;
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.panel-tab span:first-child {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.plan-panel-count {
-  flex: 0 0 auto;
-  font-variant-numeric: tabular-nums;
-  font-family: monospace;
-  font-size: 0.72rem;
-  color: var(--faint);
+.panel-tab:hover,
+.panel-tab.active {
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 1px 8px;
+  border-color: var(--border);
+  color: var(--text);
 }
 
-.plan-panel-close {
+.panel-tab-close {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--faint);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.panel-tab-close:hover {
+  background: var(--surface-strong);
+  color: var(--text);
+}
+
+.workspace-panel-close {
   margin-left: auto;
   flex: 0 0 auto;
   background: none;
@@ -126,16 +337,166 @@ function statusLabel(status: string): string {
   padding: 3px 9px;
 }
 
-.plan-panel-close:hover {
+.workspace-panel-close:hover {
   color: var(--text);
   background: var(--surface-strong);
 }
 
-.plan-panel-body {
+.workspace-panel-body {
   min-height: 0;
   flex: 1;
   overflow-y: auto;
   padding: 16px;
+}
+
+.panel-section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.panel-section-heading h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 650;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.panel-section-heading p {
+  margin: 4px 0 0;
+  font-size: 0.76rem;
+  color: var(--faint);
+}
+
+.change-total,
+.change-stats {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8rem;
+}
+
+.add {
+  color: #7bd88f;
+}
+
+.del {
+  color: #e06c75;
+}
+
+.change-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.change-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 10px;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.change-row:hover {
+  background: var(--surface);
+}
+
+.change-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.change-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.86rem;
+}
+
+.change-kind {
+  color: var(--faint);
+  font-size: 0.72rem;
+}
+
+.file-heading h2 {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.82rem;
+}
+
+.rename-block {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+}
+
+.rename-block span {
+  overflow-wrap: anywhere;
+}
+
+.diff-view {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.diff-row {
+  display: grid;
+  grid-template-columns: 42px 42px 18px minmax(0, 1fr);
+  min-height: 24px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.diff-row.add {
+  background: rgba(123, 216, 143, 0.12);
+}
+
+.diff-row.del {
+  background: rgba(224, 108, 117, 0.13);
+}
+
+.diff-line,
+.diff-mark {
+  color: var(--faint);
+  user-select: none;
+  text-align: right;
+  padding: 3px 6px;
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.diff-mark {
+  text-align: center;
+}
+
+.diff-row code {
+  min-width: 0;
+  display: block;
+  padding: 3px 8px;
+  color: var(--text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .plan-panel-prose {
@@ -236,7 +597,7 @@ function statusLabel(status: string): string {
   color: var(--faint);
 }
 
-.plan-panel-empty {
+.panel-empty {
   font-size: 0.85rem;
   color: var(--faint);
   line-height: 1.5;

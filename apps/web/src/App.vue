@@ -7,6 +7,7 @@ import AddProjectModal from './components/AddProjectModal.vue';
 import SettingsScreen from './components/settings/SettingsScreen.vue';
 import AgentTaskList from './components/AgentTaskList.vue';
 import PlanPanel from './components/PlanPanel.vue';
+import { collectWorkspaceChanges } from './lib/workspaceChanges';
 
 const {
   runs,
@@ -82,18 +83,18 @@ const currentTaskList = computed<string | null>(() => {
   return null;
 });
 
-// The plan side panel mirrors Codex / Claude desktop: it opens automatically as
-// soon as the assistant has created a plan (via the update_plan tool) for the
-// active run, and then stays open regardless of mode until the user closes it.
-// Switching modes (e.g. plan -> accept) never hides it; only the Close button
-// or the plan link in the thread toggle it.
-const planPanelCollapsed = ref(false);
-const planPanelOpen = computed(() =>
-  !!currentPlan.value && !planPanelCollapsed.value
+const workspaceChanges = computed(() => collectWorkspaceChanges(messages.value, activeRun.value?.projectPath));
+
+// The side panel mirrors Codex / Claude desktop: it opens automatically as soon
+// as the assistant creates a plan or edits workspace files. Closing it collapses
+// every panel tab until the user re-opens the plan link or switches chats.
+const sidePanelCollapsed = ref(false);
+const sidePanelOpen = computed(() =>
+  (!!currentPlan.value || workspaceChanges.value.length > 0) && !sidePanelCollapsed.value
 );
 
-// Reset the collapsed state when switching chats so each run's plan shows.
-watch(activeRunId, () => { planPanelCollapsed.value = false; });
+// Reset the collapsed state when switching chats so each run's panel shows.
+watch(activeRunId, () => { sidePanelCollapsed.value = false; });
 
 // --- Plan approval actions (Start / Revise / Reject) ----------------------
 // While in plan mode, the panel offers three choices once a plan is presented.
@@ -147,7 +148,7 @@ async function rejectPlan() {
 </script>
 
 <template>
-  <div class="app-shell" :class="{ 'sidebar-collapsed': isSidebarCollapsed, 'plan-open': planPanelOpen }">
+  <div class="app-shell" :class="{ 'sidebar-collapsed': isSidebarCollapsed, 'panel-open': sidePanelOpen }">
     <AppSidebar
       :project-options="projects.projectOptions.value"
       :active-project-path="projects.activeProjectPath.value"
@@ -196,8 +197,8 @@ async function rejectPlan() {
             :grouped-messages="groupedMessages"
             :is-running="isRunning"
             :plan="currentPlan"
-            :plan-panel-open="planPanelOpen"
-            @open-plan="planPanelCollapsed = false"
+            :plan-panel-open="sidePanelOpen"
+            @open-plan="sidePanelCollapsed = false"
           />
         </section>
 
@@ -264,10 +265,11 @@ async function rejectPlan() {
     </main>
 
     <PlanPanel
-      v-if="planPanelOpen"
+      v-if="sidePanelOpen"
       :plan="currentPlan"
+      :changes="workspaceChanges"
       :show-actions="showPlanActions"
-      @close="planPanelCollapsed = true"
+      @close="sidePanelCollapsed = true"
       @start="startPlan"
       @revise="revisePlan"
       @reject="rejectPlan"

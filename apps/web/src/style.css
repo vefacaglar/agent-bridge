@@ -88,11 +88,13 @@ pre {
   grid-template-columns: 0px minmax(0, 1fr);
 }
 
-.app-shell.plan-open {
+.app-shell.plan-open,
+.app-shell.panel-open {
   grid-template-columns: 360px minmax(0, 1fr) minmax(420px, 560px);
 }
 
-.app-shell.plan-open.sidebar-collapsed {
+.app-shell.plan-open.sidebar-collapsed,
+.app-shell.panel-open.sidebar-collapsed {
   grid-template-columns: 0px minmax(0, 1fr) minmax(420px, 560px);
 }
 
