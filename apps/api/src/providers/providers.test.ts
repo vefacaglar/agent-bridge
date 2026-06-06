@@ -169,7 +169,7 @@ test("Provider Registry and Model Providers Unit Tests", async (t) => {
           model: "my-model",
           messages: [{ role: "user", content: "test" }]
         }),
-        /Request to provider timed out after 60000ms/
+        /Request to provider timed out after 300000ms with no response data/
       );
     } finally {
       globalThis.setTimeout = originalSetTimeout;

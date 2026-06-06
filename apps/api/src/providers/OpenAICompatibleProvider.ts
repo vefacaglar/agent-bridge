@@ -1,6 +1,10 @@
 import type { CompletionRequest, CompletionResponse } from "@agent-bridge/shared";
 import type { ModelProvider } from "./ModelProvider.js";
 
+// Max time to wait with no response data before aborting. Reset on every chunk,
+// so a model that keeps streaming (e.g. long reasoning) is never cut off.
+const IDLE_TIMEOUT_MS = 300_000; // 5 minutes
+
 function parseOpenAIMessageContent(content: string): any {
   if (!content) return "";
   const regex = /!\[([^\]]*)\]\((data:image\/[a-zA-Z+.-]+;base64,[^)]+)\)/g;
@@ -83,10 +87,16 @@ export class OpenAICompatibleProvider implements ModelProvider {
       body.stream = true;
     }
 
+    // Idle (inactivity) timeout: the timer resets whenever data arrives, so a
+    // long-running model is never cut off mid-stream — only a genuine stall
+    // (no bytes for IDLE_TIMEOUT_MS) aborts the request.
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => {
-      controller.abort();
-    }, 60000); // 60s timeout
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const armTimeout = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => controller.abort(), IDLE_TIMEOUT_MS);
+    };
+    armTimeout();
 
     try {
       const response = await fetch(url, {
@@ -98,6 +108,7 @@ export class OpenAICompatibleProvider implements ModelProvider {
         body: JSON.stringify(body),
         signal: controller.signal
       });
+      armTimeout();
 
       if (!response.ok) {
         const errText = await response.text().catch(() => "Unknown error");
@@ -115,6 +126,7 @@ export class OpenAICompatibleProvider implements ModelProvider {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
+          armTimeout(); // data arrived — reset the inactivity timer
 
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split("\n");
@@ -226,7 +238,7 @@ export class OpenAICompatibleProvider implements ModelProvider {
       };
     } catch (error: any) {
       if (error.name === "AbortError" || error.message?.includes("aborted")) {
-        throw new Error("Request to provider timed out after 60000ms");
+        throw new Error(`Request to provider timed out after ${IDLE_TIMEOUT_MS}ms with no response data`);
       }
       throw new Error(`Failed to query OpenAI-compatible provider: ${error.message}`);
     } finally {

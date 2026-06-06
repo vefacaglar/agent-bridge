@@ -420,7 +420,7 @@ Handle clearly and save to the run record without losing prior messages:
 ```txt
 missing provider config        invalid/empty model response
 invalid API key                invalid model name
-provider timeout (60s)         network error
+provider timeout (idle 300s)   network error
 rate limit                     cancelled run
 permission denied
 ```

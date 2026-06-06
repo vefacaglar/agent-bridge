@@ -1,6 +1,10 @@
 import type { CompletionRequest, CompletionResponse, ChatMessage } from "@agent-bridge/shared";
 import type { ModelProvider } from "./ModelProvider.js";
 
+// Max time to wait for the (non-streamed) response before aborting. Generous so
+// long generations aren't cut off prematurely.
+const REQUEST_TIMEOUT_MS = 300_000; // 5 minutes
+
 /**
  * Converts OpenAI-style tool definitions into Anthropic's tool schema.
  * (function.parameters -> input_schema)
@@ -141,7 +145,7 @@ export class AnthropicProvider implements ModelProvider {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
       controller.abort();
-    }, 60000); // 60s timeout
+    }, REQUEST_TIMEOUT_MS);
 
     try {
       const response = await fetch(url, {
@@ -208,7 +212,7 @@ export class AnthropicProvider implements ModelProvider {
       };
     } catch (error: any) {
       if (error.name === "AbortError" || error.message?.includes("aborted")) {
-        throw new Error("Request to provider timed out after 60000ms");
+        throw new Error(`Request to provider timed out after ${REQUEST_TIMEOUT_MS}ms`);
       }
       throw new Error(`Failed to query Anthropic provider: ${error.message}`);
     } finally {
