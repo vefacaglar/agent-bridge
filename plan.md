@@ -1,8 +1,8 @@
-# Agent Bridge Plan
+# Locagens Plan
 
 ## 1. Project Summary
 
-Agent Bridge is a local-first AI orchestration tool that connects two AI models in one controlled workflow.
+Locagens is a local-first AI orchestration tool that connects two AI models in one controlled workflow.
 
 The main purpose is to remove the manual copy-paste bridge between different AI tools. One model acts as the planner, architect, or reviewer. The other model acts as the coder or implementation agent.
 
@@ -17,7 +17,7 @@ User Task
   -> Final Output
 ```
 
-Agent Bridge should not try to become a full autonomous coding agent in the MVP. The first milestone is a clean two-model orchestration system with a simple Vue interface, provider adapters, local configuration, run history, and live message streaming.
+Locagens should not try to become a full autonomous coding agent in the MVP. The first milestone is a clean two-model orchestration system with a simple Vue interface, provider adapters, local configuration, run history, and live message streaming.
 
 ---
 
@@ -39,7 +39,7 @@ Coder:
 
 The user should be able to see both models' messages in the same screen.
 
-Agent Bridge owns the message flow. The user should not manually copy messages from one model to another.
+Locagens owns the message flow. The user should not manually copy messages from one model to another.
 
 ---
 
@@ -236,7 +236,7 @@ raw provider secrets
 
 ## 8. Provider Adapter Pattern
 
-Different providers use different request/response formats. Agent Bridge should hide those differences behind adapters.
+Different providers use different request/response formats. Locagens should hide those differences behind adapters.
 
 The orchestrator should depend only on this interface:
 
@@ -307,7 +307,7 @@ apps/api/src/providers/
 
 ## 9. Agent Roles
 
-Agent Bridge has two main agent roles.
+Locagens has two main agent roles.
 
 ## Planner Agent
 
@@ -524,7 +524,7 @@ pending
 
 ## 15. Orchestrator Responsibilities
 
-The orchestrator is the core of Agent Bridge.
+The orchestrator is the core of Locagens.
 
 It should:
 
@@ -969,7 +969,7 @@ Multi-user mode
 
 ## 26. Design Principle
 
-Agent Bridge should stay focused.
+Locagens should stay focused.
 
 The first version should solve one problem well:
 

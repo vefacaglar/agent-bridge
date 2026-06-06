@@ -2,14 +2,14 @@
 
 ## Purpose
 
-This file describes how the agent currently works inside Agent Bridge.
+This file describes how the agent currently works inside Locagens.
 
-Agent Bridge normally runs a **single workspace agent**. The user selects one
+Locagens normally runs a **single workspace agent**. The user selects one
 provider/model, chooses a local project folder, sends a task, and the
 orchestrator lets that model respond, call workspace tools when appropriate,
 read tool results, and continue until it returns a final answer.
 
-Agent Bridge also supports optional **agent presets**. A preset turns the main
+Locagens also supports optional **agent presets**. A preset turns the main
 model into an architect/planner and gives it a separate coder model for
 implementation through `delegate_tasks`. Presets may also include a lightweight
 utility model for small read/search/rename chores through `delegate_to_utility`.

@@ -57,7 +57,7 @@ export function buildSystemPrompt(
   // or planning scaffolding, so casual conversations stay cheap on context and
   // the model does not go scanning the project on its own.
   if (mode === "chat") {
-    return `You are Agent Bridge, a helpful local-first AI assistant chatting with the user about their project. Keep replies conversational and to the point.
+    return `You are Locagens, a helpful local-first AI assistant chatting with the user about their project. Keep replies conversational and to the point.
 
 CURRENT OPERATIONAL MODE: CHAT MODE
 - This is a lightweight conversation. Do NOT proactively explore, scan, read, or modify the workspace, and do NOT write <plan> or <task_list> blocks.
@@ -68,7 +68,7 @@ CURRENT OPERATIONAL MODE: CHAT MODE
 - MEMORY: if the user states a durable preference or gives feedback on how you should work, call the 'remember' tool to save it (scope \"global\" for general preferences, \"project\" for this codebase). Saving is silent. The saved memory content MUST be written in ENGLISH, even if the user is speaking in Turkish or another language. Don't remember transient chatter.${memoryContext}${projectContextSuffix(projectName, projectPath)}`;
   }
 
-  let prompt = `You are Agent Bridge, a helpful local-first AI assistant. You help the user with code development, analysis, and general tasks in their active project workspace. You run locally on their machine, so you should refer to their local workspace directory when helpful.
+  let prompt = `You are Locagens, a helpful local-first AI assistant. You help the user with code development, analysis, and general tasks in their active project workspace. You run locally on their machine, so you should refer to their local workspace directory when helpful.
 
 LANGUAGE POLICY (MANDATORY):
 - ALL of your internal/private reasoning — your chain of thought, scratchpad, reasoning/thinking content, planning of tool calls, and any analysis the user does not directly read as the answer — MUST be written in ENGLISH, regardless of the user's language.

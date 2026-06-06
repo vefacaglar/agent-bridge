@@ -13,7 +13,7 @@ export const PERMISSION_OPTIONS: PermissionOption[] = [
   { decision: 'allow_once', label: 'Yes' },
   { decision: 'allow_project', label: "Yes, don't ask again in this project" },
   { decision: 'allow_always', label: 'Yes, allow always (global)' },
-  { decision: 'deny', label: 'No, tell Agent Bridge what to do differently', hint: 'esc' }
+  { decision: 'deny', label: 'No, tell Locagens what to do differently', hint: 'esc' }
 ];
 
 export function actionLabel(action?: string): string {

@@ -2,7 +2,7 @@
 
 ## Project
 
-Agent Bridge is a local-first AI orchestration tool. The user picks one provider
+Locagens is a local-first AI orchestration tool. The user picks one provider
 and model, gives it a task, and the assistant works inside a selected project
 folder on the local machine.
 
@@ -105,7 +105,7 @@ packages/
 
 providers.example.json         Template (committed)
 providers.local.json           Real credentials (git-ignored, never committed)
-agent-bridge.db                Local SQLite file (git-ignored)
+locagens.db                    Local SQLite file (git-ignored)
 ```
 
 ---

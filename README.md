@@ -1,6 +1,6 @@
-# Agent Bridge
+# Locagens
 
-Agent Bridge is a local-first workspace assistant for local projects.
+Locagens is a local-first workspace assistant for local projects.
 
 The user selects one provider/model, chooses a project folder, sends a task, and
 the backend orchestrator runs a tool-calling chat loop. The assistant can read,

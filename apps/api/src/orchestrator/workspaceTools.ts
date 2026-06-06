@@ -862,7 +862,7 @@ async function fetchUrl(rawUrl: string): Promise<string> {
       method: "GET",
       redirect: "follow",
       signal: controller.signal,
-      headers: { "User-Agent": "AgentBridge/1.0 (+local workspace assistant)" }
+      headers: { "User-Agent": "Locagens/1.0 (+local workspace assistant)" }
     });
     const contentType = response.headers.get("content-type") ?? "";
     const body = await response.text();
