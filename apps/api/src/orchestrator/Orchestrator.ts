@@ -4,8 +4,8 @@ import { RunRepository, MessageRepository, PlanRepository } from "../database/re
 import { ProviderRegistry } from "../providers/ProviderRegistry.js";
 import { eventBus } from "./eventBus.js";
 import { db } from "../database/db.js";
-import { buildSystemPrompt } from "./systemPrompt.js";
-import { WORKSPACE_TOOLS, UPDATE_PLAN_TOOL, executeWorkspaceToolAsync, buildPermissionPreview, DANGEROUS_TOOLS, permissionKey } from "./workspaceTools.js";
+import { buildSystemPrompt, buildCoderSystemPrompt } from "./systemPrompt.js";
+import { WORKSPACE_TOOLS, UPDATE_PLAN_TOOL, DELEGATE_TASKS_TOOL, executeWorkspaceToolAsync, buildPermissionPreview, DANGEROUS_TOOLS, READONLY_TOOLS, permissionKey } from "./workspaceTools.js";
 
 type PermissionDecision = "allow_once" | "allow_project" | "allow_always" | "deny";
 
@@ -19,6 +19,10 @@ export class Orchestrator {
     resolve: (decision: PermissionDecision) => void;
     toolCall: any;
   }>();
+  // Serializes concurrent permission prompts for the same run. Parallel coder
+  // sub-agents share one runId and the pending-permission slot is single, so
+  // their approval prompts must be shown one at a time, not overwrite each other.
+  private permissionChain = new Map<string, Promise<void>>();
 
   constructor(
     private runRepo: RunRepository,
@@ -69,16 +73,31 @@ export class Orchestrator {
   }
 
   private async requestPermission(runId: string, run: Run, toolCall: any): Promise<PermissionDecision> {
-    return new Promise((resolve) => {
-      this.pendingPermissions.set(runId, { resolve, toolCall });
-      this.emitStatus(runId, "awaiting_permission");
-      eventBus.emit(`run:${runId}`, {
-        type: "permission_requested",
-        runId,
-        toolCall,
-        preview: buildPermissionPreview(run, toolCall)
+    // Acquire the per-run permission lock so only one prompt is outstanding at a
+    // time (parallel sub-agents would otherwise clobber the single pending slot).
+    const prev = this.permissionChain.get(runId) ?? Promise.resolve();
+    let release!: () => void;
+    const gate = new Promise<void>((r) => { release = r; });
+    this.permissionChain.set(runId, prev.then(() => gate));
+    await prev;
+
+    try {
+      // If the run was cancelled while we waited in line, deny without prompting.
+      if (!this.activeRuns.has(runId)) return "deny";
+
+      return await new Promise<PermissionDecision>((resolve) => {
+        this.pendingPermissions.set(runId, { resolve, toolCall });
+        this.emitStatus(runId, "awaiting_permission");
+        eventBus.emit(`run:${runId}`, {
+          type: "permission_requested",
+          runId,
+          toolCall,
+          preview: buildPermissionPreview(run, toolCall)
+        });
       });
-    });
+    } finally {
+      release();
+    }
   }
 
   // --- Event helpers -------------------------------------------------------
@@ -226,10 +245,17 @@ export class Orchestrator {
     return chatMessages;
   }
 
+  /** Resolves how many coder sub-agents this run may launch (preset-bound, 1..3). */
+  private maxSubAgentsFor(run: Run): number {
+    const preset = run.agentPreset ? this.registry.getAgentPreset(run.agentPreset) : undefined;
+    return Math.min(3, Math.max(1, preset?.maxSubAgents ?? 3));
+  }
+
   /**
-   * Shared generation loop used by both fresh runs and continuations:
-   * calls the model, executes any tool calls (gated by permissions), and
-   * repeats until the model returns a final answer with no tool calls.
+   * Top-level run driver used by both fresh runs and continuations. Sets up the
+   * architect/main agent loop (advertising delegate_tasks when a coder model is
+   * configured), then finalizes run status. The generation loop itself lives in
+   * runAgentLoop, which is reused by coder sub-agents.
    */
   private async drive(
     runId: string,
@@ -237,123 +263,46 @@ export class Orchestrator {
     initialMessages: ChatMessage[],
     shouldReadProjectGuidance: boolean
   ): Promise<void> {
-    const checkCancelled = () => {
-      if (!this.activeRuns.has(runId)) {
-        throw new Error("ORCHESTRATION_CANCELLED");
-      }
-    };
-
     try {
-      const provider = this.registry.getProvider(run.providerId);
-      const currentMessages: ChatMessage[] = [...initialMessages];
-
       console.log(`[Orchestrator] Run ${runId} - Entering GENERATING state`);
       this.emitStatus(runId, "generating");
 
-      let completionDone = false;
-      while (!completionDone) {
-        checkCancelled();
+      // Dual-model: when a coder model is wired up, the main model is the
+      // architect — it gets the delegate_tasks tool and architect instructions.
+      // Delegation means implementation, so it is only offered in build-type
+      // modes — never in plan mode (planning only) or chat mode (lightweight).
+      const canDelegate = run.mode !== "plan" && run.mode !== "chat";
+      const delegation = (canDelegate && run.coderModel && run.coderProviderId)
+        ? { coderModel: run.coderModel, maxSubAgents: this.maxSubAgentsFor(run) }
+        : undefined;
 
-        const msgId = randomId("msg-res");
-        let accumulatedContent = "";
-        let accumulatedReasoning = "";
-        let hasCreatedMessage = false;
+      // Plan mode is planning-only: expose ONLY read-only tools plus update_plan,
+      // so the model literally cannot mutate the workspace or run commands there.
+      // Other modes get the full toolset (+ delegate_tasks when a coder is set).
+      const baseTools = run.mode === "plan"
+        ? [...WORKSPACE_TOOLS.filter(t => READONLY_TOOLS.has(t.function.name)), UPDATE_PLAN_TOOL]
+        : [...WORKSPACE_TOOLS];
+      const tools = delegation ? [...baseTools, DELEGATE_TASKS_TOOL] : baseTools;
 
-        // In plan mode the model maintains a structured plan via update_plan;
-        // other modes keep the lighter text-based <task_list> workflow.
-        const tools = run.mode === "plan" ? [...WORKSPACE_TOOLS, UPDATE_PLAN_TOOL] : WORKSPACE_TOOLS;
+      const systemPrompt = buildSystemPrompt(
+        run.projectName,
+        run.projectPath,
+        run.mode,
+        run.mode !== "chat" && shouldReadProjectGuidance,
+        delegation
+      );
 
-        const response = await provider.complete({
-          model: run.model,
-          systemPrompt: buildSystemPrompt(
-            run.projectName,
-            run.projectPath,
-            run.mode,
-            run.mode !== "chat" && shouldReadProjectGuidance
-          ),
-          messages: currentMessages,
-          tools
-        }, (chunk) => {
-          checkCancelled();
-          if (chunk.content) accumulatedContent += chunk.content;
-          if (chunk.reasoningContent) accumulatedReasoning += chunk.reasoningContent;
-
-          const assistantMsg: RunMessage = {
-            id: msgId,
-            runId,
-            role: "assistant",
-            providerId: run.providerId,
-            providerDisplayName: run.providerDisplayName,
-            model: run.model,
-            content: accumulatedContent,
-            reasoningContent: accumulatedReasoning || undefined,
-            createdAt: new Date().toISOString()
-          };
-
-          if (!hasCreatedMessage) {
-            this.emitMessage(runId, assistantMsg);
-            hasCreatedMessage = true;
-          } else {
-            this.updateMessage(runId, assistantMsg);
-          }
-        });
-
-        checkCancelled();
-
-        const finalMsg: RunMessage = {
-          id: msgId,
-          runId,
-          role: "assistant",
-          providerId: run.providerId,
-          providerDisplayName: run.providerDisplayName,
-          model: run.model,
-          content: response.content || (response.toolCalls ? "Calling workspace tools..." : ""),
-          reasoningContent: response.reasoningContent,
-          rawResponse: response.toolCalls ? JSON.stringify(response.toolCalls) : undefined,
-          createdAt: new Date().toISOString()
-        };
-
-        if (!hasCreatedMessage) {
-          this.emitMessage(runId, finalMsg);
-        } else {
-          this.updateMessage(runId, finalMsg);
-        }
-
-        if (response.toolCalls && response.toolCalls.length > 0) {
-          currentMessages.push({
-            role: "assistant",
-            content: response.content || "",
-            toolCalls: response.toolCalls
-          });
-
-          for (const tc of response.toolCalls) {
-            checkCancelled();
-            const result = await this.runToolCall(runId, run, tc);
-
-            const toolMsg: RunMessage = {
-              id: randomId("msg-tool"),
-              runId,
-              role: "tool",
-              content: result,
-              createdAt: new Date().toISOString()
-            };
-            this.emitMessage(runId, toolMsg);
-
-            currentMessages.push({
-              role: "tool",
-              content: result,
-              tool_call_id: tc.id,
-              name: tc.function.name
-            });
-          }
-        } else {
-          completionDone = true;
-        }
-      }
+      const finalText = await this.runAgentLoop(runId, run, [...initialMessages], {
+        providerId: run.providerId,
+        providerDisplayName: run.providerDisplayName,
+        model: run.model,
+        systemPrompt,
+        tools,
+        agentRole: delegation ? "planner" : undefined
+      });
 
       this.emitStatus(runId, "done");
-      const lastContent = currentMessages[currentMessages.length - 1]?.content || "";
-      eventBus.emit(`run:${runId}`, { type: "run_completed", finalOutput: lastContent });
+      eventBus.emit(`run:${runId}`, { type: "run_completed", finalOutput: finalText });
       console.log(`[Orchestrator] Run ${runId} - Completed successfully.`);
     } catch (error: any) {
       if (error.message === "ORCHESTRATION_CANCELLED") {
@@ -375,7 +324,207 @@ export class Orchestrator {
       }
     } finally {
       this.activeRuns.delete(runId);
+      this.permissionChain.delete(runId);
     }
+  }
+
+  /**
+   * Model-agnostic generation loop: calls the given model, streams + persists its
+   * messages (tagged with the supplied agentRole), executes any tool calls (gated
+   * by permissions), and repeats until the model returns a final answer with no
+   * tool calls. Used for the architect/main agent AND for each coder sub-agent.
+   * Returns the model's final text. Does not change run-level status — the caller
+   * owns generating/done/failed transitions.
+   */
+  private async runAgentLoop(
+    runId: string,
+    run: Run,
+    messages: ChatMessage[],
+    opts: {
+      providerId: string;
+      providerDisplayName: string;
+      model: string;
+      systemPrompt: string;
+      tools: any[];
+      agentRole?: RunMessage["agentRole"];
+    }
+  ): Promise<string> {
+    const checkCancelled = () => {
+      if (!this.activeRuns.has(runId)) {
+        throw new Error("ORCHESTRATION_CANCELLED");
+      }
+    };
+
+    const provider = this.registry.getProvider(opts.providerId);
+    const currentMessages = messages;
+    let lastText = "";
+
+    let completionDone = false;
+    while (!completionDone) {
+      checkCancelled();
+
+      const msgId = randomId("msg-res");
+      let accumulatedContent = "";
+      let accumulatedReasoning = "";
+      let hasCreatedMessage = false;
+
+      const response = await provider.complete({
+        model: opts.model,
+        systemPrompt: opts.systemPrompt,
+        messages: currentMessages,
+        tools: opts.tools
+      }, (chunk) => {
+        checkCancelled();
+        if (chunk.content) accumulatedContent += chunk.content;
+        if (chunk.reasoningContent) accumulatedReasoning += chunk.reasoningContent;
+
+        const assistantMsg: RunMessage = {
+          id: msgId,
+          runId,
+          role: "assistant",
+          agentRole: opts.agentRole,
+          providerId: opts.providerId,
+          providerDisplayName: opts.providerDisplayName,
+          model: opts.model,
+          content: accumulatedContent,
+          reasoningContent: accumulatedReasoning || undefined,
+          createdAt: new Date().toISOString()
+        };
+
+        if (!hasCreatedMessage) {
+          this.emitMessage(runId, assistantMsg);
+          hasCreatedMessage = true;
+        } else {
+          this.updateMessage(runId, assistantMsg);
+        }
+      });
+
+      checkCancelled();
+
+      const finalMsg: RunMessage = {
+        id: msgId,
+        runId,
+        role: "assistant",
+        agentRole: opts.agentRole,
+        providerId: opts.providerId,
+        providerDisplayName: opts.providerDisplayName,
+        model: opts.model,
+        content: response.content || (response.toolCalls ? "Calling workspace tools..." : ""),
+        reasoningContent: response.reasoningContent,
+        rawResponse: response.toolCalls ? JSON.stringify(response.toolCalls) : undefined,
+        createdAt: new Date().toISOString()
+      };
+
+      if (!hasCreatedMessage) {
+        this.emitMessage(runId, finalMsg);
+      } else {
+        this.updateMessage(runId, finalMsg);
+      }
+
+      if (response.content) lastText = response.content;
+
+      if (response.toolCalls && response.toolCalls.length > 0) {
+        currentMessages.push({
+          role: "assistant",
+          content: response.content || "",
+          toolCalls: response.toolCalls
+        });
+
+        for (const tc of response.toolCalls) {
+          checkCancelled();
+          const result = await this.runToolCall(runId, run, tc);
+
+          const toolMsg: RunMessage = {
+            id: randomId("msg-tool"),
+            runId,
+            role: "tool",
+            agentRole: opts.agentRole,
+            content: result,
+            createdAt: new Date().toISOString()
+          };
+          this.emitMessage(runId, toolMsg);
+
+          currentMessages.push({
+            role: "tool",
+            content: result,
+            tool_call_id: tc.id,
+            name: tc.function.name
+          });
+        }
+      } else {
+        completionDone = true;
+      }
+    }
+
+    return lastText;
+  }
+
+  /**
+   * Executes a delegate_tasks call from the architect: spins up 1..maxSubAgents
+   * coder sub-agents (each its own runAgentLoop on the coder model, in the same
+   * workspace) and returns their result summaries to the architect. Runs them in
+   * parallel only when the architect explicitly requested it; otherwise sequential.
+   */
+  private async executeDelegateTasks(runId: string, run: Run, toolCall: any): Promise<string> {
+    if (!run.coderModel || !run.coderProviderId) {
+      return JSON.stringify({ success: false, error: "No coder model is configured for this run, so tasks cannot be delegated." });
+    }
+    // Safety net: delegation is implementation, which is forbidden in plan/chat
+    // mode. The tool is normally not even advertised in those modes, but guard
+    // here too in case the model calls it from replayed history.
+    if (run.mode === "plan" || run.mode === "chat") {
+      return JSON.stringify({ success: false, error: `Cannot delegate tasks in ${run.mode} mode. Switch to Build mode to implement.` });
+    }
+
+    let args: any;
+    try {
+      args = JSON.parse(toolCall.function.arguments || "{}");
+    } catch (e: any) {
+      return JSON.stringify({ success: false, error: `Invalid delegate_tasks arguments: ${e.message}` });
+    }
+
+    const limit = this.maxSubAgentsFor(run);
+    const rawTasks = Array.isArray(args.tasks) ? args.tasks : [];
+    const tasks = rawTasks
+      .filter((t: any) => t && typeof t.instructions === "string" && t.instructions.trim())
+      .slice(0, limit)
+      .map((t: any, i: number) => ({
+        title: typeof t.title === "string" && t.title.trim() ? t.title.trim() : `Subtask ${i + 1}`,
+        instructions: String(t.instructions)
+      }));
+
+    if (tasks.length === 0) {
+      return JSON.stringify({ success: false, error: "No valid tasks to delegate (each task needs non-empty instructions)." });
+    }
+
+    const coderMeta = this.registry.getSafeMetadata().find(p => p.id === run.coderProviderId);
+    const coderDisplayName = coderMeta ? coderMeta.displayName : run.coderProviderId;
+    const parallel = !!args.parallel && tasks.length > 1;
+
+    const runOne = async (task: { title: string; instructions: string }) => {
+      const systemPrompt = buildCoderSystemPrompt(run.projectName, run.projectPath, task.title);
+      const summary = await this.runAgentLoop(runId, run, [{ role: "user", content: task.instructions }], {
+        providerId: run.coderProviderId!,
+        providerDisplayName: coderDisplayName,
+        model: run.coderModel!,
+        systemPrompt,
+        tools: [...WORKSPACE_TOOLS],
+        agentRole: "coder"
+      });
+      return { title: task.title, summary: summary || "(no summary returned)" };
+    };
+
+    let results: { title: string; summary: string }[];
+    if (parallel) {
+      results = await Promise.all(tasks.map(runOne));
+    } else {
+      results = [];
+      for (const task of tasks) {
+        results.push(await runOne(task));
+      }
+    }
+
+    return JSON.stringify({ success: true, parallel, results });
   }
 
   /**
@@ -388,6 +537,23 @@ export class Orchestrator {
     // effects), so it runs silently without any permission prompt.
     if (toolCall.function?.name === "update_plan") {
       return this.executePlanUpdate(runId, toolCall);
+    }
+
+    // delegate_tasks fans out to coder sub-agents; the orchestrator runs their
+    // loops itself (the sub-agents' own tool calls are gated normally).
+    if (toolCall.function?.name === "delegate_tasks") {
+      return this.executeDelegateTasks(runId, run, toolCall);
+    }
+
+    // HARD RULE: plan mode is read-only. No file mutation, no run_command, no
+    // fetch_url — even if the user approves. The model must switch to Build mode
+    // before anything changes. We block here regardless of any permission grant.
+    const toolName = toolCall.function?.name;
+    if (run.mode === "plan" && !READONLY_TOOLS.has(toolName)) {
+      return JSON.stringify({
+        success: false,
+        error: `Blocked: "${toolName}" is not allowed in Plan mode. Plan mode makes NO changes and runs NO commands. Ask the user to switch to Build mode to implement.`
+      });
     }
 
     const isDangerous = DANGEROUS_TOOLS.has(toolCall.function?.name);

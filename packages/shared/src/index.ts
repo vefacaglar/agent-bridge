@@ -75,9 +75,33 @@ export interface Run {
   providerDisplayName: string;
   model: string;
   mode?: string;
+  // Dual-model ("architect + coder") runs: the architect uses providerId/model
+  // above and delegates code-writing to the coder model below via delegate_tasks.
+  // All three are empty for ordinary single-model runs.
+  coderProviderId?: string;
+  coderModel?: string;
+  agentPreset?: string;
   errorMessage?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+// One end of a dual-model agent preset: which provider + model to use.
+export interface AgentPresetEndpoint {
+  providerId: string;
+  model: string;
+}
+
+// A saved "architect + coder" pairing (e.g. "opusplan"). Stored server-side in
+// providers.local.json and selectable, optionally, next to the model picker.
+// The architect plans/coordinates and delegates code-writing to 1..maxSubAgents
+// instances of the coder model via the delegate_tasks tool.
+export interface AgentPreset {
+  id: string;
+  displayName: string;
+  architect: AgentPresetEndpoint;
+  coder: AgentPresetEndpoint;
+  maxSubAgents: number;
 }
 
 export type RunEvent =

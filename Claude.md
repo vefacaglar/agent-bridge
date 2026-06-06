@@ -141,6 +141,12 @@ id, displayName, type, models
 
 Never expose `apiKey`, authorization headers, or raw secrets to the browser.
 
+Optionally, `providers.local.json` may also define an `agentPresets` block: named
+dual-model pairings (an **architect** model + a **coder** model + `maxSubAgents`).
+`GET /api/agent-presets` returns this as safe metadata (only provider ids + model
+names, already public). `PUT /api/agent-presets` saves the full set back via
+`ProviderRegistry.saveAgentPresets`. See "Dual-Model Agent Presets" below.
+
 ---
 
 ## Provider Adapter Rules
@@ -310,6 +316,46 @@ loaded on run select via `GET /api/runs/:id/plan`.
 
 ---
 
+## Dual-Model Agent Presets (`delegate_tasks`)
+
+A run can optionally use **two models**: an **architect** (the run's normal
+`providerId`/`model`) that plans and coordinates, and a **coder** (the run's
+`coderProviderId`/`coderModel`) that does the actual code-writing as 1–3 sub-agents.
+This pairing is a named **preset** ("opusplan"-style) defined server-side in
+`providers.local.json` under `agentPresets` and selectable, optionally, next to
+the model picker in the composer (`useComposerSettings.selectedPresetId`). When no
+preset is selected the run is plain single-model and behaves exactly as before.
+
+When (and only when) a coder model is configured, the architect loop is given an
+extra `delegate_tasks` tool:
+
+```txt
+delegate_tasks(tasks[{ title, instructions, files? }], parallel?)
+```
+
+The architect writes self-contained `instructions` per sub-task (the coder does
+NOT see the conversation) and decides concurrency: `parallel: true` only when the
+tasks touch disjoint files, otherwise they run sequentially. The orchestrator caps
+the list at the preset's `maxSubAgents` (1–3) and runs each sub-task through the
+SAME generation loop (`runAgentLoop`) on the coder model, in the same workspace,
+tagging those messages `agentRole: "coder"`. Each sub-agent's final text is
+returned to the architect as the tool result.
+
+Implementation notes:
+- `Orchestrator.drive()` sets up the architect loop (adding `DELEGATE_TASKS_TOOL`
+  and architect instructions when a coder is configured); `runAgentLoop` is the
+  shared, model-agnostic loop used by both the architect and every coder sub-agent.
+- Coder sub-agents get `WORKSPACE_TOOLS` only — never `delegate_tasks` or
+  `update_plan` — so delegation depth is hard-capped at 1 (no recursion).
+- Sub-agents share the run's `runId`, so cancellation and the permission flow just
+  work; because parallel sub-agents share the single pending-permission slot, their
+  approval prompts are serialized via `permissionChain` (one prompt at a time).
+- Coder prompt is `buildCoderSystemPrompt`; the web UI badges coder messages
+  (`MessageThread.vue`, `ToolGroup.vue`). Presets are managed in Settings →
+  Agents (`AgentPresetsTab.vue`).
+
+---
+
 ## Run States
 
 Use explicit run states (`RunStatus` in shared):
@@ -331,7 +377,8 @@ export type RunStatus =
 SQLite via `node:sqlite`. Tables (created/migrated in `db.ts`):
 
 ```txt
-runs         id, title, task, project_path/name, status, provider, model, mode, ...
+runs         id, title, task, project_path/name, status, provider, model, mode,
+             coder_provider_id?, coder_model?, agent_preset?, ...
 messages     id, run_id, role, agent_role?, provider/model?, content, raw_response?, ...
 projects     path (pk), name, created_at
 permissions  scope, project_path, tool, command, status; UNIQUE(scope, project_path, tool, command)

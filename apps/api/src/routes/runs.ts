@@ -10,13 +10,16 @@ type PermissionDecision = (typeof PERMISSION_DECISIONS)[number];
 export function registerRunRoutes(server: FastifyInstance, ctx: AppContext) {
   // Create and trigger a new orchestration run.
   server.post("/api/runs", async (request, reply) => {
-    const { task, projectPath, projectName, providerId, model, mode } = request.body as {
+    const { task, projectPath, projectName, providerId, model, mode, coderProviderId, coderModel, agentPreset } = request.body as {
       task: string;
       projectPath?: string;
       projectName?: string;
       providerId: string;
       model: string;
       mode?: string;
+      coderProviderId?: string;
+      coderModel?: string;
+      agentPreset?: string;
     };
 
     if (!task || !providerId || !model) {
@@ -41,6 +44,9 @@ export function registerRunRoutes(server: FastifyInstance, ctx: AppContext) {
       providerDisplayName,
       model,
       mode: mode || "accept_edits",
+      coderProviderId: coderProviderId || undefined,
+      coderModel: coderModel || undefined,
+      agentPreset: agentPreset || undefined,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -73,11 +79,14 @@ export function registerRunRoutes(server: FastifyInstance, ctx: AppContext) {
   // Continue a run with follow-up instructions in the same thread.
   server.post("/api/runs/:id/continue", async (request, reply) => {
     const { id } = request.params as { id: string };
-    const { task, providerId, model, mode } = request.body as {
+    const { task, providerId, model, mode, coderProviderId, coderModel, agentPreset } = request.body as {
       task: string;
       providerId?: string;
       model?: string;
       mode?: string;
+      coderProviderId?: string;
+      coderModel?: string;
+      agentPreset?: string;
     };
 
     if (!task || !task.trim()) {
@@ -101,6 +110,14 @@ export function registerRunRoutes(server: FastifyInstance, ctx: AppContext) {
     }
     if (mode) {
       updates.mode = mode;
+    }
+    // Allow switching the agent preset (or back to single model) mid-conversation.
+    // The web client always sends the current selection, so reflect it verbatim.
+    const body = request.body as Record<string, unknown>;
+    if ("agentPreset" in body || "coderModel" in body) {
+      updates.agentPreset = agentPreset || undefined;
+      updates.coderProviderId = coderProviderId || undefined;
+      updates.coderModel = coderModel || undefined;
     }
     if (Object.keys(updates).length > 0) {
       ctx.runRepo.update(id, updates);

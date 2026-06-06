@@ -1,5 +1,6 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import type { ProviderMetadata, Run } from '@agent-bridge/shared';
+import type { ProviderMetadata, Run, AgentPreset } from '@agent-bridge/shared';
+import { api } from '../api/client';
 import { useChatAutoScroll } from './useChatAutoScroll';
 import { useChatSession } from './useChatSession';
 import { useComposerSettings } from './useComposerSettings';
@@ -8,16 +9,23 @@ import { usePermissions } from './usePermissions';
 
 export function useAppShell() {
   const providers = ref<ProviderMetadata[]>([]);
+  const agentPresets = ref<AgentPreset[]>([]);
   const runs = ref<Run[]>([]);
   const messagesContainer = ref<HTMLElement | null>(null);
 
-  const settings = useComposerSettings(providers);
+  const settings = useComposerSettings(providers, agentPresets);
+
+  async function loadAgentPresets() {
+    agentPresets.value = (await api.getAgentPresets()) ?? [];
+  }
   const projects = useProjects(runs);
   const permissions = usePermissions();
   const chat = useChatSession({
     providers,
     runs,
     selectedModelCombined: settings.selectedModelCombined,
+    effectiveModel: settings.effectiveModel,
+    agentRunFields: settings.agentRunFields,
     currentMode: settings.currentMode,
     bypassPermissions: settings.bypassPermissions,
     activeProject: projects.activeProject,
@@ -56,6 +64,7 @@ export function useAppShell() {
 
   async function initialize() {
     await chat.loadProviders();
+    await loadAgentPresets();
     settings.ensureDefaultModel();
     await projects.loadProjects();
     await chat.loadRuns();
@@ -72,6 +81,8 @@ export function useAppShell() {
 
   return {
     runs,
+    agentPresets,
+    loadAgentPresets,
     setMessagesContainer,
     settings,
     projects,

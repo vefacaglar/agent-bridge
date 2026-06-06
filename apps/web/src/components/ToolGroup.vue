@@ -8,7 +8,11 @@ const props = defineProps<{
   thought?: string;
   toolCalls: any[];
   toolResponses: RunMessage[];
+  agentRole?: RunMessage['agentRole'];
+  model?: string;
 }>();
+
+const isCoder = computed(() => props.agentRole === 'coder');
 
 const emit = defineEmits<{
   (e: 'open-plan'): void;
@@ -106,6 +110,12 @@ function getToolLabel(name: string, args: string): string {
       return `Searched: ${parsed.query ?? ''}`;
     case 'run_command':
       return `Command: ${parsed.command ?? ''}`;
+    case 'fetch_url':
+      return `Fetched: ${parsed.url ?? ''}`;
+    case 'delegate_tasks': {
+      const count = Array.isArray(parsed.tasks) ? parsed.tasks.length : 0;
+      return `Delegated ${count} task${count === 1 ? '' : 's'} to coder${parsed.parallel ? ' (parallel)' : ''}`;
+    }
     default:
       return `Tool ${name} executed`;
   }
@@ -235,11 +245,17 @@ function formatToolResult(name: string, contentJson: string): string {
 </script>
 
 <template>
-  <div class="tool-group-wrap">
+  <div class="tool-group-wrap" :class="{ 'coder-tool-group': isCoder }">
+    <!-- Coder sub-agent label -->
+    <div v-if="isCoder" class="coder-tool-meta">
+      <span class="agent-badge coder-badge">Coder</span>
+      <span v-if="model" class="coder-tool-model">{{ model }}</span>
+    </div>
+
     <!-- Thought Step -->
-    <div 
-      v-if="cleanedThought" 
-      class="tool-thought-body markdown-body" 
+    <div
+      v-if="cleanedThought"
+      class="tool-thought-body markdown-body"
       v-html="renderMarkdown(cleanedThought)"
     ></div>
 
@@ -424,6 +440,38 @@ function formatToolResult(name: string, contentJson: string): string {
 .tool-group-wrap {
   margin: 14px 0;
   width: 100%;
+}
+
+/* Coder sub-agent tool group: subtle left accent matching coder messages. */
+.tool-group-wrap.coder-tool-group {
+  border-left: 2px solid var(--border);
+  padding-left: 14px;
+  margin-left: 2px;
+}
+
+.coder-tool-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.coder-tool-meta .agent-badge.coder-badge {
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text);
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 1px 6px;
+}
+
+.coder-tool-model {
+  font-size: 0.72rem;
+  color: var(--faint);
+  font-family: monospace;
 }
 
 .tool-thought-body {

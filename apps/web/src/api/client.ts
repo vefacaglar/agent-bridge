@@ -1,10 +1,18 @@
-import type { ProviderMetadata, Run, RunMessage, Project, PermissionRule, Plan } from '@agent-bridge/shared';
+import type { ProviderMetadata, Run, RunMessage, Project, PermissionRule, Plan, AgentPreset } from '@agent-bridge/shared';
 
 export const API_BASE = 'http://localhost:3000';
 
 export type PermissionDecision = 'allow_once' | 'allow_project' | 'allow_always' | 'deny';
 
-export interface CreateRunPayload {
+// Optional dual-model fields: when an agent preset is active the architect uses
+// providerId/model and delegates code-writing to the coder model below.
+export interface AgentRunFields {
+  coderProviderId?: string;
+  coderModel?: string;
+  agentPreset?: string;
+}
+
+export interface CreateRunPayload extends AgentRunFields {
   task: string;
   projectPath?: string;
   projectName?: string;
@@ -14,7 +22,7 @@ export interface CreateRunPayload {
   bypassPermissions: boolean;
 }
 
-export interface ContinueRunPayload {
+export interface ContinueRunPayload extends AgentRunFields {
   task: string;
   providerId: string;
   model: string;
@@ -36,6 +44,15 @@ async function getJson<T>(path: string): Promise<T | null> {
 
 export const api = {
   getProviders: () => getJson<ProviderMetadata[]>('/api/providers'),
+  getAgentPresets: () => getJson<AgentPreset[]>('/api/agent-presets'),
+  async saveAgentPresets(presets: Record<string, any>): Promise<void> {
+    const response = await fetch(`${API_BASE}/api/agent-presets`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(presets)
+    });
+    if (!response.ok) throw new Error(await errorMessage(response, 'Failed to save agent presets.'));
+  },
   getProvidersConfig: () => getJson<Record<string, any>>('/api/providers/config'),
   async saveProvidersConfig(configs: Record<string, any>): Promise<void> {
     const response = await fetch(`${API_BASE}/api/providers/config`, {

@@ -6,6 +6,7 @@ const { showAlert } = useCustomDialog();
 import type { PermissionDecision } from '../api/client';
 import type { MessageGroup } from '../lib/messageGroups';
 import { MODES_LIST, type ChatMode, type ModelOption } from '../composables/useComposerSettings';
+import type { AgentPreset } from '@agent-bridge/shared';
 import ConfirmationCard from './ConfirmationCard.vue';
 import PermissionCard from './PermissionCard.vue';
 
@@ -17,6 +18,8 @@ const props = defineProps<{
   selectedModel: string;
   modelOptions: ModelOption[];
   activeModelDisplayName: string;
+  agentPresets?: AgentPreset[];
+  selectedPresetId?: string;
   focusSignal: number;
   confirmationGroup: MessageGroup | null;
   showPermission: boolean;
@@ -32,6 +35,7 @@ const emit = defineEmits<{
   (e: 'update:currentMode', value: ChatMode): void;
   (e: 'update:bypassPermissions', value: boolean): void;
   (e: 'update:selectedModel', value: string): void;
+  (e: 'update:selectedPresetId', value: string): void;
   (e: 'send'): void;
   (e: 'cancel'): void;
   (e: 'quick-reply', option: string): void;
@@ -186,6 +190,20 @@ function selectModel(value: string) {
   showModelMenu.value = false;
 }
 
+// Optional dual-model agent presets (architect + coder). Only shown when at
+// least one preset is configured. '' = single model (default).
+const showPresetMenu = ref(false);
+const hasPresets = computed(() => (props.agentPresets?.length ?? 0) > 0);
+const activePresetLabel = computed(() => {
+  const p = props.agentPresets?.find(x => x.id === props.selectedPresetId);
+  return p ? p.displayName : 'Single model';
+});
+
+function selectPreset(value: string) {
+  emit('update:selectedPresetId', value);
+  showPresetMenu.value = false;
+}
+
 const showProjectMenu = ref(false);
 
 const activeProjectName = computed(() => {
@@ -226,6 +244,7 @@ function handleDocumentClick(e: MouseEvent) {
   const target = e.target as HTMLElement;
   if (!target.closest('.mode-selector-wrap')) showModeMenu.value = false;
   if (!target.closest('.model-dropdown-wrap')) showModelMenu.value = false;
+  if (!target.closest('.preset-dropdown-wrap')) showPresetMenu.value = false;
   if (!target.closest('.project-dropdown-wrap')) showProjectMenu.value = false;
 }
 
@@ -405,11 +424,48 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="composer-status-section">
-          <div class="model-dropdown-wrap">
-            <button class="model-select-display-btn" @click.stop="showModelMenu = !showModelMenu">
-              {{ activeModelDisplayName }}
+          <!-- Optional dual-model agent preset selector (next to the model picker). -->
+          <div v-if="hasPresets" class="preset-dropdown-wrap model-dropdown-wrap">
+            <button
+              class="model-select-display-btn preset-select-btn"
+              :class="{ 'preset-active': !!selectedPresetId }"
+              @click.stop="showPresetMenu = !showPresetMenu"
+            >
+              {{ activePresetLabel }}
             </button>
-            <div v-if="showModelMenu" class="model-dropdown-list">
+            <div v-if="showPresetMenu" class="model-dropdown-list preset-dropdown-list">
+              <div
+                class="model-dropdown-item"
+                :class="{ active: !selectedPresetId }"
+                @click.stop="selectPreset('')"
+              >
+                <span class="model-name-text">Single model</span>
+              </div>
+              <div
+                v-for="preset in agentPresets"
+                :key="preset.id"
+                class="model-dropdown-item"
+                :class="{ active: selectedPresetId === preset.id }"
+                @click.stop="selectPreset(preset.id)"
+              >
+                <span class="model-name-text">{{ preset.displayName }}</span>
+                <span class="preset-sub">{{ preset.architect.model }} → {{ preset.coder.model }}</span>
+              </div>
+            </div>
+          </div>
+
+          <span v-if="hasPresets" class="status-divider">/</span>
+
+          <div class="model-dropdown-wrap">
+            <button
+              class="model-select-display-btn"
+              :disabled="!!selectedPresetId"
+              :title="selectedPresetId ? 'Architect model is set by the selected agent preset' : ''"
+              @click.stop="showModelMenu = !showModelMenu"
+            >
+              {{ selectedPresetId ? 'Architect: preset' : activeModelDisplayName }}
+            </button>
+            <div v-if="showModelMenu && !selectedPresetId" class="model-dropdown-list">
               <div
                 v-for="option in modelOptions"
                 :key="option.value"
@@ -737,6 +793,31 @@ onBeforeUnmount(() => {
 .model-select-display-btn:hover {
   color: var(--text);
   background: rgba(255, 255, 255, 0.05);
+}
+
+.model-select-display-btn:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.model-select-display-btn:disabled:hover {
+  background: transparent;
+  color: var(--muted);
+}
+
+/* Dual-model preset selector: emphasize when a preset (not single model) is on. */
+.preset-select-btn.preset-active {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+  font-weight: 600;
+}
+
+.model-dropdown-item .preset-sub {
+  margin-left: auto;
+  padding-left: 12px;
+  font-size: 0.72rem;
+  color: var(--faint);
+  white-space: nowrap;
 }
 
 .model-dropdown-list {

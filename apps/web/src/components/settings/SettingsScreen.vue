@@ -3,6 +3,7 @@ import { onBeforeUnmount, onMounted, ref } from 'vue';
 import type { PermissionRule, ProviderMetadata } from '@agent-bridge/shared';
 import PermissionsTab from './PermissionsTab.vue';
 import ProvidersTab from './ProvidersTab.vue';
+import AgentPresetsTab from './AgentPresetsTab.vue';
 
 const props = defineProps<{
   show: boolean;
@@ -15,11 +16,13 @@ const emit = defineEmits<{
   (e: 'close'): void;
   (e: 'revoke', id: number): void;
   (e: 'clear-all'): void;
+  (e: 'presets-saved'): void;
 }>();
 
 const TABS = [
   { id: 'permissions', label: 'Permissions' },
-  { id: 'providers', label: 'Providers' }
+  { id: 'providers', label: 'Providers' },
+  { id: 'agents', label: 'Agents' }
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
 
@@ -76,6 +79,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
                 @clear-all="emit('clear-all')"
               />
               <ProvidersTab v-else-if="activeTab === 'providers'" :providers="providers" />
+              <AgentPresetsTab
+                v-else-if="activeTab === 'agents'"
+                :providers="providers"
+                @saved="emit('presets-saved')"
+              />
             </div>
           </section>
         </main>

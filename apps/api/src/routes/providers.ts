@@ -82,6 +82,29 @@ export function registerProviderRoutes(server: FastifyInstance, ctx: AppContext)
     }
   });
 
+  // Dual-model agent presets (architect + coder). Safe metadata only — presets
+  // reference provider ids + model names, which are already public.
+  server.get("/api/agent-presets", async () => {
+    ctx.registry.reload();
+    return ctx.registry.getAgentPresets();
+  });
+
+  // Save the full agent-preset set. Body is a map keyed by preset id.
+  server.put("/api/agent-presets", async (request, reply) => {
+    const presets = request.body as Record<string, any>;
+    if (!presets || typeof presets !== "object") {
+      reply.status(400);
+      return { error: "Invalid agent preset object." };
+    }
+    try {
+      ctx.registry.saveAgentPresets(presets);
+      return { success: true };
+    } catch (err: any) {
+      reply.status(500);
+      return { error: `Failed to save agent presets: ${err.message}` };
+    }
+  });
+
   // Fetch available models from provider dynamically.
   server.post("/api/providers/fetch-models", async (request, reply) => {
     const { type, baseUrl, apiKey, providerId } = request.body as {

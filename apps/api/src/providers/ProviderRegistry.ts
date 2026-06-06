@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import type { ProviderMetadata } from "@agent-bridge/shared";
+import type { ProviderMetadata, AgentPreset } from "@agent-bridge/shared";
 import type { ModelProvider } from "./ModelProvider.js";
 import { ProviderFactory } from "./ProviderFactory.js";
 
@@ -12,12 +12,21 @@ interface ProviderConfigBlock {
   models: string[];
 }
 
+interface AgentPresetBlock {
+  displayName: string;
+  architect: { providerId: string; model: string };
+  coder: { providerId: string; model: string };
+  maxSubAgents?: number;
+}
+
 interface ConfigSchema {
   providers: Record<string, ProviderConfigBlock>;
+  agentPresets?: Record<string, AgentPresetBlock>;
 }
 
 export class ProviderRegistry {
   private configs: Record<string, ProviderConfigBlock> = {};
+  private agentPresets: Record<string, AgentPresetBlock> = {};
   private providers: Map<string, ModelProvider> = new Map();
 
   constructor(configPathOverride?: string) {
@@ -60,6 +69,7 @@ export class ProviderRegistry {
       if (parsed && parsed.providers) {
         this.configs = parsed.providers;
       }
+      this.agentPresets = (parsed && parsed.agentPresets) || {};
     } catch (err: any) {
       console.error(`[ProviderRegistry] Failed to parse configuration file at ${configPath}:`, err.message);
     }
@@ -72,6 +82,31 @@ export class ProviderRegistry {
       type: block.type,
       models: block.models
     }));
+  }
+
+  /**
+   * Safe metadata for the configured dual-model agent presets. Presets only
+   * reference provider ids + model names (already public), so no secrets leak.
+   * maxSubAgents is clamped to 1..3.
+   */
+  getAgentPresets(): AgentPreset[] {
+    return Object.entries(this.agentPresets).map(([id, block]) => ({
+      id,
+      displayName: block.displayName || id,
+      architect: { providerId: block.architect.providerId, model: block.architect.model },
+      coder: { providerId: block.coder.providerId, model: block.coder.model },
+      maxSubAgents: Math.min(3, Math.max(1, block.maxSubAgents ?? 3))
+    }));
+  }
+
+  getAgentPreset(id: string): AgentPreset | undefined {
+    return this.getAgentPresets().find(p => p.id === id);
+  }
+
+  /** Persists the full agent-preset set to providers.local.json (keeps providers intact). */
+  saveAgentPresets(presets: Record<string, AgentPresetBlock>) {
+    this.agentPresets = presets;
+    this.persist();
   }
 
   getProvider(id: string): ModelProvider {
@@ -94,11 +129,20 @@ export class ProviderRegistry {
   }
 
   saveConfigs(configs: Record<string, ProviderConfigBlock>) {
-    const wsRoot = this.findWorkspaceRoot();
-    const localPath = path.join(wsRoot, "providers.local.json");
-    fs.writeFileSync(localPath, JSON.stringify({ providers: configs }, null, 2), "utf-8");
     this.configs = configs;
     this.providers.clear();
+    this.persist();
+  }
+
+  /** Writes the current providers + agentPresets back to providers.local.json. */
+  private persist() {
+    const wsRoot = this.findWorkspaceRoot();
+    const localPath = path.join(wsRoot, "providers.local.json");
+    const payload: ConfigSchema = { providers: this.configs };
+    if (Object.keys(this.agentPresets).length > 0) {
+      payload.agentPresets = this.agentPresets;
+    }
+    fs.writeFileSync(localPath, JSON.stringify(payload, null, 2), "utf-8");
   }
 
   // Reload config for testing purposes

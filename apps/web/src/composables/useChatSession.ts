@@ -1,7 +1,7 @@
 import { computed, ref, type ComputedRef, type Ref } from 'vue';
 import type { ProviderMetadata, Run, RunMessage, RunStatus, Plan } from '@agent-bridge/shared';
 import { api, type PermissionDecision } from '../api/client';
-import { ACTIVE_STATUSES, splitCombined } from '../lib/format';
+import { ACTIVE_STATUSES } from '../lib/format';
 import { groupMessages, type MessageGroup } from '../lib/messageGroups';
 import { getConfirmationOptions } from '../lib/confirmation';
 import { useCustomDialog } from './useCustomDialog';
@@ -10,6 +10,10 @@ interface ChatSessionOptions {
   providers: Ref<ProviderMetadata[]>;
   runs: Ref<Run[]>;
   selectedModelCombined: Ref<string>;
+  // The effective main/architect model (preset architect or single-model pick)
+  // and the optional dual-model fields, both derived in useComposerSettings.
+  effectiveModel: ComputedRef<{ providerId: string; model: string }>;
+  agentRunFields: ComputedRef<{ coderProviderId?: string; coderModel?: string; agentPreset?: string }>;
   currentMode: Ref<string>;
   bypassPermissions: Ref<boolean>;
   activeProject: ComputedRef<{ path: string; name: string } | undefined>;
@@ -203,7 +207,8 @@ export function useChatSession(options: ChatSessionOptions) {
   async function handleSendTask() {
     if (!taskInput.value.trim() || isRunning.value || !options.selectedModelCombined.value) return;
 
-    const { providerId, model } = splitCombined(options.selectedModelCombined.value);
+    const { providerId, model } = options.effectiveModel.value;
+    const agentFields = options.agentRunFields.value;
     isRunning.value = true;
 
     const isContinuation = activeRun.value && !ACTIVE_STATUSES.includes(activeRun.value.status);
@@ -219,7 +224,8 @@ export function useChatSession(options: ChatSessionOptions) {
           providerId,
           model,
           mode: options.currentMode.value,
-          bypassPermissions: options.bypassPermissions.value
+          bypassPermissions: options.bypassPermissions.value,
+          ...agentFields
         });
       } catch (err: any) {
         isRunning.value = false;
@@ -242,7 +248,8 @@ export function useChatSession(options: ChatSessionOptions) {
           providerId,
           model,
           mode: options.currentMode.value,
-          bypassPermissions: options.bypassPermissions.value
+          bypassPermissions: options.bypassPermissions.value,
+          ...agentFields
         });
         taskInput.value = '';
         activeRunId.value = run.id;

@@ -50,6 +50,16 @@ try {
   // Ignored if column already exists or runs table schema migration is not needed
 }
 
+// Migration: Add dual-model (architect + coder) columns to runs. All nullable;
+// populated only when a run uses an agent preset that delegates to a coder model.
+for (const col of ["coder_provider_id", "coder_model", "agent_preset"]) {
+  try {
+    db.exec(`ALTER TABLE runs ADD COLUMN ${col} TEXT`);
+  } catch (e) {
+    // Ignored if the column already exists
+  }
+}
+
 // Create Messages Table
 db.exec(`
   CREATE TABLE IF NOT EXISTS messages (

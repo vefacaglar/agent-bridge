@@ -206,11 +206,18 @@ const formattedElapsedTime = computed(() => {
         :thought="group.message.content"
         :tool-calls="group.toolCalls"
         :tool-responses="group.toolResponses"
+        :agent-role="group.message.agentRole"
+        :model="group.message.model"
         @open-plan="emit('open-plan')"
       />
 
-      <article v-else-if="group.type === 'assistant'" class="assistant-message">
+      <article
+        v-else-if="group.type === 'assistant'"
+        class="assistant-message"
+        :class="{ 'coder-message': group.message.agentRole === 'coder' }"
+      >
         <div class="assistant-meta">
+          <span v-if="group.message.agentRole === 'coder'" class="agent-badge coder-badge">Coder</span>
           <span>{{ group.message.providerDisplayName }} / {{ group.message.model }}</span>
           <span>{{ formatTime(group.message.createdAt) }}</span>
         </div>
@@ -344,6 +351,26 @@ const formattedElapsedTime = computed(() => {
 </template>
 
 <style scoped>
+/* Coder sub-agent messages: subtle left accent + monochrome badge so the
+   architect's stream is visually distinct from delegated coder work. */
+.assistant-message.coder-message {
+  border-left: 2px solid var(--border);
+  padding-left: 14px;
+  margin-left: 2px;
+}
+
+.agent-badge.coder-badge {
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text);
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 1px 6px;
+}
+
 .plan-thread-link {
   display: flex;
   align-items: center;

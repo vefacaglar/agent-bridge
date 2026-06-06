@@ -437,4 +437,237 @@ test("Orchestrator Integration Tests", async (t) => {
     
     assert.strictEqual(savedMsgs[3].role, "assistant");
   });
+
+  await t.test("Orchestrator - delegate_tasks runs coder sub-agents sequentially", async () => {
+    const registry = new ProviderRegistry(testConfigPath);
+    const runRepo = new RunRepository();
+    const messageRepo = new MessageRepository();
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository());
+
+    const runId = "run-test-delegate";
+    const runData: Run = {
+      id: runId,
+      title: "Test Delegate",
+      task: "Build two things",
+      status: "created",
+      providerId: "test-provider",
+      providerDisplayName: "Test Provider",
+      model: "model-1",
+      // Dual-model: architect + coder on the same mock provider.
+      coderProviderId: "test-provider",
+      coderModel: "model-1",
+      projectPath: process.cwd(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    runRepo.create(runData);
+
+    let callCount = 0;
+    globalThis.fetch = async (_url: any, _options: any) => {
+      callCount++;
+      if (callCount === 1) {
+        // Architect delegates two sub-tasks sequentially.
+        return {
+          ok: true,
+          json: async () => ({
+            choices: [{
+              message: {
+                role: "assistant",
+                content: "Delegating the work.",
+                tool_calls: [{
+                  id: "call_delegate_1",
+                  type: "function",
+                  function: {
+                    name: "delegate_tasks",
+                    arguments: JSON.stringify({
+                      parallel: false,
+                      tasks: [
+                        { title: "Task A", instructions: "Do A" },
+                        { title: "Task B", instructions: "Do B" }
+                      ]
+                    })
+                  }
+                }]
+              }
+            }]
+          })
+        } as any;
+      }
+      // Coder sub-agents (calls 2 and 3) and the architect's final turn (call 4)
+      // all return a plain text answer with no further tool calls.
+      const text = callCount === 2 ? "Coder finished A"
+        : callCount === 3 ? "Coder finished B"
+        : "All subtasks complete.";
+      return {
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { role: "assistant", content: text } }]
+        })
+      } as any;
+    };
+
+    await orchestrator.run(runId);
+
+    const finishedRun = runRepo.getById(runId);
+    assert.strictEqual(finishedRun?.status, "done");
+
+    const savedMsgs = messageRepo.listByRunId(runId);
+    // architect tool call, coder A, coder B, delegate tool result, architect final
+    assert.strictEqual(savedMsgs.length, 5);
+    assert.strictEqual(savedMsgs[0].agentRole, "planner");
+    assert.ok(savedMsgs[0].rawResponse?.includes("delegate_tasks"));
+    assert.strictEqual(savedMsgs[1].agentRole, "coder");
+    assert.strictEqual(savedMsgs[1].content, "Coder finished A");
+    assert.strictEqual(savedMsgs[2].agentRole, "coder");
+    assert.strictEqual(savedMsgs[2].content, "Coder finished B");
+    assert.strictEqual(savedMsgs[3].role, "tool");
+
+    const delegateResult = JSON.parse(savedMsgs[3].content);
+    assert.strictEqual(delegateResult.success, true);
+    assert.strictEqual(delegateResult.parallel, false);
+    assert.strictEqual(delegateResult.results.length, 2);
+    assert.strictEqual(delegateResult.results[0].summary, "Coder finished A");
+
+    assert.strictEqual(savedMsgs[4].content, "All subtasks complete.");
+  });
+
+  await t.test("Orchestrator - plan mode blocks mutating/command tools even if the model calls them", async () => {
+    const registry = new ProviderRegistry(testConfigPath);
+    const runRepo = new RunRepository();
+    const messageRepo = new MessageRepository();
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository());
+
+    const runId = "run-test-plan-block";
+    const blockedFilePath = path.join(process.cwd(), "test_plan_blocked.json");
+    t.after(() => {
+      if (fs.existsSync(blockedFilePath)) fs.unlinkSync(blockedFilePath);
+    });
+
+    runRepo.create({
+      id: runId,
+      title: "Plan block",
+      task: "Plan only",
+      status: "created",
+      providerId: "test-provider",
+      providerDisplayName: "Test Provider",
+      model: "model-1",
+      mode: "plan",
+      projectPath: process.cwd(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
+
+    const statusesEmitted: RunStatus[] = [];
+    const listener = (event: any) => {
+      if (event.type === "status_changed") statusesEmitted.push(event.status);
+    };
+    eventBus.on(`run:${runId}`, listener);
+    t.after(() => eventBus.off(`run:${runId}`, listener));
+
+    let callCount = 0;
+    globalThis.fetch = async () => {
+      callCount++;
+      if (callCount === 1) {
+        // Model (mis)behaves: tries to write a file while in plan mode.
+        return {
+          ok: true,
+          json: async () => ({
+            choices: [{
+              message: {
+                role: "assistant",
+                content: "Writing file",
+                tool_calls: [{
+                  id: "call_plan_write",
+                  type: "function",
+                  function: { name: "write_file", arguments: JSON.stringify({ path: "test_plan_blocked.json", content: "{}" }) }
+                }]
+              }
+            }]
+          })
+        } as any;
+      }
+      return {
+        ok: true,
+        json: async () => ({ choices: [{ message: { role: "assistant", content: "Understood, staying in plan mode." } }] })
+      } as any;
+    };
+
+    await orchestrator.run(runId);
+
+    // The file must NOT have been created, and no permission prompt should occur.
+    assert.ok(!fs.existsSync(blockedFilePath), "plan mode must not create files");
+    assert.ok(!statusesEmitted.includes("awaiting_permission"), "plan mode must not even prompt for permission");
+
+    const savedMsgs = messageRepo.listByRunId(runId);
+    const toolMsg = savedMsgs.find(m => m.role === "tool");
+    assert.ok(toolMsg);
+    const result = JSON.parse(toolMsg!.content);
+    assert.strictEqual(result.success, false);
+    assert.match(result.error, /Plan mode/);
+  });
+
+  await t.test("Orchestrator - delegate_tasks clamps to at most 3 sub-agents", async () => {
+    const registry = new ProviderRegistry(testConfigPath);
+    const runRepo = new RunRepository();
+    const messageRepo = new MessageRepository();
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository());
+
+    const runId = "run-test-delegate-clamp";
+    runRepo.create({
+      id: runId,
+      title: "Clamp",
+      task: "Too many",
+      status: "created",
+      providerId: "test-provider",
+      providerDisplayName: "Test Provider",
+      model: "model-1",
+      coderProviderId: "test-provider",
+      coderModel: "model-1",
+      projectPath: process.cwd(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
+
+    let callCount = 0;
+    globalThis.fetch = async () => {
+      callCount++;
+      if (callCount === 1) {
+        return {
+          ok: true,
+          json: async () => ({
+            choices: [{
+              message: {
+                role: "assistant",
+                content: "Delegating five tasks.",
+                tool_calls: [{
+                  id: "call_delegate_clamp",
+                  type: "function",
+                  function: {
+                    name: "delegate_tasks",
+                    arguments: JSON.stringify({
+                      parallel: false,
+                      tasks: [1, 2, 3, 4, 5].map(n => ({ title: `T${n}`, instructions: `Do ${n}` }))
+                    })
+                  }
+                }]
+              }
+            }]
+          })
+        } as any;
+      }
+      return {
+        ok: true,
+        json: async () => ({ choices: [{ message: { role: "assistant", content: "ok" } }] })
+      } as any;
+    };
+
+    await orchestrator.run(runId);
+
+    const savedMsgs = messageRepo.listByRunId(runId);
+    const toolMsg = savedMsgs.find(m => m.role === "tool");
+    assert.ok(toolMsg);
+    const result = JSON.parse(toolMsg!.content);
+    assert.strictEqual(result.results.length, 3, "should clamp 5 requested tasks to 3");
+  });
 });

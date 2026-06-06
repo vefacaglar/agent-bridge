@@ -252,8 +252,57 @@ export const UPDATE_PLAN_TOOL = {
   }
 };
 
+/**
+ * Architect-only tool (dual-model runs). Lets the architect model delegate one
+ * or more self-contained coding tasks to coder sub-agents running the configured
+ * coder model. Performs no direct filesystem/network I/O itself — the orchestrator
+ * runs each sub-agent loop — so it is not in DANGEROUS_TOOLS and runs without a
+ * permission prompt (the sub-agents' own tool calls are still gated normally).
+ */
+export const DELEGATE_TASKS_TOOL = {
+  type: "function" as const,
+  function: {
+    name: "delegate_tasks",
+    description: "Delegate self-contained coding task(s) to coder sub-agent(s) that run a separate coder model in this same workspace. Use this to offload the heavy implementation work. Each task must be fully self-contained because the sub-agent does NOT see this conversation — give it a clear title and detailed instructions. You receive each sub-agent's result summary back. Set parallel=true ONLY when the tasks touch disjoint files; otherwise leave it false so they run sequentially.",
+    parameters: {
+      type: "object",
+      properties: {
+        tasks: {
+          type: "array",
+          description: "The coding tasks to delegate (1 to 3). Each runs in its own coder sub-agent.",
+          items: {
+            type: "object",
+            properties: {
+              title: { type: "string", description: "Short title for this sub-task." },
+              instructions: { type: "string", description: "Complete, self-contained instructions: which files to create/edit, the exact behavior/contract, and all context the coder needs. The sub-agent only sees this text." },
+              files: {
+                type: "array",
+                description: "Optional: the files this task is expected to touch (helps you reason about conflicts for the parallel flag).",
+                items: { type: "string" }
+              }
+            },
+            required: ["title", "instructions"]
+          }
+        },
+        parallel: {
+          type: "boolean",
+          description: "Run the sub-agents concurrently. Set true ONLY if the tasks touch disjoint files and cannot conflict; otherwise false (sequential)."
+        }
+      },
+      required: ["tasks"]
+    }
+  }
+};
+
 /** Tools that must always be gated behind an explicit permission prompt. */
 export const DANGEROUS_TOOLS = new Set(["run_command", "fetch_url"]);
+
+/**
+ * Read-only tools — they only inspect the workspace, never mutate it or run
+ * commands. These are the ONLY workspace tools allowed in plan mode (which is a
+ * planning-only, no-changes mode). Everything else is blocked there.
+ */
+export const READONLY_TOOLS = new Set(["read_file", "list_directory", "search_files"]);
 
 /**
  * The key a standing permission grant is scoped to. For run_command the grant

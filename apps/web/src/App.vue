@@ -10,6 +10,8 @@ import PlanPanel from './components/PlanPanel.vue';
 
 const {
   runs,
+  agentPresets,
+  loadAgentPresets,
   setMessagesContainer,
   settings,
   projects,
@@ -209,9 +211,11 @@ async function rejectPlan() {
           v-model:current-mode="settings.currentMode.value"
           v-model:bypass-permissions="settings.bypassPermissions.value"
           v-model:selected-model="settings.selectedModelCombined.value"
+          v-model:selected-preset-id="settings.selectedPresetId.value"
           :is-running="isRunning"
           :model-options="settings.modelOptions.value"
           :active-model-display-name="settings.activeModelDisplayName.value"
+          :agent-presets="agentPresets"
           :focus-signal="focusSignal"
           :confirmation-group="activeConfirmationGroup"
           :show-permission="showPermissionModal"
@@ -231,9 +235,11 @@ async function rejectPlan() {
             v-model:current-mode="settings.currentMode.value"
             v-model:bypass-permissions="settings.bypassPermissions.value"
             v-model:selected-model="settings.selectedModelCombined.value"
+            v-model:selected-preset-id="settings.selectedPresetId.value"
             :is-running="isRunning"
             :model-options="settings.modelOptions.value"
             :active-model-display-name="settings.activeModelDisplayName.value"
+            :agent-presets="agentPresets"
             :focus-signal="focusSignal"
             :confirmation-group="activeConfirmationGroup"
             :show-permission="showPermissionModal"
@@ -281,6 +287,7 @@ async function rejectPlan() {
       @close="permissions.closeSettings"
       @revoke="permissions.revokePermission"
       @clear-all="permissions.clearPermissions"
+      @presets-saved="loadAgentPresets"
     />
 
     <!-- Custom Dialog Modal (Alert/Confirm) -->

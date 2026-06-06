@@ -1,5 +1,6 @@
 import { computed, ref, watch, type Ref } from 'vue';
-import type { ProviderMetadata } from '@agent-bridge/shared';
+import type { ProviderMetadata, AgentPreset } from '@agent-bridge/shared';
+import { splitCombined } from '../lib/format';
 
 // Three modes are exposed: Chat (lightweight conversation — no proactive
 // workspace scanning, minimal context), Build (applies edits directly; the
@@ -22,8 +23,15 @@ export interface ModelOption {
  * Owns the composer's persisted settings: selected model, operational mode
  * and the bypass-permissions toggle, plus derived model option lists.
  */
-export function useComposerSettings(providers: Ref<ProviderMetadata[]>) {
+export function useComposerSettings(
+  providers: Ref<ProviderMetadata[]>,
+  agentPresets: Ref<AgentPreset[]>
+) {
   const selectedModelCombined = ref(localStorage.getItem('bm_selected_model') || '');
+  // The optional dual-model preset selected next to the model picker. Empty string
+  // (or an id no longer present) means single-model mode — the default.
+  const selectedPresetId = ref(localStorage.getItem('bm_selected_preset') || '');
+  watch(selectedPresetId, (v) => localStorage.setItem('bm_selected_preset', v));
   // Keep a persisted Plan/Build choice; migrate anything else (or first run) to Chat.
   const storedMode = localStorage.getItem('bm_current_mode');
   const currentMode = ref<ChatMode>(
@@ -55,6 +63,30 @@ export function useComposerSettings(providers: Ref<ProviderMetadata[]>) {
     return opt.label.split(' / ').pop() || opt.label;
   });
 
+  // The currently selected dual-model preset, or null for single-model mode.
+  const activePreset = computed(() =>
+    agentPresets.value.find(p => p.id === selectedPresetId.value) ?? null
+  );
+
+  // The main/architect model a run should use: the preset's architect when a
+  // preset is active, otherwise the plain single-model selection.
+  const effectiveModel = computed<{ providerId: string; model: string }>(() => {
+    if (activePreset.value) {
+      return { ...activePreset.value.architect };
+    }
+    return splitCombined(selectedModelCombined.value);
+  });
+
+  // Dual-model fields to attach to a run; empty object in single-model mode.
+  const agentRunFields = computed<{ coderProviderId?: string; coderModel?: string; agentPreset?: string }>(() => {
+    if (!activePreset.value) return {};
+    return {
+      agentPreset: activePreset.value.id,
+      coderProviderId: activePreset.value.coder.providerId,
+      coderModel: activePreset.value.coder.model
+    };
+  });
+
   function getModeLabel(modeId: string): string {
     return MODES_LIST.find(m => m.id === modeId)?.label ?? 'Chat';
   }
@@ -68,6 +100,10 @@ export function useComposerSettings(providers: Ref<ProviderMetadata[]>) {
 
   return {
     selectedModelCombined,
+    selectedPresetId,
+    activePreset,
+    effectiveModel,
+    agentRunFields,
     currentMode,
     bypassPermissions,
     modelOptions,
