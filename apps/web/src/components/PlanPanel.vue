@@ -144,7 +144,14 @@ function isReasoningExpanded(childId: string, children: any[]): boolean {
 }
 
 function toggleReasoning(childId: string) {
-  expandedReasoning.value[childId] = !expandedReasoning.value[childId];
+  const willExpand = !expandedReasoning.value[childId];
+  expandedReasoning.value[childId] = willExpand;
+  if (willExpand) {
+    nextTick(() => {
+      const el = document.querySelector(`[data-reasoning-child-id="${childId}"]`);
+      el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+  }
 }
 
 function thoughtFor(child: any): string {
@@ -281,6 +288,7 @@ defineExpose({
                   v-if="child.message.reasoningContent"
                   :content="child.message.reasoningContent"
                   :expanded="isReasoningExpanded(child.id, agent.children)"
+                  :data-reasoning-child-id="child.id"
                   @toggle="toggleReasoning(child.id)"
                 />
 

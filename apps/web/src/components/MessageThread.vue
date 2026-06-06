@@ -89,7 +89,14 @@ function isReasoningExpanded(groupId: string): boolean {
 }
 
 function toggleReasoning(groupId: string) {
-  expandedReasoning.value[groupId] = !isReasoningExpanded(groupId);
+  const willExpand = !isReasoningExpanded(groupId);
+  expandedReasoning.value[groupId] = willExpand;
+  if (willExpand) {
+    nextTick(() => {
+      const el = document.querySelector(`[data-reasoning-group-id="${groupId}"]`);
+      el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+  }
 }
 
 // When a new reasoning panel appears, collapse the previous latest and open the
@@ -295,6 +302,7 @@ const formattedElapsedTime = computed(() => {
           v-if="group.message.reasoningContent"
           :content="group.message.reasoningContent"
           :expanded="isReasoningExpanded(group.id)"
+          :data-reasoning-group-id="group.id"
           @toggle="toggleReasoning(group.id)"
         />
         <ToolGroup
@@ -378,6 +386,7 @@ const formattedElapsedTime = computed(() => {
           v-if="group.message.reasoningContent"
           :content="group.message.reasoningContent"
           :expanded="isReasoningExpanded(group.id)"
+          :data-reasoning-group-id="group.id"
           @toggle="toggleReasoning(group.id)"
         />
 
