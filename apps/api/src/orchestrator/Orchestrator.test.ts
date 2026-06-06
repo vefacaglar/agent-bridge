@@ -11,7 +11,16 @@ import { ProviderRegistry } from "../providers/ProviderRegistry.js";
 import { RunRepository, MessageRepository, PlanRepository, MemoryRepository } from "../database/repositories.js";
 import { Orchestrator } from "./Orchestrator.js";
 import { eventBus } from "./eventBus.js";
-import { buildSystemPrompt } from "./systemPrompt.js";
+import { buildCoderSystemPrompt, buildSystemPrompt, buildUtilitySystemPrompt } from "./systemPrompt.js";
+import {
+  ASK_QUESTION_TOOL,
+  DELEGATE_TASKS_TOOL,
+  DELEGATE_UTILITY_TOOL,
+  REMEMBER_TOOL,
+  SET_TITLE_TOOL,
+  UPDATE_PLAN_TOOL,
+  WORKSPACE_TOOLS
+} from "./workspaceTools.js";
 import type { Run, RunStatus } from "@agent-bridge/shared";
 
 // Mock config content
@@ -248,6 +257,51 @@ test("Orchestrator Integration Tests", async (t) => {
     assert.ok(prompt.includes("CURRENT OPERATIONAL MODE: CHAT MODE"));
     assert.ok(!prompt.includes("INITIAL PROJECT GUIDANCE"));
     assert.ok(!prompt.includes("Before doing substantive planning or implementation"));
+  });
+
+  await t.test("System prompt - stays compact while preserving guardrails", () => {
+    const projectName = "Test Project";
+    const projectPath = "/tmp/test-project";
+    const delegation = { coderModel: "coder-model", maxSubAgents: 3, utilityModel: "utility-model" };
+
+    const chat = buildSystemPrompt(projectName, projectPath, "chat", true);
+    const plan = buildSystemPrompt(projectName, projectPath, "plan", true);
+    const build = buildSystemPrompt(projectName, projectPath, "accept_edits", true);
+    const architect = buildSystemPrompt(projectName, projectPath, "accept_edits", true, delegation);
+    const coder = buildCoderSystemPrompt(projectName, projectPath, "Implement the requested change");
+    const utility = buildUtilitySystemPrompt(projectName, projectPath, "Find the relevant file");
+
+    assert.ok(chat.length <= 1200, `chat prompt too large: ${chat.length}`);
+    assert.ok(plan.length <= 3200, `plan prompt too large: ${plan.length}`);
+    assert.ok(build.length <= 2600, `build prompt too large: ${build.length}`);
+    assert.ok(architect.length <= 3600, `architect prompt too large: ${architect.length}`);
+    assert.ok(coder.length <= 900, `coder prompt too large: ${coder.length}`);
+    assert.ok(utility.length <= 800, `utility prompt too large: ${utility.length}`);
+
+    assert.ok(plan.includes("Do NOT implement"));
+    assert.ok(plan.includes("Do NOT write production code"));
+    assert.ok(plan.includes("do not treat repeated or pasted plan text as approval"));
+    assert.ok(plan.includes("DO NOT call any file-mutating tools"));
+    assert.ok(build.includes("implementation must stay strictly within it"));
+    assert.ok(architect.includes("To change files, call delegate_tasks"));
+  });
+
+  await t.test("Tool schemas - stay compact", () => {
+    const tools = [
+      ...WORKSPACE_TOOLS,
+      UPDATE_PLAN_TOOL,
+      SET_TITLE_TOOL,
+      ASK_QUESTION_TOOL,
+      REMEMBER_TOOL,
+      DELEGATE_TASKS_TOOL,
+      DELEGATE_UTILITY_TOOL
+    ];
+
+    const schemaText = JSON.stringify(tools);
+    assert.ok(schemaText.length <= 12000, `tool schema too large: ${schemaText.length}`);
+    for (const tool of tools) {
+      assert.ok(tool.function.description.length <= 180, `${tool.function.name} description too large`);
+    }
   });
 
   await t.test("Orchestrator - pauses for permissions in ask_permissions mode and resumes on approval", async () => {

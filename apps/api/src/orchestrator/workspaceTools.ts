@@ -12,17 +12,17 @@ export const WORKSPACE_TOOLS = [
     type: "function" as const,
     function: {
       name: "write_file",
-      description: "Writes or overwrites content to a specified file in the local workspace directory. Use edit_file for small changes to large existing files.",
+      description: "Create or overwrite a workspace file. Prefer edit_file for small changes.",
       parameters: {
         type: "object",
         properties: {
           path: {
             type: "string",
-            description: "The file path relative to the workspace directory (e.g., 'src/main.js' or 'index.html')."
+            description: "Workspace-relative file path."
           },
           content: {
             type: "string",
-            description: "The exact text content to write to the file."
+            description: "Exact file content."
           }
         },
         required: ["path", "content"]
@@ -33,25 +33,25 @@ export const WORKSPACE_TOOLS = [
     type: "function" as const,
     function: {
       name: "edit_file",
-      description: "Edits an existing file by replacing an exact substring with new text. Prefer this over write_file when changing part of a larger file. The old_string must match the file content exactly (including whitespace and indentation).",
+      description: "Replace exact text in an existing file. old_string must match exactly.",
       parameters: {
         type: "object",
         properties: {
           path: {
             type: "string",
-            description: "The file path relative to the workspace directory."
+            description: "Workspace-relative file path."
           },
           old_string: {
             type: "string",
-            description: "The exact text to find and replace. Must be unique in the file unless replace_all is true."
+            description: "Exact text to replace. Must be unique unless replace_all is true."
           },
           new_string: {
             type: "string",
-            description: "The text to replace old_string with."
+            description: "Replacement text."
           },
           replace_all: {
             type: "boolean",
-            description: "When true, replaces every occurrence of old_string. Defaults to false (replaces a single, unique occurrence)."
+            description: "Replace every occurrence. Defaults to false."
           }
         },
         required: ["path", "old_string", "new_string"]
@@ -62,13 +62,13 @@ export const WORKSPACE_TOOLS = [
     type: "function" as const,
     function: {
       name: "delete_file",
-      description: "Deletes a specified file from the local workspace directory.",
+      description: "Delete a workspace file.",
       parameters: {
         type: "object",
         properties: {
           path: {
             type: "string",
-            description: "The file path relative to the workspace directory."
+            description: "Workspace-relative file path."
           }
         },
         required: ["path"]
@@ -79,13 +79,13 @@ export const WORKSPACE_TOOLS = [
     type: "function" as const,
     function: {
       name: "read_file",
-      description: "Reads the content of a specified file in the local workspace directory.",
+      description: "Read a workspace file.",
       parameters: {
         type: "object",
         properties: {
           path: {
             type: "string",
-            description: "The file path relative to the workspace directory."
+            description: "Workspace-relative file path."
           }
         },
         required: ["path"]
@@ -96,13 +96,13 @@ export const WORKSPACE_TOOLS = [
     type: "function" as const,
     function: {
       name: "list_directory",
-      description: "Lists all files and folders in a specified directory path (relative to the workspace). Use empty string '' or '.' for the root directory.",
+      description: "List files and folders in a workspace directory.",
       parameters: {
         type: "object",
         properties: {
           path: {
             type: "string",
-            description: "The directory path relative to the workspace (e.g., 'src' or '')."
+            description: "Workspace-relative directory path; use '' or '.' for root."
           }
         },
         required: ["path"]
@@ -113,13 +113,13 @@ export const WORKSPACE_TOOLS = [
     type: "function" as const,
     function: {
       name: "create_directory",
-      description: "Creates a new directory (and any missing parent directories) inside the workspace.",
+      description: "Create a workspace directory, including parents.",
       parameters: {
         type: "object",
         properties: {
           path: {
             type: "string",
-            description: "The directory path relative to the workspace (e.g., 'src/components')."
+            description: "Workspace-relative directory path."
           }
         },
         required: ["path"]
@@ -130,17 +130,17 @@ export const WORKSPACE_TOOLS = [
     type: "function" as const,
     function: {
       name: "move_file",
-      description: "Moves or renames a file or directory within the workspace. Both source and destination must stay inside the workspace.",
+      description: "Move or rename a workspace file or directory.",
       parameters: {
         type: "object",
         properties: {
           source_path: {
             type: "string",
-            description: "The current path of the file or directory, relative to the workspace."
+            description: "Current workspace-relative path."
           },
           destination_path: {
             type: "string",
-            description: "The new path, relative to the workspace."
+            description: "New workspace-relative path."
           }
         },
         required: ["source_path", "destination_path"]
@@ -151,17 +151,17 @@ export const WORKSPACE_TOOLS = [
     type: "function" as const,
     function: {
       name: "search_files",
-      description: "Searches the workspace for files whose name or content matches a query. Skips node_modules and .git. Returns matching files with line numbers for content hits.",
+      description: "Search workspace file names and contents. Skips node_modules and .git.",
       parameters: {
         type: "object",
         properties: {
           query: {
             type: "string",
-            description: "The text to search for in file names and file contents."
+            description: "Text to search for."
           },
           path: {
             type: "string",
-            description: "Optional subdirectory to limit the search to (relative to the workspace). Defaults to the whole workspace."
+            description: "Optional workspace-relative subdirectory."
           }
         },
         required: ["query"]
@@ -172,13 +172,13 @@ export const WORKSPACE_TOOLS = [
     type: "function" as const,
     function: {
       name: "run_command",
-      description: "Runs a shell command in the workspace directory (e.g., to build, compile, run tests, or install dependencies). The command runs with the workspace as the working directory. This always requires explicit user permission before it runs.",
+      description: "Run a shell command in the workspace. Requires user approval.",
       parameters: {
         type: "object",
         properties: {
           command: {
             type: "string",
-            description: "The shell command to execute (e.g., 'npm run build' or 'pnpm test')."
+            description: "Command to execute."
           }
         },
         required: ["command"]
@@ -189,13 +189,13 @@ export const WORKSPACE_TOOLS = [
     type: "function" as const,
     function: {
       name: "fetch_url",
-      description: "Fetches a web page or API endpoint over HTTP(S) and returns its text content (HTML, JSON, or plain text). Use this to look up documentation, read an API response, or check a reference online. Only http and https URLs are allowed. This always requires explicit user permission before it runs.",
+      description: "Fetch an http(s) URL as text. Requires user approval.",
       parameters: {
         type: "object",
         properties: {
           url: {
             type: "string",
-            description: "The absolute http(s) URL to fetch (e.g., 'https://example.com/docs')."
+            description: "Absolute http(s) URL."
           }
         },
         required: ["url"]
@@ -214,29 +214,29 @@ export const UPDATE_PLAN_TOOL = {
   type: "function" as const,
   function: {
     name: "update_plan",
-    description: "Record the plan for this chat as a STABLE document shown to the user in a side panel. Put the COMPLETE plan write-up in the body field and the list of steps in tasks — this tool's output IS the plan the user reads, so do not also paste the full plan into your chat reply. Call it once when you first draft the plan. Do NOT call it again to show progress; the panel is meant to stay unchanged. Only call it again when the user explicitly asks you to revise/change the plan (update the same plan), or — when an entirely finished plan is replaced by a genuinely new effort — with start_new set to true.",
+    description: "Record or revise the stable plan-panel document. Put detailed prose in body and steps in tasks; do not use it for progress updates.",
     parameters: {
       type: "object",
       properties: {
         title: {
           type: "string",
-          description: "A short title summarizing what this plan accomplishes."
+          description: "Short plan title."
         },
         body: {
           type: "string",
-          description: "The full plan write-up in markdown, rendered above the checklist in the panel. Include everything the user should read: overview/goal, key design decisions (tables are fine), a file-by-file breakdown, and any notes. This is the primary place the detailed plan lives, so be thorough here rather than in the chat message."
+          description: "Full markdown plan shown in the panel."
         },
         tasks: {
           type: "array",
-          description: "The complete ordered list of plan steps with their current status.",
+          description: "Ordered plan steps with status.",
           items: {
             type: "object",
             properties: {
-              text: { type: "string", description: "The step description." },
+              text: { type: "string", description: "Step text." },
               status: {
                 type: "string",
                 enum: ["pending", "in_progress", "completed"],
-                description: "Current status of this step."
+                description: "Step status."
               }
             },
             required: ["text", "status"]
@@ -244,7 +244,7 @@ export const UPDATE_PLAN_TOOL = {
         },
         start_new: {
           type: "boolean",
-          description: "Set true to supersede the previous (finished) plan with a brand-new one. Omit or false to update the current plan in place."
+          description: "True to replace a finished plan with a new effort."
         }
       },
       required: ["title", "tasks"]
@@ -261,13 +261,13 @@ export const SET_TITLE_TOOL = {
   type: "function" as const,
   function: {
     name: "set_chat_title",
-    description: "Set a short, descriptive title for THIS chat session (3-6 words, no quotes, in the user's language). Call this exactly once, as soon as the user's intent is clear (typically right after their first message). The session starts as \"New session…\"; replace it with a concise title that summarizes the task. Do not call it again unless the topic of the conversation fundamentally changes.",
+    description: "Set this chat's short title once intent is clear.",
     parameters: {
       type: "object",
       properties: {
         title: {
           type: "string",
-          description: "A short, descriptive title for the session (3-6 words, no surrounding quotes)."
+          description: "Short title, 3-6 words, no quotes."
         }
       },
       required: ["title"]
@@ -286,36 +286,36 @@ export const ASK_QUESTION_TOOL = {
   type: "function" as const,
   function: {
     name: "ask_user_question",
-    description: "Ask the user one or more multiple-choice questions when you are blocked on a decision that is genuinely theirs to make — one you cannot resolve from the request, the code, or sensible defaults. Do NOT use it for choices with an obvious default or facts you can verify yourself; in those cases pick the obvious option and proceed. The run pauses until the user answers, and you receive their selections back. Keep questions short and the options concrete and mutually exclusive (unless multiSelect is set). Ask 1-4 questions, each with 2-4 options.",
+    description: "Ask 1-4 multiple-choice questions only for decisions you cannot resolve from context or sensible defaults.",
     parameters: {
       type: "object",
       properties: {
         questions: {
           type: "array",
-          description: "The questions to ask (1-4).",
+          description: "Questions to ask.",
           items: {
             type: "object",
             properties: {
               question: {
                 type: "string",
-                description: "The full question text, clear and specific, ending with a question mark."
+                description: "Clear question text."
               },
               header: {
                 type: "string",
-                description: "A very short label for the question (max 12 chars), e.g. \"Auth method\", \"Library\"."
+                description: "Short label, max 12 chars."
               },
               multiSelect: {
                 type: "boolean",
-                description: "True to let the user pick more than one option; false for a single choice."
+                description: "Allow multiple selections."
               },
               options: {
                 type: "array",
-                description: "The available choices (2-4). Each must be a distinct option.",
+                description: "Distinct choices.",
                 items: {
                   type: "object",
                   properties: {
-                    label: { type: "string", description: "The choice text shown to the user (concise)." },
-                    description: { type: "string", description: "Optional one-line explanation of what this choice means." }
+                    label: { type: "string", description: "Choice label." },
+                    description: { type: "string", description: "Optional one-line explanation." }
                   },
                   required: ["label"]
                 }
@@ -341,27 +341,27 @@ export const REMEMBER_TOOL = {
   type: "function" as const,
   function: {
     name: "remember",
-    description: "Save a DURABLE fact to remember across future sessions. Use this when you learn something that will stay useful beyond the current task: a user preference or working style, recurring feedback the user gives you about HOW to work, a stable fact about this project, or a reference (URL/ticket) worth keeping. The saved memory MUST be written in ENGLISH. Do NOT remember transient task details, one-off context, secrets, or anything already written in the code/config. Keep each memory to 1-3 sentences. Saving is silent (no confirmation); the user manages saved memories in Settings. If you are refining a memory that already exists (shown to you in 'Remembered context'), pass its id as update_id instead of creating a duplicate.",
+    description: "Save a durable preference, feedback, project fact, or reference in ENGLISH. Do not save transient details, secrets, or facts already in code/config.",
     parameters: {
       type: "object",
       properties: {
         scope: {
           type: "string",
           enum: ["global", "project"],
-          description: "\"global\" for facts about the user or their general working style that apply to ALL projects; \"project\" for facts specific to THIS codebase."
+          description: "global for user-wide facts; project for this codebase."
         },
         category: {
           type: "string",
           enum: ["user", "feedback", "project", "reference"],
-          description: "user = who the user is / general preferences; feedback = guidance on how you should work; project = a fact about this codebase; reference = an external pointer (URL, ticket)."
+          description: "Memory category."
         },
         content: {
           type: "string",
-          description: "The fact to remember, in 1-3 concise sentences in ENGLISH."
+          description: "Fact to remember, 1-3 concise English sentences."
         },
         update_id: {
           type: "number",
-          description: "Optional: the id of an existing memory (from 'Remembered context') to revise in place instead of creating a new one."
+          description: "Existing memory id to update."
         }
       },
       required: ["scope", "category", "content"]
@@ -380,21 +380,21 @@ export const DELEGATE_TASKS_TOOL = {
   type: "function" as const,
   function: {
     name: "delegate_tasks",
-    description: "Delegate self-contained coding task(s) to coder sub-agent(s) that run a separate coder model in this same workspace. Use this to offload the heavy implementation work. Each task must be fully self-contained because the sub-agent does NOT see this conversation — give it a clear title and detailed instructions. You receive each sub-agent's result summary back. Set parallel=true ONLY when the tasks touch disjoint files; otherwise leave it false so they run sequentially.",
+    description: "Delegate 1-3 self-contained coding tasks to coder sub-agents. Use parallel only for disjoint files.",
     parameters: {
       type: "object",
       properties: {
         tasks: {
           type: "array",
-          description: "The coding tasks to delegate (1 to 3). Each runs in its own coder sub-agent.",
+          description: "Coding tasks to delegate.",
           items: {
             type: "object",
             properties: {
-              title: { type: "string", description: "Short title for this sub-task." },
-              instructions: { type: "string", description: "Complete, self-contained instructions: which files to create/edit, the exact behavior/contract, and all context the coder needs. The sub-agent only sees this text." },
+              title: { type: "string", description: "Short task title." },
+              instructions: { type: "string", description: "Self-contained instructions; the sub-agent sees only this text." },
               files: {
                 type: "array",
-                description: "Optional: the files this task is expected to touch (helps you reason about conflicts for the parallel flag).",
+                description: "Expected touched files.",
                 items: { type: "string" }
               }
             },
@@ -403,7 +403,7 @@ export const DELEGATE_TASKS_TOOL = {
         },
         parallel: {
           type: "boolean",
-          description: "Run the sub-agents concurrently. Set true ONLY if the tasks touch disjoint files and cannot conflict; otherwise false (sequential)."
+          description: "Run concurrently only when tasks cannot conflict."
         }
       },
       required: ["tasks"]
@@ -424,25 +424,25 @@ export const DELEGATE_UTILITY_TOOL = {
   type: "function" as const,
   function: {
     name: "delegate_to_utility",
-    description: "Delegate TINY, mechanical task(s) to a cheap utility sub-agent (a smaller model) to keep your own context lean. Ideal for: locating where a file/symbol/function lives, summarizing a file, or simple renames/moves. The utility sub-agent can ONLY read/list/search files and move (rename) them — it cannot write or edit code. Each task is self-contained (the sub-agent does NOT see this conversation) and returns a SHORT answer (e.g. a file:line or a one-paragraph summary). Use delegate_tasks (the coder) for substantial implementation; use this only for cheap lookups/renames. Set parallel=true only when tasks are independent.",
+    description: "Delegate 1-3 tiny lookup/summary/rename tasks to utility sub-agents. Not for substantial implementation.",
     parameters: {
       type: "object",
       properties: {
         tasks: {
           type: "array",
-          description: "The tiny tasks to delegate (1 to 3). Each runs in its own utility sub-agent.",
+          description: "Tiny utility tasks.",
           items: {
             type: "object",
             properties: {
-              title: { type: "string", description: "Short title for this lookup/task." },
-              instructions: { type: "string", description: "Complete, self-contained instructions and exactly what short answer to return. The sub-agent only sees this text." }
+              title: { type: "string", description: "Short task title." },
+              instructions: { type: "string", description: "Self-contained instructions and desired short answer." }
             },
             required: ["title", "instructions"]
           }
         },
         parallel: {
           type: "boolean",
-          description: "Run the utility sub-agents concurrently. Set true only when the tasks are independent."
+          description: "Run concurrently only for independent tasks."
         }
       },
       required: ["tasks"]
