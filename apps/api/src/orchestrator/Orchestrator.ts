@@ -199,7 +199,15 @@ export class Orchestrator {
    * reattaching tool_call ids so tool results line up with their calls.
    */
   private rebuildHistory(runId: string, task: string): ChatMessage[] {
-    const allMessages = this.messageRepo.listByRunId(runId);
+    // Replay ONLY top-level (architect/main) messages. Coder & utility sub-agent
+    // messages are internal to a delegate_tasks/delegate_to_utility call — the
+    // architect never saw them, only the summarized tool result. Including them
+    // would also interleave their assistant/tool messages between the architect's
+    // delegate tool_call and its tool result, which strict providers reject with
+    // "tool call result does not follow tool call".
+    const allMessages = this.messageRepo
+      .listByRunId(runId)
+      .filter(m => m.agentRole !== "coder" && m.agentRole !== "utility");
     const chatMessages: ChatMessage[] = [{ role: "user", content: task }];
 
     for (const m of allMessages) {

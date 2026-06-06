@@ -24,10 +24,10 @@ export function useChatAutoScroll(
     const userContainers = container.value.querySelectorAll('.user-message-container');
     const lastUserContainer = userContainers[userContainers.length - 1] as HTMLElement | undefined;
     if (lastUserContainer) {
-      // Add 100px offset to scroll the user's message higher up and bring the reasoning block into view
-      const topOffset = lastUserContainer.getBoundingClientRect().top - container.value.getBoundingClientRect().top + container.value.scrollTop + 100;
+      // Put the new user turn as high as possible while leaving a small visual inset.
+      const topOffset = lastUserContainer.getBoundingClientRect().top - container.value.getBoundingClientRect().top + container.value.scrollTop - 16;
       container.value.scrollTo({
-        top: topOffset,
+        top: Math.max(0, topOffset),
         behavior: 'smooth'
       });
     }
@@ -64,10 +64,10 @@ export function useChatAutoScroll(
       // Clear the forceScrollNext flag for future message updates
       forceScrollNext = false;
 
-      const wasAtBottom = isAtBottom(container.value);
+      const wasAtBottom = isAtBottom(container.value, 180);
 
       nextTick(() => {
-        if (isUserMsg) {
+        if (isUserMsg && (forceScroll || wasAtBottom)) {
           scrollToUserMessage();
         } else if (!isThinking && (forceScroll || wasAtBottom)) {
           scrollToBottom();
@@ -97,4 +97,3 @@ export function useChatAutoScroll(
 
   return { scrollToBottom };
 }
-
