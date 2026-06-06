@@ -513,8 +513,8 @@ async function handleFetchModels() {
 
 .delete-model-btn:hover {
   color: var(--danger);
-  background: rgba(255, 138, 128, 0.1);
-  border-color: rgba(255, 138, 128, 0.3);
+  background: var(--danger-soft);
+  border-color: var(--danger-border);
 }
 
 .add-model-btn {
@@ -532,14 +532,14 @@ async function handleFetchModels() {
   font-size: 0.75rem;
   margin-top: 4px;
   color: var(--success);
-  border-color: rgba(74, 222, 128, 0.2);
+  border-color: var(--success-border);
   transition: all 0.2s ease;
 }
 
 .fetch-models-btn:hover:not(:disabled) {
-  background: rgba(74, 222, 128, 0.08);
-  border-color: rgba(74, 222, 128, 0.4);
-  color: #6ee7b7;
+  background: var(--success-soft);
+  border-color: var(--success-border);
+  color: var(--success);
 }
 
 .fetch-models-btn:disabled {

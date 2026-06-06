@@ -111,6 +111,26 @@ function toAnthropicMessages(messages: ChatMessage[]): any[] {
   return out;
 }
 
+/**
+ * Adds a rolling prompt-cache breakpoint to the END of the conversation by
+ * tagging the last content block of the last message with `cache_control`.
+ * Combined with the breakpoint on the system block, this lets every turn of the
+ * agent loop read the entire prior prefix (tools + system + all earlier
+ * messages) from cache instead of re-billing it at full rate. Mutates in place.
+ */
+function markLastBlockForCaching(messages: any[]): void {
+  const last = messages[messages.length - 1];
+  if (!last) return;
+  if (typeof last.content === "string") {
+    // Never tag an empty text block — Anthropic rejects those.
+    if (!last.content.trim()) return;
+    last.content = [{ type: "text", text: last.content, cache_control: { type: "ephemeral" } }];
+  } else if (Array.isArray(last.content) && last.content.length > 0) {
+    const lastBlock = last.content[last.content.length - 1];
+    last.content[last.content.length - 1] = { ...lastBlock, cache_control: { type: "ephemeral" } };
+  }
+}
+
 export class AnthropicProvider implements ModelProvider {
   private baseUrl: string;
   private apiKey: string;
@@ -126,15 +146,26 @@ export class AnthropicProvider implements ModelProvider {
   ): Promise<CompletionResponse> {
     const url = `${this.baseUrl}/v1/messages`;
 
+    // Prompt caching: tag the conversation tail so the whole prior prefix
+    // (tools + system + earlier turns) is served from cache on later loop turns.
+    const messages = toAnthropicMessages(request.messages);
+    markLastBlockForCaching(messages);
+
     const body: any = {
       model: request.model,
-      messages: toAnthropicMessages(request.messages),
+      messages,
       max_tokens: request.maxTokens ?? 4096, // Anthropic requires max_tokens
       temperature: request.temperature ?? 0.7
     };
 
     if (request.systemPrompt) {
-      body.system = request.systemPrompt;
+      // Send the system prompt as a cacheable block. This breakpoint caches the
+      // stable prefix (tools come before system in the cache, so they are
+      // covered too); within the 5-minute TTL each agent-loop turn reads it back
+      // at ~10% of the input cost instead of re-billing the full prompt.
+      body.system = [
+        { type: "text", text: request.systemPrompt, cache_control: { type: "ephemeral" } }
+      ];
     }
 
     const tools = toAnthropicTools(request.tools);
@@ -205,9 +236,13 @@ export class AnthropicProvider implements ModelProvider {
         toolCalls,
         raw: data,
         usage: usage ? {
+          // Anthropic's input_tokens already EXCLUDES cached reads and cache
+          // writes, so these three are disjoint buckets of prompt tokens.
           inputTokens: usage.input_tokens,
           outputTokens: usage.output_tokens,
-          totalTokens: usage.input_tokens + usage.output_tokens
+          totalTokens: usage.input_tokens + usage.output_tokens,
+          cacheReadInputTokens: usage.cache_read_input_tokens ?? undefined,
+          cacheWriteInputTokens: usage.cache_creation_input_tokens ?? undefined
         } : undefined
       };
     } catch (error: any) {

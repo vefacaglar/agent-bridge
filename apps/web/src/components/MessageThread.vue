@@ -622,7 +622,7 @@ const formattedElapsedTime = computed(() => {
 
 .terminal-toggle-btn:hover {
   color: var(--text);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--surface-strong);
   border-color: var(--border);
 }
 
@@ -720,7 +720,7 @@ const formattedElapsedTime = computed(() => {
 
 .copy-button-icon:hover {
   color: var(--text);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--surface-strong);
 }
 
 .user-bubble {

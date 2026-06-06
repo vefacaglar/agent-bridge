@@ -126,9 +126,9 @@ function ruleScopeText(rule: PermissionRule): string {
 
 .perm-rule-revoke {
   flex: 0 0 auto;
-  background: rgba(255, 138, 128, 0.1);
+  background: var(--danger-soft);
   color: var(--danger);
-  border: 1px solid rgba(255, 138, 128, 0.2);
+  border: 1px solid var(--danger-border);
   padding: 6px 14px;
   border-radius: 6px;
   font-size: 0.8rem;
@@ -138,8 +138,8 @@ function ruleScopeText(rule: PermissionRule): string {
 }
 
 .perm-rule-revoke:hover {
-  background: rgba(255, 138, 128, 0.2);
-  border-color: rgba(255, 138, 128, 0.3);
+  background: var(--danger-soft-strong);
+  border-color: var(--danger);
 }
 
 .danger-text {

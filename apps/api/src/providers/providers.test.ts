@@ -113,7 +113,8 @@ test("Provider Registry and Model Providers Unit Tests", async (t) => {
     assert.deepStrictEqual(res.usage, {
       inputTokens: 10,
       outputTokens: 5,
-      totalTokens: 15
+      totalTokens: 15,
+      cacheReadInputTokens: undefined
     });
   });
 
@@ -187,10 +188,17 @@ test("Provider Registry and Model Providers Unit Tests", async (t) => {
 
       const body = JSON.parse(options.body);
       assert.strictEqual(body.model, "claude-model");
-      assert.strictEqual(body.system, "System prompt");
+      // System prompt is sent as a cacheable text block.
+      assert.deepStrictEqual(body.system, [
+        { type: "text", text: "System prompt", cache_control: { type: "ephemeral" } }
+      ]);
       assert.strictEqual(body.messages.length, 1);
       assert.strictEqual(body.messages[0].role, "user");
-      assert.strictEqual(body.messages[0].content, "Claude hello");
+      // The last message's tail block carries the rolling cache breakpoint, so a
+      // plain string turn is promoted to a text block.
+      assert.deepStrictEqual(body.messages[0].content, [
+        { type: "text", text: "Claude hello", cache_control: { type: "ephemeral" } }
+      ]);
 
       return {
         ok: true,
@@ -217,7 +225,9 @@ test("Provider Registry and Model Providers Unit Tests", async (t) => {
     assert.deepStrictEqual(res.usage, {
       inputTokens: 12,
       outputTokens: 8,
-      totalTokens: 20
+      totalTokens: 20,
+      cacheReadInputTokens: undefined,
+      cacheWriteInputTokens: undefined
     });
   });
 

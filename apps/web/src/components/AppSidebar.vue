@@ -371,12 +371,12 @@ function onDeleteProject(path: string, event: Event) {
 
 .new-chat-project-btn:hover {
   color: var(--text);
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--surface-strong);
 }
 
 .delete-project-btn:hover {
   color: var(--danger);
-  background: rgba(255, 138, 128, 0.15);
+  background: var(--danger-soft-strong);
 }
 
 /* Slide expand transition for the accordion */

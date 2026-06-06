@@ -321,7 +321,7 @@ function submitAdd() {
 }
 
 .mem-btn {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--surface-strong);
   color: var(--muted);
   border: 1px solid var(--border);
   padding: 6px 12px;
@@ -334,18 +334,18 @@ function submitAdd() {
 
 .mem-btn:hover {
   color: var(--text);
-  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--muted);
 }
 
 .mem-btn.danger {
-  background: rgba(255, 138, 128, 0.1);
+  background: var(--danger-soft);
   color: var(--danger);
-  border-color: rgba(255, 138, 128, 0.2);
+  border-color: var(--danger-border);
 }
 
 .mem-btn.danger:hover {
-  background: rgba(255, 138, 128, 0.2);
-  border-color: rgba(255, 138, 128, 0.3);
+  background: var(--danger-soft-strong);
+  border-color: var(--danger);
 }
 
 .danger-text {

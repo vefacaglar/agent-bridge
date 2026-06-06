@@ -24,6 +24,15 @@
   --success: #88a890;
   --warning: #bca282;
   --info: #b0a0b8;
+
+  /* Soft tints derived from the semantic colors, for buttons / chips that need a
+     filled background while staying within the muted theme palette. */
+  --danger-soft: rgba(184, 130, 130, 0.12);
+  --danger-soft-strong: rgba(184, 130, 130, 0.2);
+  --danger-border: rgba(184, 130, 130, 0.32);
+  --success-soft: rgba(136, 168, 144, 0.14);
+  --success-border: rgba(136, 168, 144, 0.34);
+
   --radius: 10px;
 
   /* Shared top-bar geometry so the three columns' header rows line up:

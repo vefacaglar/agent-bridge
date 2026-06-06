@@ -235,3 +235,4 @@ PLAN.local.md
 !*.example.env
 !README.md
 !DEVELOPMENT_PLAN.md
+usage.log

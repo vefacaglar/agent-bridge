@@ -3,6 +3,7 @@ import type { ModelProvider } from "../providers/ModelProvider.js";
 import { RunRepository, MessageRepository, PlanRepository, MemoryRepository } from "../database/repositories.js";
 import { ProviderRegistry } from "../providers/ProviderRegistry.js";
 import { eventBus } from "./eventBus.js";
+import { appendFileSync } from "node:fs";
 import { db } from "../database/db.js";
 import { buildSystemPrompt, buildCoderSystemPrompt, buildUtilitySystemPrompt, formatMemoryContext } from "./systemPrompt.js";
 import { WORKSPACE_TOOLS, UPDATE_PLAN_TOOL, DELEGATE_TASKS_TOOL, DELEGATE_UTILITY_TOOL, UTILITY_TOOLS, SET_TITLE_TOOL, ASK_QUESTION_TOOL, REMEMBER_TOOL, executeWorkspaceToolAsync, buildPermissionPreview, DANGEROUS_TOOLS, READONLY_TOOLS, MODIFYING_TOOLS, permissionKey } from "./workspaceTools.js";
@@ -531,6 +532,29 @@ export class Orchestrator {
       });
 
       checkCancelled();
+
+      // Prompt-cache measurement: one line per model call so cache hit-rate is
+      // observable live in the server console during a run. inputTokens is the
+      // fresh (full-rate) prompt; cacheRead is served cheaply from cache.
+      if (response.usage) {
+        const u = response.usage;
+        const fresh = u.inputTokens ?? 0;
+        const cacheRead = u.cacheReadInputTokens ?? 0;
+        const cacheWrite = u.cacheWriteInputTokens ?? 0;
+        const promptTotal = fresh + cacheRead + cacheWrite;
+        const hitPct = promptTotal > 0 ? Math.round((cacheRead / promptTotal) * 100) : 0;
+        const line =
+          `[usage] ${new Date().toISOString()} run=${runId} role=${opts.agentRole ?? "main"} model=${opts.model} ` +
+          `in=${fresh} cacheRead=${cacheRead} cacheWrite=${cacheWrite} out=${u.outputTokens ?? 0} cacheHit=${hitPct}%`;
+        console.log(line);
+        // Also append to a local log file so token/cache usage can be inspected
+        // after the fact (the console stream is otherwise lost in the dev terminal).
+        try {
+          appendFileSync("usage.log", line + "\n");
+        } catch {
+          // Best-effort only; never let logging break a run.
+        }
+      }
 
       const finalMsg: RunMessage = {
         id: msgId,

@@ -1029,28 +1029,28 @@ defineExpose({
 }
 
 .plan-action.start {
-  border-color: #ffffff;
-  background: #ffffff;
-  color: #111111;
+  border-color: var(--text);
+  background: var(--text);
+  color: var(--bg);
 }
 
 .plan-action.start:hover {
-  border-color: #ffffff;
-  background: #e6e6e6;
-  color: #111111;
+  border-color: var(--text);
+  background: var(--text);
+  color: var(--bg);
+  opacity: 0.85;
 }
 
 .plan-action.reject {
-  border-color: var(--danger);
-  background: var(--danger);
-  color: #ffffff;
+  border-color: var(--danger-border);
+  background: var(--danger-soft);
+  color: var(--danger);
 }
 
 .plan-action.reject:hover {
   border-color: var(--danger);
-  background: var(--danger);
-  color: #ffffff;
-  filter: brightness(1.1);
+  background: var(--danger-soft-strong);
+  color: var(--danger);
 }
 
 /* Minimal: the transcript just gets breathing room and a hairline separator —

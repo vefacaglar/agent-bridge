@@ -188,43 +188,32 @@ function submit() {
   width: 100%;
   text-align: left;
   padding: 10px 14px;
-  border-radius: 8px;
+  border-radius: 9px;
   font-size: 0.85rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
-  background: transparent;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+  background: var(--bg);
   color: var(--text);
   border: 1px solid var(--border);
 }
 
 .composer-confirm-btn:hover {
-  background: rgba(255, 255, 255, 0.05);
   border-color: var(--muted);
 }
 
-.composer-confirm-btn.no {
-  background: rgba(255, 138, 128, 0.1);
-  color: var(--danger);
-  border: 1px solid rgba(255, 138, 128, 0.2);
-}
-
-.composer-confirm-btn.no:hover {
-  background: rgba(255, 138, 128, 0.2);
-  border-color: rgba(255, 138, 128, 0.3);
-}
-
+.composer-confirm-btn.no,
 .composer-confirm-btn.yes {
-  background: var(--text);
-  color: var(--bg);
-  border: none;
+  background: var(--surface-strong);
+  color: var(--text);
+  border-color: transparent;
   font-weight: 600;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 
+.composer-confirm-btn.no:hover,
 .composer-confirm-btn.yes:hover {
-  background: #ffffff;
-  transform: translateY(-1px);
+  border-color: transparent;
+  filter: brightness(1.05);
 }
 
 .confirm-note {
@@ -238,7 +227,7 @@ function submit() {
   color: var(--text);
   font-size: 0.82rem;
   font-family: inherit;
-  resize: vertical;
+  resize: none;
 }
 
 .confirm-note::placeholder {
@@ -251,8 +240,8 @@ function submit() {
 }
 
 .composer-confirm-btn.selected {
-  border-color: var(--text);
-  background: rgba(255, 255, 255, 0.08);
+  border-color: transparent;
+  background: var(--surface-strong);
   font-weight: 600;
 }
 
@@ -285,22 +274,23 @@ function submit() {
 .confirm-nav-btn.primary {
   background: var(--text);
   color: var(--bg);
-  border: none;
+  border: 1px solid var(--text);
   font-weight: 600;
 }
 
 .confirm-nav-btn.primary:hover:not(:disabled) {
-  background: #ffffff;
+  opacity: 0.85;
 }
 
 .confirm-nav-btn.secondary {
   background: transparent;
-  color: var(--text);
+  color: var(--muted);
   border: 1px solid var(--border);
 }
 
 .confirm-nav-btn.secondary:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  border-color: var(--muted);
 }
 
 .confirm-nav-btn:disabled {

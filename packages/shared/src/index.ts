@@ -39,9 +39,14 @@ export interface CompletionResponse {
   toolCalls?: ToolCall[];
   raw?: unknown;
   usage?: {
+    // Fresh (uncached) input tokens billed at the full input rate.
     inputTokens?: number;
     outputTokens?: number;
     totalTokens?: number;
+    // Prompt-cache accounting: tokens read back from cache (cheap) and, for
+    // Anthropic, tokens written to the cache on this call (a one-time premium).
+    cacheReadInputTokens?: number;
+    cacheWriteInputTokens?: number;
   };
 }
 

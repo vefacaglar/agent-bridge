@@ -668,8 +668,8 @@ onBeforeUnmount(() => {
   justify-content: center;
   width: 32px;
   height: 32px;
-  background: #e3e3e2;
-  color: #11110f;
+  background: var(--text);
+  color: var(--bg);
   border: none;
   border-radius: 9px;
   cursor: pointer;
@@ -692,13 +692,13 @@ onBeforeUnmount(() => {
 }
 
 .composer-send-btn.stop-mode {
-  background: rgba(255, 138, 128, 0.15);
-  color: #ffd1ce;
-  border: 1px solid rgba(255, 138, 128, 0.45);
+  background: var(--danger-soft);
+  color: var(--danger);
+  border: 1px solid var(--danger-border);
 }
 
 .composer-send-btn.stop-mode:hover {
-  background: rgba(255, 138, 128, 0.25);
+  background: var(--danger-soft-strong);
 }
 
 .composer-menu-row {
@@ -859,7 +859,7 @@ onBeforeUnmount(() => {
 }
 
 .bypass-toggle-badge.enabled {
-  background: rgba(123, 216, 143, 0.15);
+  background: var(--success-soft);
   color: var(--success);
 }
 
@@ -1082,7 +1082,7 @@ onBeforeUnmount(() => {
 
 .remove-attachment-btn:hover {
   color: var(--danger);
-  background: rgba(255, 138, 128, 0.1);
+  background: var(--danger-soft);
 }
 
 /* Attach file button styling */

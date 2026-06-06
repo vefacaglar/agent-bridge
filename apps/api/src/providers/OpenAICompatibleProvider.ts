@@ -23,6 +23,23 @@ const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, m
 const backoffDelay = (attempt: number): number =>
   RETRY_BASE_DELAY_MS * 2 ** attempt + Math.floor(Math.random() * 150);
 
+/**
+ * Maps an OpenAI-shaped usage object to our common usage shape. OpenAI counts
+ * cached prompt tokens INSIDE prompt_tokens, so we subtract them to report the
+ * fresh (full-rate) input and surface the cached portion separately. There is no
+ * cache-write premium on this API.
+ */
+function mapOpenAIUsage(usage: any): CompletionResponse["usage"] {
+  if (!usage) return undefined;
+  const cachedTokens = usage.prompt_tokens_details?.cached_tokens ?? 0;
+  return {
+    inputTokens: usage.prompt_tokens != null ? usage.prompt_tokens - cachedTokens : undefined,
+    outputTokens: usage.completion_tokens,
+    totalTokens: usage.total_tokens,
+    cacheReadInputTokens: usage.prompt_tokens_details?.cached_tokens ?? undefined
+  };
+}
+
 function parseOpenAIMessageContent(content: string): any {
   if (!content) return "";
   const regex = /!\[([^\]]*)\]\((data:image\/[a-zA-Z+.-]+;base64,[^)]+)\)/g;
@@ -70,7 +87,12 @@ export class OpenAICompatibleProvider implements ModelProvider {
   ): Promise<CompletionResponse> {
     const url = `${this.baseUrl}/chat/completions`;
 
-    // Map system prompt and history into messages list
+    // Map system prompt and history into messages list. Prompt caching here is
+    // AUTOMATIC: OpenAI and most compatible backends cache on a stable leading
+    // prefix with no explicit markers (and there is no portable cache_control
+    // field to set without risking rejection by stricter compatible servers).
+    // Keeping the system prompt first and the prompt prefix stable across loop
+    // turns — which it is — is what lets that automatic caching kick in.
     const messages = [];
     if (request.systemPrompt) {
       messages.push({ role: "system", content: request.systemPrompt });
@@ -103,6 +125,10 @@ export class OpenAICompatibleProvider implements ModelProvider {
 
     if (onChunk) {
       body.stream = true;
+      // Ask for a trailing usage chunk so streamed agent-loop calls can still
+      // report token + prompt-cache accounting (otherwise usage is lost). Most
+      // OpenAI-compatible servers honor this or harmlessly ignore it.
+      body.stream_options = { include_usage: true };
     }
 
     // Idle (inactivity) timeout: the timer resets whenever data arrives, so a
@@ -171,6 +197,7 @@ export class OpenAICompatibleProvider implements ModelProvider {
         let buffer = "";
         let accumulatedContent = "";
         let accumulatedReasoning = "";
+        let streamedUsage: any = undefined;
         const toolCallsAccumulator: any[] = [];
 
         while (true) {
@@ -190,6 +217,8 @@ export class OpenAICompatibleProvider implements ModelProvider {
 
             try {
               const parsed = JSON.parse(rawJson);
+              // The trailing include_usage chunk carries usage with no choices.
+              if (parsed.usage) streamedUsage = parsed.usage;
               const choice = parsed.choices?.[0];
               if (!choice) continue;
 
@@ -247,7 +276,8 @@ export class OpenAICompatibleProvider implements ModelProvider {
               arguments: tc.function.arguments
             }
           })) : undefined,
-          raw: null
+          raw: null,
+          usage: streamedUsage ? mapOpenAIUsage(streamedUsage) : undefined
         };
       }
 
@@ -266,8 +296,6 @@ export class OpenAICompatibleProvider implements ModelProvider {
         throw new Error("Provider returned an empty response");
       }
 
-      const usage = data.usage;
-
       return {
         content,
         reasoningContent,
@@ -280,11 +308,7 @@ export class OpenAICompatibleProvider implements ModelProvider {
           }
         })) : undefined,
         raw: data,
-        usage: usage ? {
-          inputTokens: usage.prompt_tokens,
-          outputTokens: usage.completion_tokens,
-          totalTokens: usage.total_tokens
-        } : undefined
+        usage: mapOpenAIUsage(data.usage)
       };
     } catch (error: any) {
       if (error.name === "AbortError" || error.message?.includes("aborted")) {
