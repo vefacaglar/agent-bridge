@@ -19,6 +19,20 @@ export function useChatAutoScroll(
     return el.scrollHeight - el.scrollTop - el.clientHeight <= threshold;
   }
 
+  function scrollToUserMessage() {
+    if (!container.value) return;
+    const userContainers = container.value.querySelectorAll('.user-message-container');
+    const lastUserContainer = userContainers[userContainers.length - 1] as HTMLElement | undefined;
+    if (lastUserContainer) {
+      // Add 100px offset to scroll the user's message higher up and bring the reasoning block into view
+      const topOffset = lastUserContainer.getBoundingClientRect().top - container.value.getBoundingClientRect().top + container.value.scrollTop + 100;
+      container.value.scrollTo({
+        top: topOffset,
+        behavior: 'smooth'
+      });
+    }
+  }
+
   // Watch activeRunId to force scroll when chat loads.
   watch(activeRunId, () => {
     forceScrollNext = true;
@@ -40,11 +54,12 @@ export function useChatAutoScroll(
       const transitionedToResponding = wasThinkingLastTime && !isThinking;
       wasThinkingLastTime = !!isThinking;
 
+      const isUserMsg = lastMsg && lastMsg.role === 'user';
+
       // We force scroll if:
       // - forceScrollNext flag is set (e.g. activeRunId changed)
-      // - The last message is a user message (user just sent a message)
       // - The model just transitioned from thinking to responding
-      const forceScroll = forceScrollNext || (lastMsg && lastMsg.role === 'user') || transitionedToResponding;
+      const forceScroll = forceScrollNext || transitionedToResponding;
 
       // Clear the forceScrollNext flag for future message updates
       forceScrollNext = false;
@@ -52,7 +67,9 @@ export function useChatAutoScroll(
       const wasAtBottom = isAtBottom(container.value);
 
       nextTick(() => {
-        if (!isThinking && (forceScroll || wasAtBottom)) {
+        if (isUserMsg) {
+          scrollToUserMessage();
+        } else if (!isThinking && (forceScroll || wasAtBottom)) {
           scrollToBottom();
         }
       });
