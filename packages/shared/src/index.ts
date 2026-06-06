@@ -117,6 +117,11 @@ export interface AgentPreset {
   // via delegate_to_utility, keeping the architect's context lean. Absent =>
   // the run has no utility tier.
   utility?: AgentPresetEndpoint;
+  // When true, a delegated task that fails on its sub-agent (utility/coder) is
+  // retried down a resilience chain — utility -> coder -> architect — and as a
+  // last resort the architect executes it directly with the full toolset. When
+  // false (default), a failed delegation is not escalated to the architect.
+  fallback?: boolean;
 }
 
 export type RunEvent =

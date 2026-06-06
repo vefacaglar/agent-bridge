@@ -26,6 +26,7 @@ const formCoder = ref('');
 // Empty string => no utility tier (the "None" option).
 const formUtility = ref('');
 const formMaxSubAgents = ref(3);
+const formFallback = ref(false);
 
 // Flattened provider/model options for the architect + coder dropdowns.
 const modelOptions = computed(() => {
@@ -62,6 +63,7 @@ function handleAdd() {
   formCoder.value = modelOptions.value[0]?.value ?? '';
   formUtility.value = '';
   formMaxSubAgents.value = 3;
+  formFallback.value = false;
   isEditing.value = true;
 }
 
@@ -73,6 +75,7 @@ function handleEdit(preset: AgentPreset) {
   formCoder.value = combined(preset.coder.providerId, preset.coder.model);
   formUtility.value = preset.utility ? combined(preset.utility.providerId, preset.utility.model) : '';
   formMaxSubAgents.value = preset.maxSubAgents;
+  formFallback.value = !!preset.fallback;
   isEditing.value = true;
 }
 
@@ -90,7 +93,8 @@ function toBlocks(list: AgentPreset[]): Record<string, any> {
       architect: { providerId: p.architect.providerId, model: p.architect.model },
       coder: { providerId: p.coder.providerId, model: p.coder.model },
       maxSubAgents: p.maxSubAgents,
-      ...(p.utility ? { utility: { providerId: p.utility.providerId, model: p.utility.model } } : {})
+      ...(p.utility ? { utility: { providerId: p.utility.providerId, model: p.utility.model } } : {}),
+      ...(p.fallback ? { fallback: true } : {})
     };
   }
   return blocks;
@@ -121,7 +125,8 @@ async function handleSave() {
     architect,
     coder,
     maxSubAgents: Math.min(3, Math.max(1, Number(formMaxSubAgents.value) || 1)),
-    utility: formUtility.value ? splitCombined(formUtility.value) : undefined
+    utility: formUtility.value ? splitCombined(formUtility.value) : undefined,
+    fallback: formFallback.value
   };
 
   // Replace the edited preset (by original id) or append a new one.
@@ -200,6 +205,16 @@ async function handleDelete(preset: AgentPreset) {
           <option :value="3">3</option>
         </select>
       </div>
+      <label class="form-toggle">
+        <input type="checkbox" v-model="formFallback" />
+        <span>
+          Fallback to architect
+          <span class="form-hint">
+            — if a delegated task fails on the utility/coder model, escalate
+            (utility → coder → architect) and let the architect finish it directly.
+          </span>
+        </span>
+      </label>
       <div class="editor-actions">
         <button class="ghost-btn" @click="cancelEdit">Cancel</button>
         <button class="add-btn" @click="handleSave">Save preset</button>
@@ -213,7 +228,7 @@ async function handleDelete(preset: AgentPreset) {
         <div class="preset-info">
           <span class="preset-name">{{ preset.displayName }}</span>
           <span class="preset-flow">
-            {{ preset.architect.model }} → {{ preset.coder.model }}<template v-if="preset.utility"> · utility: {{ preset.utility.model }}</template> · up to {{ preset.maxSubAgents }} sub-agent{{ preset.maxSubAgents === 1 ? '' : 's' }}
+            {{ preset.architect.model }} → {{ preset.coder.model }}<template v-if="preset.utility"> · utility: {{ preset.utility.model }}</template> · up to {{ preset.maxSubAgents }} sub-agent{{ preset.maxSubAgents === 1 ? '' : 's' }}<template v-if="preset.fallback"> · fallback on</template>
           </span>
         </div>
         <div class="preset-actions">
@@ -283,6 +298,20 @@ async function handleDelete(preset: AgentPreset) {
 .form-hint {
   color: var(--faint);
   font-weight: 400;
+}
+
+.form-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: 0.82rem;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.form-toggle input {
+  margin-top: 2px;
+  flex: 0 0 auto;
 }
 
 .form-row input,

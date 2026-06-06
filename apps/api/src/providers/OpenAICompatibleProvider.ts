@@ -5,6 +5,24 @@ import type { ModelProvider } from "./ModelProvider.js";
 // so a model that keeps streaming (e.g. long reasoning) is never cut off.
 const IDLE_TIMEOUT_MS = 300_000; // 5 minutes
 
+// Transient upstream failures (provider overloaded / temporarily unavailable /
+// rate limited) are retried a couple of times with a short exponential backoff
+// before giving up — kept brief on purpose so a sustained outage falls through
+// quickly to the orchestrator's sub-agent fallback chain instead of stalling.
+// We only retry BEFORE any stream data has been emitted, so the UI never sees
+// duplicated content.
+const MAX_RETRIES = 2;
+const RETRY_BASE_DELAY_MS = 400;
+
+const isTransientStatus = (status: number): boolean =>
+  status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
+
+const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
+
+// Exponential backoff with jitter: ~0.4s, ~0.8s (+ up to 150ms random).
+const backoffDelay = (attempt: number): number =>
+  RETRY_BASE_DELAY_MS * 2 ** attempt + Math.floor(Math.random() * 150);
+
 function parseOpenAIMessageContent(content: string): any {
   if (!content) return "";
   const regex = /!\[([^\]]*)\]\((data:image\/[a-zA-Z+.-]+;base64,[^)]+)\)/g;
@@ -89,30 +107,62 @@ export class OpenAICompatibleProvider implements ModelProvider {
 
     // Idle (inactivity) timeout: the timer resets whenever data arrives, so a
     // long-running model is never cut off mid-stream — only a genuine stall
-    // (no bytes for IDLE_TIMEOUT_MS) aborts the request.
-    const controller = new AbortController();
+    // (no bytes for IDLE_TIMEOUT_MS) aborts the request. The controller/timer
+    // are reassigned per attempt and kept alive for the successful attempt's
+    // body read.
+    let controller!: AbortController;
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
     const armTimeout = () => {
       clearTimeout(timeoutId);
       timeoutId = setTimeout(() => controller.abort(), IDLE_TIMEOUT_MS);
     };
-    armTimeout();
 
     try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${this.apiKey}`
-        },
-        body: JSON.stringify(body),
-        signal: controller.signal
-      });
-      armTimeout();
+      // Retry loop around the request + initial response check. Transient
+      // upstream failures (overloaded / 5xx / rate limit) and pre-stream network
+      // errors are retried with backoff; once we have a good response we fall
+      // through and read it (no retry past this point, to avoid dup chunks).
+      let response!: Response;
+      for (let attempt = 0; ; attempt++) {
+        controller = new AbortController();
+        armTimeout();
 
-      if (!response.ok) {
-        const errText = await response.text().catch(() => "Unknown error");
-        throw new Error(`OpenAI API returned status ${response.status}: ${errText}`);
+        try {
+          response = await fetch(url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${this.apiKey}`
+            },
+            body: JSON.stringify(body),
+            signal: controller.signal
+          });
+          armTimeout();
+        } catch (fetchError: any) {
+          // A genuine idle timeout abort is not retryable — surface it as-is.
+          if (fetchError.name === "AbortError" || fetchError.message?.includes("aborted")) {
+            throw fetchError;
+          }
+          // Pre-stream network error: retry if attempts remain.
+          if (attempt < MAX_RETRIES) {
+            clearTimeout(timeoutId);
+            await sleep(backoffDelay(attempt));
+            continue;
+          }
+          throw fetchError;
+        }
+
+        if (!response.ok) {
+          const errText = await response.text().catch(() => "Unknown error");
+          if (isTransientStatus(response.status) && attempt < MAX_RETRIES) {
+            clearTimeout(timeoutId);
+            await sleep(backoffDelay(attempt));
+            continue;
+          }
+          throw new Error(`OpenAI API returned status ${response.status}: ${errText}`);
+        }
+
+        break; // got a usable response — stop retrying
       }
 
       if (onChunk && response.body) {

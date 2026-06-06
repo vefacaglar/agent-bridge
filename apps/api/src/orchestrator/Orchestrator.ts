@@ -9,6 +9,17 @@ import { WORKSPACE_TOOLS, UPDATE_PLAN_TOOL, DELEGATE_TASKS_TOOL, DELEGATE_UTILIT
 
 type PermissionDecision = "allow_once" | "allow_project" | "allow_always" | "deny";
 
+/** One execution attempt for a delegated task: a model paired with its toolset. */
+interface SubAgentTier {
+  providerId: string;
+  providerDisplayName: string;
+  model: string;
+  tools: any[];
+  agentRole: RunMessage["agentRole"];
+  systemPrompt: string;
+  agentName: string;
+}
+
 function randomId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
 }
@@ -196,58 +207,75 @@ export class Orchestrator {
 
   /**
    * Reconstructs the provider-facing message list from persisted messages,
-   * reattaching tool_call ids so tool results line up with their calls.
+   * pairing each assistant tool_call with its results so the history is valid
+   * for strict providers ("a tool result must immediately follow its call").
+   *
+   * Replays ONLY top-level (architect/main) messages: coder & utility sub-agent
+   * messages are internal to a delegate_tasks/delegate_to_utility call — the
+   * architect never saw them, only the summarized tool result — and including
+   * them would interleave their messages between the architect's delegate
+   * tool_call and its result.
    */
   private rebuildHistory(runId: string, task: string): ChatMessage[] {
-    // Replay ONLY top-level (architect/main) messages. Coder & utility sub-agent
-    // messages are internal to a delegate_tasks/delegate_to_utility call — the
-    // architect never saw them, only the summarized tool result. Including them
-    // would also interleave their assistant/tool messages between the architect's
-    // delegate tool_call and its tool result, which strict providers reject with
-    // "tool call result does not follow tool call".
-    const allMessages = this.messageRepo
+    const messages = this.messageRepo
       .listByRunId(runId)
       .filter(m => m.agentRole !== "coder" && m.agentRole !== "utility");
     const chatMessages: ChatMessage[] = [{ role: "user", content: task }];
 
-    for (const m of allMessages) {
-      const chatMsg: ChatMessage = { role: m.role, content: m.content };
+    for (let i = 0; i < messages.length; i++) {
+      const m = messages[i];
 
-      if (m.role === "tool") {
-        const precedingAssistant = allMessages
-          .slice(0, allMessages.indexOf(m))
-          .reverse()
-          .find(msg => msg.role === "assistant" && msg.rawResponse);
+      // A tool message reached here directly is an orphan result: its assistant
+      // tool_call (if any) consumes its results in the assistant branch below, so
+      // anything left over has no matching call. Drop it — sending it would make
+      // a provider reject the whole request.
+      if (m.role === "tool") continue;
 
-        if (precedingAssistant && precedingAssistant.rawResponse) {
+      if (m.role === "assistant") {
+        let toolCalls: any[] | undefined;
+        if (m.rawResponse) {
           try {
-            const tcList = JSON.parse(precedingAssistant.rawResponse);
-            if (Array.isArray(tcList) && tcList.length > 0) {
-              const toolIndex = allMessages
-                .slice(allMessages.indexOf(precedingAssistant) + 1, allMessages.indexOf(m))
-                .filter(msg => msg.role === "tool").length;
-              if (tcList[toolIndex]) {
-                chatMsg.tool_call_id = tcList[toolIndex].id;
-                chatMsg.name = tcList[toolIndex].function.name;
-              }
-            }
-          } catch (e) { /* ignore malformed raw response */ }
+            const parsed = JSON.parse(m.rawResponse);
+            if (Array.isArray(parsed) && parsed.length > 0) toolCalls = parsed;
+          } catch { /* ignore malformed raw response */ }
         }
 
-        if (!chatMsg.tool_call_id) {
-          chatMsg.tool_call_id = "call_fallback";
-          chatMsg.name = "write_file";
+        if (!toolCalls) {
+          chatMessages.push({ role: "assistant", content: m.content });
+          continue;
         }
-      } else if (m.role === "assistant" && m.rawResponse) {
-        try {
-          const tcs = JSON.parse(m.rawResponse);
-          if (Array.isArray(tcs)) {
-            chatMsg.toolCalls = tcs;
-          }
-        } catch (e) { /* ignore malformed raw response */ }
+
+        // The N tool results for this call are the next N consecutive tool
+        // messages. Collect them in order.
+        const results: RunMessage[] = [];
+        let j = i + 1;
+        while (j < messages.length && messages[j].role === "tool" && results.length < toolCalls.length) {
+          results.push(messages[j]);
+          j++;
+        }
+
+        if (results.length < toolCalls.length) {
+          // Results are missing (e.g. the run was cancelled mid tool execution).
+          // Drop the tool_calls rather than send calls without results.
+          chatMessages.push({ role: "assistant", content: m.content });
+          continue;
+        }
+
+        chatMessages.push({ role: "assistant", content: m.content || "", toolCalls });
+        for (let k = 0; k < toolCalls.length; k++) {
+          chatMessages.push({
+            role: "tool",
+            content: results[k].content,
+            tool_call_id: toolCalls[k].id,
+            name: toolCalls[k].function?.name
+          });
+        }
+        i = j - 1; // skip the consumed result messages
+        continue;
       }
 
-      chatMessages.push(chatMsg);
+      // system / user messages pass through unchanged
+      chatMessages.push({ role: m.role, content: m.content });
     }
 
     return chatMessages;
@@ -257,6 +285,17 @@ export class Orchestrator {
   private maxSubAgentsFor(run: Run): number {
     const preset = run.agentPreset ? this.registry.getAgentPreset(run.agentPreset) : undefined;
     return Math.min(3, Math.max(1, preset?.maxSubAgents ?? 3));
+  }
+
+  /**
+   * Whether this run's preset opts into the sub-agent fallback chain. When on, a
+   * delegated task that errors out escalates (utility -> coder -> architect), and
+   * the architect can take over directly as a last resort. Resolved live from the
+   * preset; absent/deleted preset => off.
+   */
+  private fallbackEnabled(run: Run): boolean {
+    const preset = run.agentPreset ? this.registry.getAgentPreset(run.agentPreset) : undefined;
+    return !!preset?.fallback;
   }
 
   /**
@@ -494,10 +533,67 @@ export class Orchestrator {
   }
 
   /**
+   * Runs a delegated task through an ordered list of execution tiers, escalating
+   * to the next tier only when one throws a provider/network error (cancellation
+   * is never swallowed). This is the resilience chain: utility -> coder ->
+   * architect. If a cheap model is unavailable the work retries on a stronger
+   * one, and as a last resort the architect executes it directly with the full
+   * workspace toolset. Normal tool failures are NOT thrown — they come back
+   * inside the sub-agent's summary — so they never trigger escalation here.
+   */
+  private async runTaskWithFallback(
+    runId: string,
+    run: Run,
+    task: { title: string; instructions: string },
+    tiers: SubAgentTier[]
+  ): Promise<{ title: string; summary: string }> {
+    let lastError: any;
+    for (let t = 0; t < tiers.length; t++) {
+      const tier = tiers[t];
+      try {
+        const summary = await this.runAgentLoop(runId, run, [{ role: "user", content: task.instructions }], {
+          providerId: tier.providerId,
+          providerDisplayName: tier.providerDisplayName,
+          model: tier.model,
+          systemPrompt: tier.systemPrompt,
+          tools: tier.tools,
+          agentRole: tier.agentRole,
+          agentName: tier.agentName
+        });
+        return { title: task.title, summary: summary || "(no summary returned)" };
+      } catch (err: any) {
+        // Cancellation must unwind the whole run — never swallow it as a tier failure.
+        if (err?.message === "ORCHESTRATION_CANCELLED") throw err;
+        lastError = err;
+        const next = t + 1 < tiers.length ? `escalating to "${tiers[t + 1].agentName}"` : "no tiers left";
+        console.warn(`[Orchestrator] Run ${runId} - tier "${tier.agentName}" failed (${err?.message}); ${next}.`);
+      }
+    }
+    return {
+      title: task.title,
+      summary: `(could not complete — all execution tiers failed: ${lastError?.message ?? "unknown error"})`
+    };
+  }
+
+  /** Builds the architect "last resort" tier: the run's own model + full toolset. */
+  private architectTier(run: Run, task: { title: string }): SubAgentTier {
+    return {
+      providerId: run.providerId,
+      providerDisplayName: run.providerDisplayName,
+      model: run.model,
+      tools: [...WORKSPACE_TOOLS],
+      agentRole: "coder",
+      systemPrompt: buildCoderSystemPrompt(run.projectName, run.projectPath, task.title),
+      agentName: `${task.title} (architect fallback)`
+    };
+  }
+
+  /**
    * Executes a delegate_tasks call from the architect: spins up 1..maxSubAgents
    * coder sub-agents (each its own runAgentLoop on the coder model, in the same
    * workspace) and returns their result summaries to the architect. Runs them in
    * parallel only when the architect explicitly requested it; otherwise sequential.
+   * If the coder model is unavailable, each task falls back to the architect.
    */
   private async executeDelegateTasks(runId: string, run: Run, toolCall: any): Promise<string> {
     if (!run.coderModel || !run.coderProviderId) {
@@ -535,20 +631,25 @@ export class Orchestrator {
     const coderDisplayName = coderMeta ? coderMeta.displayName : run.coderProviderId;
     const parallel = !!args.parallel && tasks.length > 1;
 
-    const runOne = async (task: { title: string; instructions: string }) => {
-      const systemPrompt = buildCoderSystemPrompt(run.projectName, run.projectPath, task.title);
-      const summary = await this.runAgentLoop(runId, run, [{ role: "user", content: task.instructions }], {
-        providerId: run.coderProviderId!,
-        providerDisplayName: coderDisplayName,
-        model: run.coderModel!,
-        systemPrompt,
-        tools: [...WORKSPACE_TOOLS],
-        agentRole: "coder",
-        // Tag every message with the sub-task title so the UI can render each
-        // coder sub-agent in its own window instead of merging them.
-        agentName: task.title
-      });
-      return { title: task.title, summary: summary || "(no summary returned)" };
+    const fallback = this.fallbackEnabled(run);
+    const runOne = (task: { title: string; instructions: string }) => {
+      const tiers: SubAgentTier[] = [
+        {
+          providerId: run.coderProviderId!,
+          providerDisplayName: coderDisplayName,
+          model: run.coderModel!,
+          tools: [...WORKSPACE_TOOLS],
+          agentRole: "coder",
+          systemPrompt: buildCoderSystemPrompt(run.projectName, run.projectPath, task.title),
+          // Tag every message with the sub-task title so the UI can render each
+          // coder sub-agent in its own window instead of merging them.
+          agentName: task.title
+        }
+      ];
+      // Last resort (only when the preset enables fallback): the architect takes
+      // control and does it directly.
+      if (fallback) tiers.push(this.architectTier(run, task));
+      return this.runTaskWithFallback(runId, run, task, tiers);
     };
 
     let results: { title: string; summary: string }[];
@@ -600,20 +701,41 @@ export class Orchestrator {
 
     const utilityMeta = this.registry.getSafeMetadata().find(p => p.id === run.utilityProviderId);
     const utilityDisplayName = utilityMeta ? utilityMeta.displayName : run.utilityProviderId;
+    const coderMeta = this.registry.getSafeMetadata().find(p => p.id === run.coderProviderId);
+    const coderDisplayName = coderMeta?.displayName ?? run.coderProviderId ?? "Coder";
     const parallel = !!args.parallel && tasks.length > 1;
 
-    const runOne = async (task: { title: string; instructions: string }) => {
-      const systemPrompt = buildUtilitySystemPrompt(run.projectName, run.projectPath, task.title);
-      const summary = await this.runAgentLoop(runId, run, [{ role: "user", content: task.instructions }], {
-        providerId: run.utilityProviderId!,
-        providerDisplayName: utilityDisplayName,
-        model: run.utilityModel!,
-        systemPrompt,
-        tools: [...UTILITY_TOOLS],
-        agentRole: "utility",
-        agentName: task.title
-      });
-      return { title: task.title, summary: summary || "(no summary returned)" };
+    const fallback = this.fallbackEnabled(run);
+    const runOne = (task: { title: string; instructions: string }) => {
+      const tiers: SubAgentTier[] = [
+        {
+          providerId: run.utilityProviderId!,
+          providerDisplayName: utilityDisplayName,
+          model: run.utilityModel!,
+          tools: [...UTILITY_TOOLS],
+          agentRole: "utility",
+          systemPrompt: buildUtilitySystemPrompt(run.projectName, run.projectPath, task.title),
+          agentName: task.title
+        }
+      ];
+      // Resilience chain (only when the preset enables fallback): if the cheap
+      // utility errors out, escalate to the coder (full toolset, so it can
+      // actually write/delete), then to the architect doing it directly.
+      if (fallback) {
+        if (run.coderModel && run.coderProviderId) {
+          tiers.push({
+            providerId: run.coderProviderId,
+            providerDisplayName: coderDisplayName,
+            model: run.coderModel,
+            tools: [...WORKSPACE_TOOLS],
+            agentRole: "coder",
+            systemPrompt: buildCoderSystemPrompt(run.projectName, run.projectPath, task.title),
+            agentName: `${task.title} (coder fallback)`
+          });
+        }
+        tiers.push(this.architectTier(run, task));
+      }
+      return this.runTaskWithFallback(runId, run, task, tiers);
     };
 
     let results: { title: string; summary: string }[];
