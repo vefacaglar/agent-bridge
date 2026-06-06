@@ -14,7 +14,7 @@ async function start() {
   registerRoutes(server, ctx);
 
   try {
-    const port = Number(process.env.PORT) || 3000;
+    const port = Number(process.env.PORT) || 4321;
     await server.listen({ port, host: "0.0.0.0" });
     console.log(`Server is running on http://localhost:${port}`);
   } catch (err) {

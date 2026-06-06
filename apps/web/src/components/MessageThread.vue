@@ -406,6 +406,13 @@ const formattedElapsedTime = computed(() => {
 </template>
 
 <style scoped>
+.messages-inner > :deep(.coder-group + .coder-group),
+.messages-inner > :deep(.tool-group-wrap + .tool-group-wrap),
+.messages-inner > :deep(.plan-terminal-container + .tool-group-wrap),
+.messages-inner > :deep(.tool-group-wrap + .plan-terminal-container),
+.messages-inner > :deep(.plan-terminal-container + .plan-terminal-container) {
+  margin-top: -24px !important;
+}
 /* Coder sub-agent messages: subtle left accent + monochrome badge so the
    architect's stream is visually distinct from delegated coder work. */
 .assistant-message.coder-message {

@@ -110,7 +110,7 @@ watch(() => props.children.map(c => c.message.content + (c.message.reasoningCont
 
 <style scoped>
 .coder-group {
-  margin: 14px 0;
+  margin: 1px 0;
   border: 1px solid var(--border);
   border-left: 2px solid var(--muted);
   border-radius: 10px;

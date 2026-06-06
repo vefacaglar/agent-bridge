@@ -1,6 +1,6 @@
 import type { ProviderMetadata, Run, RunMessage, Project, PermissionRule, Plan, AgentPreset } from '@agent-bridge/shared';
 
-export const API_BASE = 'http://localhost:3000';
+export const API_BASE = 'http://localhost:4321';
 
 export type PermissionDecision = 'allow_once' | 'allow_project' | 'allow_always' | 'deny';
 

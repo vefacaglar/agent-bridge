@@ -35,7 +35,7 @@ const emit = defineEmits<{
 
 <style scoped>
 .plan-terminal-container {
-  margin: 12px 0 18px;
+  margin: 1px 0;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 8px;

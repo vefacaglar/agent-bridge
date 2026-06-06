@@ -515,7 +515,7 @@ function formatToolResult(name: string, contentJson: string): string {
 }
 
 .tool-group-wrap {
-  margin: 14px 0;
+  margin: 1px 0;
   width: 100%;
 }
 
