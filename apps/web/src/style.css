@@ -1028,6 +1028,9 @@ pre {
   font-family: 'Raleway', sans-serif;
   font-size: 0.95rem;
   line-height: 1.6;
+  /* Raleway 400 reads thin on dark; 550 (variable axis, loaded as 300..700)
+     gives a sturdier body weight without quite matching bold (700). */
+  font-weight: 500;
   color: var(--text);
 }
 
