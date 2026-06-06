@@ -13,6 +13,17 @@ export interface MessageGroup {
   title?: string;
 }
 
+export interface AgentSummary {
+  id: string;
+  title: string;
+  role: 'coder' | 'utility';
+  roleLabel: string;
+  model: string;
+  status: 'running' | 'done';
+  tokenEstimate: number;
+  toolUseCount: number;
+}
+
 /** Whether an assistant message carries serialized tool calls in rawResponse. */
 export function hasToolCalls(message: RunMessage): boolean {
   if (!message.rawResponse) return false;
@@ -50,6 +61,47 @@ export function formatToolArgs(args?: string): string {
  */
 export function groupMessages(messages: RunMessage[]): MessageGroup[] {
   return foldCoderGroups(buildFlatGroups(messages));
+}
+
+export function collectAgentSummaries(groups: MessageGroup[], isRunning: boolean): AgentSummary[] {
+  const lastNonCoderIdx = lastNonCoderIndex(groups);
+  return groups
+    .map((group, index) => ({ group, index }))
+    .filter(({ group }) => group.type === 'coder_group' && group.children?.length)
+    .map(({ group, index }) => {
+      const children = group.children ?? [];
+      const role = children[0]?.message.agentRole === 'utility' ? 'utility' : 'coder';
+      const model = children.find(c => c.message.model)?.message.model ?? '';
+      return {
+        id: group.id,
+        title: group.title || (role === 'utility' ? 'Utility task' : 'Coder task'),
+        role,
+        roleLabel: role === 'utility' ? 'Utility' : 'Coder',
+        model,
+        status: isRunning && index > lastNonCoderIdx ? 'running' : 'done',
+        tokenEstimate: children.reduce((sum, child) => sum + estimateTokens(
+          `${child.message.content || ''}${child.message.reasoningContent || ''}`
+        ), 0),
+        toolUseCount: children.reduce((sum, child) => {
+          if (child.type !== 'tool_group') return sum;
+          return sum + Math.max(child.toolCalls.length, 1);
+        }, 0)
+      };
+    });
+}
+
+export function lastNonCoderIndex(groups: MessageGroup[]): number {
+  for (let i = groups.length - 1; i >= 0; i--) {
+    if (groups[i].type !== 'coder_group') return i;
+  }
+  return -1;
+}
+
+function estimateTokens(text: string): number {
+  if (!text) return 0;
+  const charCount = text.length;
+  const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
+  return Math.round(Math.max(charCount / 3.7, wordCount * 1.3));
 }
 
 /**

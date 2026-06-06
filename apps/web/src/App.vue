@@ -8,6 +8,7 @@ import SettingsScreen from './components/settings/SettingsScreen.vue';
 import AgentTaskList from './components/AgentTaskList.vue';
 import PlanPanel from './components/PlanPanel.vue';
 import { collectWorkspaceChanges } from './lib/workspaceChanges';
+import { collectAgentSummaries } from './lib/messageGroups';
 
 const {
   runs,
@@ -85,17 +86,28 @@ const currentTaskList = computed<string | null>(() => {
 });
 
 const workspaceChanges = computed(() => collectWorkspaceChanges(messages.value, activeRun.value?.projectPath));
+const agentSummaries = computed(() => collectAgentSummaries(groupedMessages.value, isRunning.value));
 
 // The side panel mirrors Codex / Claude desktop: it opens automatically as soon
-// as the assistant creates a plan or edits workspace files. Closing it collapses
-// every panel tab until the user re-opens the plan link or switches chats.
+// as the assistant creates a plan, edits workspace files, or starts sub-agents.
+// Closing it collapses every panel tab until the user re-opens a thread link or
+// switches chats.
 const sidePanelCollapsed = ref(false);
 const sidePanelOpen = computed(() =>
-  (!!currentPlan.value || workspaceChanges.value.length > 0) && !sidePanelCollapsed.value
+  (!!currentPlan.value || workspaceChanges.value.length > 0 || agentSummaries.value.length > 0) && !sidePanelCollapsed.value
 );
 
 // Reset the collapsed state when switching chats so each run's panel shows.
 watch(activeRunId, () => { sidePanelCollapsed.value = false; });
+
+async function openAgentTranscript(agentId: string) {
+  sidePanelCollapsed.value = false;
+  await nextTick();
+  const target = Array
+    .from(document.querySelectorAll<HTMLElement>('[data-agent-group-id]'))
+    .find(el => el.dataset.agentGroupId === agentId) ?? null;
+  target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
 
 // --- Plan approval actions (Start / Revise / Reject) ----------------------
 // While in plan mode, the panel offers three choices once a plan is presented.
@@ -199,7 +211,9 @@ async function rejectPlan() {
             :is-running="isRunning"
             :plan="currentPlan"
             :plan-panel-open="sidePanelOpen"
+            :agent-summaries="agentSummaries"
             @open-plan="sidePanelCollapsed = false"
+            @open-agents="sidePanelCollapsed = false"
           />
         </section>
 
@@ -273,8 +287,10 @@ async function rejectPlan() {
       v-if="sidePanelOpen"
       :plan="currentPlan"
       :changes="workspaceChanges"
+      :agents="agentSummaries"
       :show-actions="showPlanActions"
       @close="sidePanelCollapsed = true"
+      @view-agent="openAgentTranscript"
       @start="startPlan"
       @revise="revisePlan"
       @reject="rejectPlan"

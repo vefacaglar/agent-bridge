@@ -1,37 +1,43 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import type { Plan } from '@agent-bridge/shared';
+import type { AgentSummary } from '../lib/messageGroups';
 import { renderMarkdown } from '../lib/markdown';
 import { changeDiffRows, type WorkspaceChange } from '../lib/workspaceChanges';
 
 const props = defineProps<{
   plan: Plan | null;
   changes?: WorkspaceChange[];
+  agents?: AgentSummary[];
   showActions?: boolean;
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'close'): void;
+  (e: 'view-agent', id: string): void;
   (e: 'start'): void;
   (e: 'revise'): void;
   (e: 'reject'): void;
 }>();
 
-type StaticTab = 'plan' | 'review';
+type StaticTab = 'plan' | 'agents' | 'review';
 type PanelTab = StaticTab | `file:${string}`;
 
 const activeTab = ref<PanelTab>('plan');
 const openFileTabs = ref<string[]>([]);
 
 const changes = computed(() => props.changes ?? []);
+const agents = computed(() => props.agents ?? []);
 const doneCount = computed(() => props.plan?.tasks.filter(t => t.status === 'completed').length ?? 0);
 const totalCount = computed(() => props.plan?.tasks.length ?? 0);
 const totalAdded = computed(() => changes.value.reduce((sum, c) => sum + c.added, 0));
 const totalDeleted = computed(() => changes.value.reduce((sum, c) => sum + c.deleted, 0));
+const runningAgentCount = computed(() => agents.value.filter(agent => agent.status === 'running').length);
 
 const tabs = computed(() => {
   const list: { id: PanelTab; label: string }[] = [];
   if (props.plan) list.push({ id: 'plan', label: 'Plan' });
+  if (agents.value.length) list.push({ id: 'agents', label: 'Agents' });
   if (changes.value.length) list.push({ id: 'review', label: 'Review' });
   for (const id of openFileTabs.value) {
     const change = changes.value.find(c => c.id === id);
@@ -49,13 +55,20 @@ const activeChange = computed(() => {
 const activeDiffRows = computed(() => activeChange.value ? changeDiffRows(activeChange.value) : []);
 
 watch(
-  () => [props.plan?.id, changes.value.length] as const,
+  () => [props.plan?.id, agents.value.length, changes.value.length] as const,
   () => {
     openFileTabs.value = openFileTabs.value.filter(id => changes.value.some(c => c.id === id));
     if (tabs.value.some(tab => tab.id === activeTab.value)) return;
-    activeTab.value = props.plan ? 'plan' : 'review';
+    activeTab.value = props.plan ? 'plan' : agents.value.length ? 'agents' : 'review';
   },
   { immediate: true }
+);
+
+watch(
+  () => agents.value.length,
+  (count, previous) => {
+    if (count > 0 && previous === 0) activeTab.value = 'agents';
+  }
 );
 
 function openFile(change: WorkspaceChange) {
@@ -102,6 +115,15 @@ function changeKindLabel(kind: WorkspaceChange['kind']): string {
   if (kind === 'deleted') return 'Deleted';
   if (kind === 'moved') return 'Moved';
   return 'Changed';
+}
+
+function compactNumber(value: number): string {
+  if (value >= 1000) return `${(value / 1000).toFixed(value >= 10000 ? 0 : 1)}k`;
+  return String(value);
+}
+
+function viewAgent(id: string) {
+  emit('view-agent', id);
 }
 </script>
 
@@ -157,6 +179,45 @@ function changeKindLabel(kind: WorkspaceChange['kind']): string {
 
         <p v-else-if="!plan?.body" class="panel-empty">
           The assistant's plan will appear here once it drafts one.
+        </p>
+      </section>
+
+      <section v-else-if="activeTab === 'agents'" class="panel-section">
+        <div class="panel-section-heading">
+          <div>
+            <h2>Background agents</h2>
+            <p>{{ runningAgentCount }} running · {{ agents.length }} total</p>
+          </div>
+        </div>
+
+        <div v-if="agents.length" class="agent-list">
+          <article
+            v-for="agent in agents"
+            :key="agent.id"
+            class="agent-row"
+            :class="{ running: agent.status === 'running' }"
+          >
+            <div class="agent-row-main">
+              <span class="agent-status-dot" :class="agent.status"></span>
+              <div class="agent-row-text">
+                <h3>{{ agent.title }}</h3>
+                <p>
+                  <span>{{ agent.roleLabel }}</span>
+                  <span v-if="agent.model">{{ agent.model }}</span>
+                </p>
+              </div>
+            </div>
+            <div class="agent-row-meta">
+              <span>{{ compactNumber(agent.tokenEstimate) }} tokens</span>
+              <span>{{ agent.toolUseCount }} tool {{ agent.toolUseCount === 1 ? 'use' : 'uses' }}</span>
+              <span>{{ agent.status === 'running' ? 'Running' : 'Done' }}</span>
+              <button type="button" class="agent-transcript-btn" @click="viewAgent(agent.id)">View transcript</button>
+            </div>
+          </article>
+        </div>
+
+        <p v-else class="panel-empty">
+          Sub-agents will appear here when the architect delegates work.
         </p>
       </section>
 
@@ -392,6 +453,92 @@ function changeKindLabel(kind: WorkspaceChange['kind']): string {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.agent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.agent-row {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.agent-row.running {
+  border-color: rgba(94, 162, 235, 0.35);
+}
+
+.agent-row-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.agent-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  margin-top: 7px;
+  background: var(--faint);
+  flex: 0 0 auto;
+}
+
+.agent-status-dot.running {
+  background: #5ea2eb;
+  box-shadow: 0 0 0 4px rgba(94, 162, 235, 0.12);
+}
+
+.agent-status-dot.done {
+  background: var(--success);
+}
+
+.agent-row-text {
+  min-width: 0;
+}
+
+.agent-row-text h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.agent-row-text p,
+.agent-row-meta {
+  margin: 4px 0 0;
+  color: var(--faint);
+  font-size: 0.76rem;
+}
+
+.agent-row-text p,
+.agent-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.agent-row-meta {
+  padding-left: 18px;
+}
+
+.agent-transcript-btn {
+  padding: 0;
+  background: transparent;
+  color: #5ea2eb;
+  cursor: pointer;
+  font-size: 0.76rem;
+}
+
+.agent-transcript-btn:hover {
+  color: var(--text);
 }
 
 .change-row {

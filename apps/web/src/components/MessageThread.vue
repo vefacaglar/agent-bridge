@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, onUnmounted } from 'vue';
 import type { Run, Plan } from '@agent-bridge/shared';
-import type { MessageGroup } from '../lib/messageGroups';
+import type { AgentSummary, MessageGroup } from '../lib/messageGroups';
 import { renderMarkdown, cleanMessageContent, capturePreScrollStates, restorePreScrollStates } from '../lib/markdown';
 import { formatTime } from '../lib/format';
 import ToolGroup from './ToolGroup.vue';
@@ -14,10 +14,12 @@ const props = defineProps<{
   isRunning: boolean;
   plan?: Plan | null;
   planPanelOpen?: boolean;
+  agentSummaries?: AgentSummary[];
 }>();
 
 const emit = defineEmits<{
   (e: 'open-plan'): void;
+  (e: 'open-agents'): void;
 }>();
 
 // Progress summary shown on the in-thread plan link.
@@ -254,6 +256,17 @@ const formattedElapsedTime = computed(() => {
       <span class="plan-thread-link-action">Open</span>
     </button>
 
+    <button
+      v-if="(agentSummaries?.length ?? 0) > 0 && !planPanelOpen"
+      type="button"
+      class="plan-thread-link"
+      @click="emit('open-agents')"
+    >
+      <span class="plan-thread-link-label">Background agents</span>
+      <span class="plan-thread-link-count">{{ agentSummaries?.filter(agent => agent.status === 'running').length ?? 0 }} running</span>
+      <span class="plan-thread-link-action">Open</span>
+    </button>
+
     <template v-for="(group, idx) in groupedMessages" :key="group.id">
       <div v-if="group.type === 'user'" class="user-message-container">
         <article class="user-bubble">
@@ -296,6 +309,7 @@ const formattedElapsedTime = computed(() => {
 
       <CoderGroup
         v-else-if="group.type === 'coder_group'"
+        :data-agent-group-id="group.id"
         :children="group.children || []"
         :title="group.title"
         :active="isRunning && idx > lastNonCoderIdx"
