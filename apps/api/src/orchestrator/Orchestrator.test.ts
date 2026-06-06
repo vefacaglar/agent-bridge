@@ -255,6 +255,8 @@ test("Orchestrator Integration Tests", async (t) => {
     const prompt = buildSystemPrompt("Test Project", "/tmp/test-project", "chat", true);
 
     assert.ok(prompt.includes("CURRENT OPERATIONAL MODE: CHAT MODE"));
+    assert.ok(prompt.includes("Do not use emojis"));
+    assert.ok(prompt.includes("Do not use bold text except for real section headings"));
     assert.ok(!prompt.includes("INITIAL PROJECT GUIDANCE"));
     assert.ok(!prompt.includes("Before doing substantive planning or implementation"));
   });
@@ -282,6 +284,8 @@ test("Orchestrator Integration Tests", async (t) => {
     assert.ok(plan.includes("Do NOT write production code"));
     assert.ok(plan.includes("do not treat repeated or pasted plan text as approval"));
     assert.ok(plan.includes("DO NOT call any file-mutating tools"));
+    assert.ok(plan.includes("Do not use emojis in visible conversation"));
+    assert.ok(plan.includes("Do not use bold text except for real section headings"));
     assert.ok(build.includes("implementation must stay strictly within it"));
     assert.ok(architect.includes("To change files, call delegate_tasks"));
   });
