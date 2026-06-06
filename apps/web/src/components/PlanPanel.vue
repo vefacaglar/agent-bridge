@@ -129,20 +129,37 @@ const expandedTranscripts = ref<Record<string, boolean>>({});
 const expandedReasoning = ref<Record<string, boolean>>({});
 const panelBody = ref<HTMLElement | null>(null);
 
+function latestReasoningBody(root: HTMLElement | null): HTMLElement | undefined {
+  const bodies = root?.querySelectorAll('.reasoning-terminal-container .plan-body');
+  return bodies?.[bodies.length - 1] as HTMLElement | undefined;
+}
+
 watch(
   agents,
   () => {
     const el = panelBody.value;
     if (!el) return;
 
-    // Check if the scroll position is within 180px of the bottom
-    const wasAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 180;
+    const activeReasoningBodyBefore = latestReasoningBody(el);
+    const reasoningWasAtBottom = activeReasoningBodyBefore
+      ? activeReasoningBodyBefore.scrollHeight - activeReasoningBodyBefore.scrollTop - activeReasoningBodyBefore.clientHeight <= 60
+      : true;
+    const previousReasoningScrollTop = activeReasoningBodyBefore?.scrollTop ?? 0;
+
+    const panelWasAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 180;
     
-    if (wasAtBottom) {
-      nextTick(() => {
+    nextTick(() => {
+      const activeReasoningBodyAfter = latestReasoningBody(el);
+      if (activeReasoningBodyAfter) {
+        activeReasoningBodyAfter.scrollTop = reasoningWasAtBottom
+          ? activeReasoningBodyAfter.scrollHeight
+          : previousReasoningScrollTop;
+      }
+
+      if (panelWasAtBottom) {
         el.scrollTop = el.scrollHeight;
-      });
-    }
+      }
+    });
   },
   { deep: true }
 );

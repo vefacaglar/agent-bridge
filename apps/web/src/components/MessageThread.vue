@@ -138,7 +138,7 @@ watch(() => props.groupedMessages, () => {
 
   // Query the current active reasoning body before DOM updates to check if it's at the bottom.
   // Fall back to true if no reasoning panel exists yet so it scrolls on first render.
-  const reasoningBodiesBefore = document.querySelectorAll('.reasoning-terminal-container .plan-body');
+  const reasoningBodiesBefore = containerEl.value?.querySelectorAll('.reasoning-terminal-container .plan-body') ?? [];
   const activeReasoningBodyBefore = reasoningBodiesBefore[reasoningBodiesBefore.length - 1] as HTMLElement | undefined;
   const wasAtBottom = activeReasoningBodyBefore 
     ? (activeReasoningBodyBefore.scrollHeight - activeReasoningBodyBefore.scrollTop - activeReasoningBodyBefore.clientHeight <= 60)
@@ -151,7 +151,7 @@ watch(() => props.groupedMessages, () => {
   nextTick(() => {
     // The live reasoning panel may sit in either an assistant message or a tool
     // group, so scroll the last rendered reasoning body regardless of wrapper.
-    const reasoningBodiesAfter = document.querySelectorAll('.reasoning-terminal-container .plan-body');
+    const reasoningBodiesAfter = containerEl.value?.querySelectorAll('.reasoning-terminal-container .plan-body') ?? [];
     const activeReasoningBodyAfter = reasoningBodiesAfter[reasoningBodiesAfter.length - 1] as HTMLElement | undefined;
     if (activeReasoningBodyAfter) {
       if (wasAtBottom) {
