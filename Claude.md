@@ -288,6 +288,7 @@ run_command(command)
 fetch_url(url)
 set_chat_title(title)
 ask_user_question(questions)                    main agent, every mode
+remember(scope, category, content, update_id?)  main agent, every mode
 update_plan(title, tasks, body?, start_new?)   plan mode only
 delegate_tasks(tasks, parallel?)               preset build modes only
 delegate_to_utility(tasks, parallel?)          preset build modes only
@@ -310,11 +311,12 @@ running. Its standing grants are scoped per host (approving one site does not
 approve the whole web). Because it is the only async tool, the orchestrator
 executes tools through `executeWorkspaceToolAsync`.
 
-`set_chat_title`, `ask_user_question`, `update_plan`, `delegate_tasks`, and
-`delegate_to_utility` are orchestrator tools. They do not execute through the
-filesystem helper directly: title and plan update local run/plan state,
-`ask_user_question` pauses the run for user input, and delegation starts nested
-`runAgentLoop()` calls in the same run.
+`set_chat_title`, `ask_user_question`, `remember`, `update_plan`,
+`delegate_tasks`, and `delegate_to_utility` are orchestrator tools. They do not
+execute through the filesystem helper directly: title and plan update local
+run/plan state, `remember` writes a memory row, `ask_user_question` pauses the
+run for user input, and delegation starts nested `runAgentLoop()` calls in the
+same run.
 
 Do not add git integration or further network tools without an explicit request.
 
@@ -334,6 +336,34 @@ order), which calls `Orchestrator.resolveQuestion`. The selections are fed back 
 the model as the tool result (`{ success, answers[{ question, header, selected }] }`)
 and the run resumes (`generating`). Cancellation resolves a pending question with
 no selections so the loop unwinds.
+
+### Memory (`remember`)
+
+The agent has a persistent, two-tier memory so it learns the user and the project
+over time. The main agent gets a `remember(scope, category, content, update_id?)`
+tool in every mode (sub-agents do not). It records DURABLE facts only — user
+preferences, recurring feedback about how to work, stable project facts, or
+external references — never transient task detail or secrets.
+
+- `scope` is `"global"` (applies to every project) or `"project"` (this codebase
+  only; the orchestrator scopes it to the run's `projectPath`).
+- `category` is `user` / `feedback` / `project` / `reference`.
+- `update_id` revises an existing memory in place instead of duplicating it.
+
+Like `set_chat_title`/`update_plan` it performs no filesystem/network I/O and runs
+**silently** (no permission prompt, no SSE): `Orchestrator.executeRemember`
+validates the args and writes via `MemoryRepository` (the `memory` table). On every
+run start, `drive()` loads the relevant memories (`MemoryRepository.listForContext`
+= all global + this project's) and `formatMemoryContext` injects them into the
+system prompt under a "REMEMBERED CONTEXT" section, so the model honors them from
+the first turn. There is no live SSE event — the user simply sees current memories
+when they open Settings.
+
+Memories are managed by the user in **Settings → Memory** (`MemoryTab.vue`,
+`useMemories`), backed by `GET/POST/PUT/DELETE /api/memories` (`routes/memory.ts`).
+The list is fetched when the settings screen opens (`useAppShell.openSettings`
+loads permissions + memories together). The user can add, edit, delete, or clear
+memories; global and project memories are shown in separate groups.
 
 ### Session Title (`set_chat_title`)
 
@@ -479,6 +509,7 @@ messages     id, run_id, role, agent_role?, provider/model?, content, raw_respon
 projects     path (pk), name, created_at
 permissions  scope, project_path, tool, command, status; UNIQUE(scope, project_path, tool, command)
 plans        id, run_id, title, body?, tasks (JSON), status ('active'|'completed'), version
+memory       id, scope ('global'|'project'), project_path, category, content, created_at, updated_at
 ```
 
 All agent messages are stored. A run must be reopenable after restart. On

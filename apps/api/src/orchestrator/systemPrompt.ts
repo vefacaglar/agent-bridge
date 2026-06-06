@@ -1,3 +1,5 @@
+import type { Memory } from "@agent-bridge/shared";
+
 /** Appends the active project workspace context, when available. */
 function projectContextSuffix(projectName?: string, projectPath?: string): string {
   if (!projectName && !projectPath) return "";
@@ -5,6 +7,30 @@ function projectContextSuffix(projectName?: string, projectPath?: string): strin
   if (projectName) suffix += `\n- Project Name: ${projectName}`;
   if (projectPath) suffix += `\n- Project Folder Path: ${projectPath}`;
   return suffix;
+}
+
+/**
+ * Renders the memories relevant to a run into a compact prompt section the model
+ * sees at the start of every run. Global memories and project memories are listed
+ * separately; each line carries the memory's id (so the model can revise it via
+ * remember's update_id) and category. Returns "" when there is nothing to inject.
+ */
+export function formatMemoryContext(memories: Memory[]): string {
+  if (!memories || memories.length === 0) return "";
+  const global = memories.filter(m => m.scope === "global");
+  const project = memories.filter(m => m.scope === "project");
+  const line = (m: Memory) => `- [#${m.id} · ${m.category}] ${m.content}`;
+
+  let section = `\n\nREMEMBERED CONTEXT (durable facts you saved in earlier sessions):
+- Honor these. Do not re-ask what they already answer, and follow the user's recorded preferences and feedback.
+- If one is now wrong or outdated, revise it with the 'remember' tool using its #id as update_id.`;
+  if (global.length > 0) {
+    section += `\n\nGlobal (apply to every project):\n${global.map(line).join("\n")}`;
+  }
+  if (project.length > 0) {
+    section += `\n\nThis project:\n${project.map(line).join("\n")}`;
+  }
+  return section;
 }
 
 /**
@@ -24,7 +50,8 @@ export function buildSystemPrompt(
   projectPath?: string,
   mode?: string,
   shouldReadProjectGuidance = false,
-  delegation?: DelegationContext
+  delegation?: DelegationContext,
+  memoryContext = ""
 ): string {
   // Chat mode is deliberately lightweight: a short prompt with no tool catalog
   // or planning scaffolding, so casual conversations stay cheap on context and
@@ -37,7 +64,8 @@ CURRENT OPERATIONAL MODE: CHAT MODE
 - Workspace tools for inspecting the project (reading files, searching, listing directories) and fetching web pages are available. You cannot modify the workspace or run commands in this mode. Only use them if the user EXPLICITLY asks you to inspect files or fetch references.
 - LANGUAGE POLICY (MANDATORY): do ALL private reasoning / chain-of-thought / thinking-channel content in ENGLISH, even when the user writes in Turkish or another language. Only the final visible reply should match the user's language.
 - SESSION TITLE: this chat starts as "New session…". As soon as the user's intent is clear (usually after their first message), call the 'set_chat_title' tool once with a short descriptive title (3-6 words, in the user's language). Do not call it again unless the topic fundamentally changes.
-- If a request clearly needs hands-on work or command execution across the project, you MUST suggest the user switch to Build mode.${projectContextSuffix(projectName, projectPath)}`;
+- If a request clearly needs hands-on work or command execution across the project, you MUST suggest the user switch to Build mode.
+- MEMORY: if the user states a durable preference or gives feedback on how you should work, call the 'remember' tool to save it (scope "global" for general preferences, "project" for this codebase). Saving is silent. Don't remember transient chatter.${memoryContext}${projectContextSuffix(projectName, projectPath)}`;
   }
 
   let prompt = `You are Agent Bridge, a helpful local-first AI assistant. You help the user with code development, analysis, and general tasks in their active project workspace. You run locally on their machine, so you should refer to their local workspace directory when helpful.
@@ -49,6 +77,10 @@ LANGUAGE POLICY (MANDATORY):
 
 SESSION TITLE:
 - This chat session starts unnamed (shown as "New session…"). As soon as the user's intent is clear — normally right after their first message — call the 'set_chat_title' tool once with a short, descriptive title (3-6 words, in the user's language, no surrounding quotes). Do this early. Do not call it again unless the conversation's topic fundamentally changes.
+
+MEMORY:
+- You can save DURABLE facts across sessions with the 'remember' tool. Use it when you learn a user preference, recurring feedback about how you should work, a stable fact about this project, or a useful external reference. Choose scope "global" for facts about the user / their general style (apply everywhere) and "project" for facts specific to this codebase.
+- Do NOT remember transient task details, one-off context, secrets, or things already written in the code/config. Saving is silent — do not announce it or ask permission. Facts you saved before appear under "REMEMBERED CONTEXT" below; to refine one, call remember with its #id as update_id rather than duplicating it.
 
 - Whenever you present choices, options, or ask the user to decide between multiple paths (e.g., what to do next, choosing between implementation options, or selecting a feature area), you MUST present them as interactive buttons or multiple-choice questions.
 - Do NOT list numbered options or choices in plain text expecting the user to type their choice. Instead, do one of the following:
@@ -137,6 +169,7 @@ IMPORTANT INSTRUCTION FOR PLANNING & CODING:
     }
   }
 
+  prompt += memoryContext;
   prompt += projectContextSuffix(projectName, projectPath);
 
   return prompt;

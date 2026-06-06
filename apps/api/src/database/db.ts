@@ -185,6 +185,24 @@ db.exec(`
 `);
 db.exec("CREATE INDEX IF NOT EXISTS idx_plans_run ON plans(run_id)");
 
+// Create Memory Table.
+// Durable facts the assistant remembers across sessions via the `remember` tool.
+// Mirrors the permissions table's scope/project_path shape: a 'global' memory
+// (project_path = '') applies to every run; a 'project' memory only to runs for
+// that project path. Managed by the user in Settings → Memory.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS memory (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    scope TEXT NOT NULL,
+    project_path TEXT NOT NULL DEFAULT '',
+    category TEXT NOT NULL DEFAULT 'project',
+    content TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+`);
+db.exec("CREATE INDEX IF NOT EXISTS idx_memory_scope_project ON memory(scope, project_path)");
+
 // Seed default project if empty
 const projectCount = db.prepare("SELECT count(*) as count FROM projects").get() as { count: number };
 if (projectCount.count === 0) {

@@ -331,6 +331,45 @@ export const ASK_QUESTION_TOOL = {
 };
 
 /**
+ * Lets the main agent persist a durable fact across sessions. Performs no
+ * filesystem/network I/O (it only writes a row to the memory table), so it is
+ * not in DANGEROUS_TOOLS and runs silently without a permission prompt. Memories
+ * are injected back into future runs' system prompt. Available to the main agent
+ * in every mode; sub-agents never get it.
+ */
+export const REMEMBER_TOOL = {
+  type: "function" as const,
+  function: {
+    name: "remember",
+    description: "Save a DURABLE fact to remember across future sessions. Use this when you learn something that will stay useful beyond the current task: a user preference or working style, recurring feedback the user gives you about HOW to work, a stable fact about this project, or a reference (URL/ticket) worth keeping. Do NOT remember transient task details, one-off context, secrets, or anything already written in the code/config. Keep each memory to 1-3 sentences. Saving is silent (no confirmation); the user manages saved memories in Settings. If you are refining a memory that already exists (shown to you in 'Remembered context'), pass its id as update_id instead of creating a duplicate.",
+    parameters: {
+      type: "object",
+      properties: {
+        scope: {
+          type: "string",
+          enum: ["global", "project"],
+          description: "\"global\" for facts about the user or their general working style that apply to ALL projects; \"project\" for facts specific to THIS codebase."
+        },
+        category: {
+          type: "string",
+          enum: ["user", "feedback", "project", "reference"],
+          description: "user = who the user is / general preferences; feedback = guidance on how you should work; project = a fact about this codebase; reference = an external pointer (URL, ticket)."
+        },
+        content: {
+          type: "string",
+          description: "The fact to remember, in 1-3 concise sentences."
+        },
+        update_id: {
+          type: "number",
+          description: "Optional: the id of an existing memory (from 'Remembered context') to revise in place instead of creating a new one."
+        }
+      },
+      required: ["scope", "category", "content"]
+    }
+  }
+};
+
+/**
  * Architect-only tool (dual-model runs). Lets the architect model delegate one
  * or more self-contained coding tasks to coder sub-agents running the configured
  * coder model. Performs no direct filesystem/network I/O itself — the orchestrator

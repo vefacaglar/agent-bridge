@@ -252,3 +252,27 @@ export interface PermissionRule {
   status: string;
 }
 
+// "global" memories apply to every project; "project" memories only to one path.
+export type MemoryScope = "global" | "project";
+
+// What kind of fact a memory holds, so the UI and the model can reason about it:
+//   user      — who the user is / their general working style & preferences
+//   feedback  — guidance the user gave on HOW the assistant should work
+//   project   — a durable fact about this specific codebase
+//   reference — a pointer to an external resource (URL, ticket, dashboard)
+export type MemoryCategory = "user" | "feedback" | "project" | "reference";
+
+// A durable fact the assistant has chosen to remember across sessions via the
+// `remember` tool. Global memories are injected into every run; project memories
+// only into runs for the matching project path. Managed by the user in
+// Settings → Memory.
+export interface Memory {
+  id: number;
+  scope: MemoryScope;
+  projectPath: string;   // "" for global memories
+  category: MemoryCategory;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+}
+

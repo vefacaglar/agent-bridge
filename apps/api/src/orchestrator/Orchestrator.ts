@@ -1,11 +1,11 @@
 import type { Run, RunStatus, RunMessage, ChatMessage, PlanTask, UserQuestion } from "@agent-bridge/shared";
 import type { ModelProvider } from "../providers/ModelProvider.js";
-import { RunRepository, MessageRepository, PlanRepository } from "../database/repositories.js";
+import { RunRepository, MessageRepository, PlanRepository, MemoryRepository } from "../database/repositories.js";
 import { ProviderRegistry } from "../providers/ProviderRegistry.js";
 import { eventBus } from "./eventBus.js";
 import { db } from "../database/db.js";
-import { buildSystemPrompt, buildCoderSystemPrompt, buildUtilitySystemPrompt } from "./systemPrompt.js";
-import { WORKSPACE_TOOLS, UPDATE_PLAN_TOOL, DELEGATE_TASKS_TOOL, DELEGATE_UTILITY_TOOL, UTILITY_TOOLS, SET_TITLE_TOOL, ASK_QUESTION_TOOL, executeWorkspaceToolAsync, buildPermissionPreview, DANGEROUS_TOOLS, READONLY_TOOLS, MODIFYING_TOOLS, permissionKey } from "./workspaceTools.js";
+import { buildSystemPrompt, buildCoderSystemPrompt, buildUtilitySystemPrompt, formatMemoryContext } from "./systemPrompt.js";
+import { WORKSPACE_TOOLS, UPDATE_PLAN_TOOL, DELEGATE_TASKS_TOOL, DELEGATE_UTILITY_TOOL, UTILITY_TOOLS, SET_TITLE_TOOL, ASK_QUESTION_TOOL, REMEMBER_TOOL, executeWorkspaceToolAsync, buildPermissionPreview, DANGEROUS_TOOLS, READONLY_TOOLS, MODIFYING_TOOLS, permissionKey } from "./workspaceTools.js";
 
 type PermissionDecision = "allow_once" | "allow_project" | "allow_always" | "deny";
 
@@ -52,7 +52,8 @@ export class Orchestrator {
     private runRepo: RunRepository,
     private messageRepo: MessageRepository,
     private registry: ProviderRegistry,
-    private planRepo: PlanRepository
+    private planRepo: PlanRepository,
+    private memoryRepo: MemoryRepository
   ) {}
 
   // --- Permission handling -------------------------------------------------
@@ -401,17 +402,22 @@ export class Orchestrator {
       // The utility-delegation tool is offered only when a utility model is
       // configured (and the run can delegate at all).
       const withUtility = delegation?.utilityModel ? [...withDelegate, DELEGATE_UTILITY_TOOL] : withDelegate;
-      // set_chat_title and ask_user_question are available to the main agent in
-      // every mode (they only rename the run / ask the user); sub-agents never
-      // get them.
-      const tools = [...withUtility, SET_TITLE_TOOL, ASK_QUESTION_TOOL];
+      // set_chat_title, ask_user_question and remember are available to the main
+      // agent in every mode (they only rename the run / ask the user / save a
+      // memory row); sub-agents never get them.
+      const tools = [...withUtility, SET_TITLE_TOOL, ASK_QUESTION_TOOL, REMEMBER_TOOL];
+
+      // Durable memories for this run's context (all global + this project's),
+      // injected into the system prompt so the model honors them from the start.
+      const memoryContext = formatMemoryContext(this.memoryRepo.listForContext(run.projectPath));
 
       const systemPrompt = buildSystemPrompt(
         run.projectName,
         run.projectPath,
         run.mode,
         run.mode !== "chat" && shouldReadProjectGuidance,
-        delegation
+        delegation,
+        memoryContext
       );
 
       const finalText = await this.runAgentLoop(runId, run, [...initialMessages], {
@@ -829,6 +835,12 @@ export class Orchestrator {
       return this.executeAskQuestion(runId, toolCall);
     }
 
+    // remember writes a durable memory row (no filesystem/network I/O); allowed
+    // in every mode and runs silently without a permission prompt.
+    if (toolCall.function?.name === "remember") {
+      return this.executeRemember(run, toolCall);
+    }
+
     // delegate_tasks fans out to coder sub-agents; the orchestrator runs their
     // loops itself (the sub-agents' own tool calls are gated normally).
     if (toolCall.function?.name === "delegate_tasks") {
@@ -955,6 +967,42 @@ export class Orchestrator {
       };
     });
     return JSON.stringify({ success: true, answers });
+  }
+
+  /**
+   * Saves (or revises) a durable memory from the model's remember call. Silent —
+   * no permission prompt, no SSE; the user manages memories in Settings. A
+   * "project" memory is scoped to this run's project path. Never throws.
+   */
+  private executeRemember(run: Run, toolCall: any): string {
+    try {
+      const args = JSON.parse(toolCall.function.arguments || "{}");
+      const content = typeof args.content === "string" ? args.content.trim() : "";
+      if (!content) {
+        return JSON.stringify({ success: false, error: "Nothing to remember: content was empty." });
+      }
+
+      // Revise an existing memory in place when the model passes update_id.
+      const updateId = typeof args.update_id === "number" ? args.update_id : Number(args.update_id);
+      if (Number.isInteger(updateId) && updateId > 0) {
+        const updated = this.memoryRepo.update(updateId, content);
+        if (updated) {
+          return JSON.stringify({ success: true, action: "updated", memory: updated });
+        }
+        // Fall through to create if the id no longer exists.
+      }
+
+      const scope = args.scope === "global" ? "global" : "project";
+      const memory = this.memoryRepo.create({
+        scope,
+        projectPath: scope === "project" ? (run.projectPath || "") : "",
+        category: args.category,
+        content
+      });
+      return JSON.stringify({ success: true, action: "created", memory });
+    } catch (err: any) {
+      return JSON.stringify({ success: false, error: err?.message ?? "Failed to save memory." });
+    }
   }
 
   /**

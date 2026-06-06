@@ -18,6 +18,8 @@ const {
   settings,
   projects,
   permissions,
+  memories,
+  openSettings,
   chat,
   isMac,
   selectProject,
@@ -173,7 +175,7 @@ async function rejectPlan() {
       @select-project="selectProject"
       @select-run="chat.selectRun"
       @delete-project="deleteProject"
-      @open-settings="permissions.openSettings"
+      @open-settings="openSettings"
       @toggle-sidebar="toggleSidebar"
     />
 
@@ -312,10 +314,18 @@ async function rejectPlan() {
       :permissions="permissions.permissions.value"
       :is-loading="permissions.isLoading.value"
       :providers="chat.providers.value"
+      :memories="memories.memories.value"
+      :memories-loading="memories.isLoading.value"
+      :active-project-path="projects.activeProjectPath.value"
+      :active-project-name="projects.activeProject.value?.name || ''"
       @close="permissions.closeSettings"
       @revoke="permissions.revokePermission"
       @clear-all="permissions.clearPermissions"
       @presets-saved="loadAgentPresets"
+      @add-memory="memories.addMemory"
+      @update-memory="memories.updateMemory($event.id, $event.content)"
+      @delete-memory="memories.deleteMemory"
+      @clear-memories="memories.clearMemories"
     />
 
     <!-- Custom Dialog Modal (Alert/Confirm) -->

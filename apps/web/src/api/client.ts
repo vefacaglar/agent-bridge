@@ -1,4 +1,4 @@
-import type { ProviderMetadata, Run, RunMessage, Project, PermissionRule, Plan, AgentPreset } from '@agent-bridge/shared';
+import type { ProviderMetadata, Run, RunMessage, Project, PermissionRule, Plan, AgentPreset, Memory, MemoryCategory, MemoryScope } from '@agent-bridge/shared';
 
 export const API_BASE = 'http://localhost:4321';
 
@@ -78,6 +78,36 @@ export const api = {
 
   async clearPermissions(): Promise<void> {
     await fetch(`${API_BASE}/api/permissions`, { method: 'DELETE' });
+  },
+
+  getMemories: () => getJson<Memory[]>('/api/memories'),
+
+  async createMemory(payload: { scope: MemoryScope; category: MemoryCategory; content: string; projectPath?: string }): Promise<Memory> {
+    const response = await fetch(`${API_BASE}/api/memories`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) throw new Error(await errorMessage(response, 'Failed to save memory.'));
+    return response.json() as Promise<Memory>;
+  },
+
+  async updateMemory(id: number, content: string): Promise<Memory> {
+    const response = await fetch(`${API_BASE}/api/memories/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content })
+    });
+    if (!response.ok) throw new Error(await errorMessage(response, 'Failed to update memory.'));
+    return response.json() as Promise<Memory>;
+  },
+
+  async deleteMemory(id: number): Promise<void> {
+    await fetch(`${API_BASE}/api/memories/${id}`, { method: 'DELETE' });
+  },
+
+  async clearMemories(): Promise<void> {
+    await fetch(`${API_BASE}/api/memories`, { method: 'DELETE' });
   },
 
   async createRun(payload: CreateRunPayload): Promise<Run> {

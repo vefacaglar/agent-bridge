@@ -1,15 +1,20 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue';
-import type { PermissionRule, ProviderMetadata } from '@agent-bridge/shared';
+import type { Memory, MemoryCategory, MemoryScope, PermissionRule, ProviderMetadata } from '@agent-bridge/shared';
 import PermissionsTab from './PermissionsTab.vue';
 import ProvidersTab from './ProvidersTab.vue';
 import AgentPresetsTab from './AgentPresetsTab.vue';
+import MemoryTab from './MemoryTab.vue';
 
 const props = defineProps<{
   show: boolean;
   permissions: PermissionRule[];
   isLoading: boolean;
   providers: ProviderMetadata[];
+  memories: Memory[];
+  memoriesLoading: boolean;
+  activeProjectPath: string;
+  activeProjectName: string;
 }>();
 
 const emit = defineEmits<{
@@ -17,10 +22,15 @@ const emit = defineEmits<{
   (e: 'revoke', id: number): void;
   (e: 'clear-all'): void;
   (e: 'presets-saved'): void;
+  (e: 'add-memory', payload: { scope: MemoryScope; category: MemoryCategory; content: string; projectPath?: string }): void;
+  (e: 'update-memory', payload: { id: number; content: string }): void;
+  (e: 'delete-memory', id: number): void;
+  (e: 'clear-memories'): void;
 }>();
 
 const TABS = [
   { id: 'permissions', label: 'Permissions' },
+  { id: 'memory', label: 'Memory' },
   { id: 'providers', label: 'Providers' },
   { id: 'agents', label: 'Agents' }
 ] as const;
@@ -77,6 +87,17 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
                 :is-loading="isLoading"
                 @revoke="emit('revoke', $event)"
                 @clear-all="emit('clear-all')"
+              />
+              <MemoryTab
+                v-else-if="activeTab === 'memory'"
+                :memories="memories"
+                :is-loading="memoriesLoading"
+                :active-project-path="activeProjectPath"
+                :active-project-name="activeProjectName"
+                @add="emit('add-memory', $event)"
+                @update="emit('update-memory', $event)"
+                @delete="emit('delete-memory', $event)"
+                @clear-all="emit('clear-memories')"
               />
               <ProvidersTab v-else-if="activeTab === 'providers'" :providers="providers" />
               <AgentPresetsTab

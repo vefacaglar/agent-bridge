@@ -6,6 +6,7 @@ import { useChatSession } from './useChatSession';
 import { useComposerSettings } from './useComposerSettings';
 import { useProjects } from './useProjects';
 import { usePermissions } from './usePermissions';
+import { useMemories } from './useMemories';
 
 export function useAppShell() {
   const providers = ref<ProviderMetadata[]>([]);
@@ -20,6 +21,13 @@ export function useAppShell() {
   }
   const projects = useProjects(runs);
   const permissions = usePermissions();
+  const memories = useMemories();
+
+  // Opening the settings screen loads both the permissions and memory tabs so
+  // either is ready when the user switches to it.
+  async function openSettings() {
+    await Promise.all([permissions.openSettings(), memories.loadMemories()]);
+  }
   const chat = useChatSession({
     providers,
     runs,
@@ -87,6 +95,8 @@ export function useAppShell() {
     settings,
     projects,
     permissions,
+    memories,
+    openSettings,
     chat,
     isMac,
     selectProject,

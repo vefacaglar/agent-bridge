@@ -8,7 +8,7 @@ import { db } from "../database/db.js";
 process.env.NODE_ENV = "test";
 
 import { ProviderRegistry } from "../providers/ProviderRegistry.js";
-import { RunRepository, MessageRepository, PlanRepository } from "../database/repositories.js";
+import { RunRepository, MessageRepository, PlanRepository, MemoryRepository } from "../database/repositories.js";
 import { Orchestrator } from "./Orchestrator.js";
 import { eventBus } from "./eventBus.js";
 import { buildSystemPrompt } from "./systemPrompt.js";
@@ -46,7 +46,7 @@ test("Orchestrator Integration Tests", async (t) => {
     const registry = new ProviderRegistry(testConfigPath);
     const runRepo = new RunRepository();
     const messageRepo = new MessageRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository());
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository());
 
     const runId = "run-test-123";
     const runData: Run = {
@@ -110,7 +110,7 @@ test("Orchestrator Integration Tests", async (t) => {
     const registry = new ProviderRegistry(testConfigPath);
     const runRepo = new RunRepository();
     const messageRepo = new MessageRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository());
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository());
 
     const runId = "run-test-tool-call";
     const runData: Run = {
@@ -196,7 +196,7 @@ test("Orchestrator Integration Tests", async (t) => {
     const registry = new ProviderRegistry(testConfigPath);
     const runRepo = new RunRepository();
     const messageRepo = new MessageRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository());
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository());
 
     const runId = "run-test-mode-prompt";
     const runData: Run = {
@@ -254,7 +254,7 @@ test("Orchestrator Integration Tests", async (t) => {
     const registry = new ProviderRegistry(testConfigPath);
     const runRepo = new RunRepository();
     const messageRepo = new MessageRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository());
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository());
 
     const runId = "run-test-perm-ask";
     const runData: Run = {
@@ -337,7 +337,7 @@ test("Orchestrator Integration Tests", async (t) => {
     const registry = new ProviderRegistry(testConfigPath);
     const runRepo = new RunRepository();
     const messageRepo = new MessageRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository());
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository());
 
     const runId = "run-test-read-list";
     const tempDir = path.join(process.cwd(), "temp_test_dir");
@@ -442,7 +442,7 @@ test("Orchestrator Integration Tests", async (t) => {
     const registry = new ProviderRegistry(testConfigPath);
     const runRepo = new RunRepository();
     const messageRepo = new MessageRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository());
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository());
 
     const runId = "run-test-delegate";
     const runData: Run = {
@@ -536,7 +536,7 @@ test("Orchestrator Integration Tests", async (t) => {
     const registry = new ProviderRegistry(testConfigPath);
     const runRepo = new RunRepository();
     const messageRepo = new MessageRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository());
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository());
 
     const runId = "run-test-utility";
     const runData: Run = {
@@ -622,7 +622,7 @@ test("Orchestrator Integration Tests", async (t) => {
     const registry = new ProviderRegistry(testConfigPath);
     const runRepo = new RunRepository();
     const messageRepo = new MessageRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository());
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository());
 
     const runId = "run-test-plan-block";
     const blockedFilePath = path.join(process.cwd(), "test_plan_blocked.json");
@@ -697,7 +697,7 @@ test("Orchestrator Integration Tests", async (t) => {
     const registry = new ProviderRegistry(testConfigPath);
     const runRepo = new RunRepository();
     const messageRepo = new MessageRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository());
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository());
 
     const runId = "run-test-delegate-clamp";
     runRepo.create({
@@ -755,5 +755,109 @@ test("Orchestrator Integration Tests", async (t) => {
     assert.ok(toolMsg);
     const result = JSON.parse(toolMsg!.content);
     assert.strictEqual(result.results.length, 3, "should clamp 5 requested tasks to 3");
+  });
+
+  await t.test("Orchestrator - remember saves a memory and later runs inject it", async () => {
+    const registry = new ProviderRegistry(testConfigPath);
+    const runRepo = new RunRepository();
+    const messageRepo = new MessageRepository();
+    const memoryRepo = new MemoryRepository();
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), memoryRepo);
+
+    const projectPath = process.cwd();
+    const runId = "run-test-remember";
+    runRepo.create({
+      id: runId,
+      title: "Remember",
+      task: "I always want 2-space indentation",
+      status: "created",
+      providerId: "test-provider",
+      providerDisplayName: "Test Provider",
+      model: "model-1",
+      mode: "accept_edits",
+      projectPath,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
+
+    let callCount = 0;
+    globalThis.fetch = async () => {
+      callCount++;
+      if (callCount === 1) {
+        return {
+          ok: true,
+          json: async () => ({
+            choices: [{
+              message: {
+                role: "assistant",
+                content: "Noting your preference.",
+                tool_calls: [{
+                  id: "call_remember_1",
+                  type: "function",
+                  function: {
+                    name: "remember",
+                    arguments: JSON.stringify({
+                      scope: "global",
+                      category: "user",
+                      content: "Prefers 2-space indentation."
+                    })
+                  }
+                }]
+              }
+            }]
+          })
+        } as any;
+      }
+      return {
+        ok: true,
+        json: async () => ({ choices: [{ message: { role: "assistant", content: "Done." } }] })
+      } as any;
+    };
+
+    await orchestrator.run(runId);
+
+    // The memory was persisted (silently, no permission prompt).
+    const all = memoryRepo.list();
+    const saved = all.find(m => m.content === "Prefers 2-space indentation.");
+    assert.ok(saved, "memory should be saved");
+    assert.strictEqual(saved!.scope, "global");
+    assert.strictEqual(saved!.category, "user");
+
+    // The remember tool result reported success.
+    const toolMsg = messageRepo.listByRunId(runId).find(m => m.role === "tool");
+    assert.ok(toolMsg);
+    assert.strictEqual(JSON.parse(toolMsg!.content).success, true);
+
+    // A subsequent run injects the memory into the system prompt.
+    const run2Id = "run-test-remember-2";
+    runRepo.create({
+      id: run2Id,
+      title: "Next session",
+      task: "Write some code",
+      status: "created",
+      providerId: "test-provider",
+      providerDisplayName: "Test Provider",
+      model: "model-1",
+      mode: "accept_edits",
+      projectPath,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
+
+    let systemPromptUsed = "";
+    globalThis.fetch = async (_url: any, options: any) => {
+      const parsed = JSON.parse(options.body);
+      const systemMessage = parsed.messages.find((m: any) => m.role === "system");
+      if (systemMessage) systemPromptUsed = systemMessage.content;
+      return {
+        ok: true,
+        json: async () => ({ choices: [{ message: { role: "assistant", content: "ok" } }] })
+      } as any;
+    };
+
+    await orchestrator.run(run2Id);
+
+    assert.ok(systemPromptUsed.includes("REMEMBERED CONTEXT"));
+    assert.ok(systemPromptUsed.includes("Prefers 2-space indentation."));
   });
 });
