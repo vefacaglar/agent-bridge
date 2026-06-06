@@ -88,6 +88,23 @@ function parseArgs(argumentsJson: string): Record<string, any> {
   }
 }
 
+/** Label for a step; for orphaned/standalone tool outputs (no known tool name)
+ *  we surface the trimmed result message instead of a generic placeholder. */
+function getStepLabel(name: string, args: string, idx: number): string {
+  if (name === 'Workspace Tool Output') {
+    const res = props.toolResponses[idx];
+    if (res) {
+      try {
+        const parsed = JSON.parse(res.content);
+        if (parsed.error) return `Error: ${parsed.error}`;
+        if (typeof parsed.message === 'string' && parsed.message) return parsed.message;
+      } catch (e) { /* fall through */ }
+    }
+    return 'Workspace tool output';
+  }
+  return getToolLabel(name, args);
+}
+
 function getToolLabel(name: string, args: string): string {
   const path = getToolPath(args);
   const parsed = parseArgs(args);
@@ -334,7 +351,7 @@ function formatToolResult(name: string, contentJson: string): string {
             <circle cx="12" cy="12" r="3"></circle>
           </svg>
           
-          <span class="tool-call-label">{{ getToolLabel(tc.function?.name, tc.function?.arguments) }}</span>
+          <span class="tool-call-label">{{ getStepLabel(tc.function?.name, tc.function?.arguments, idx) }}</span>
           
           <template v-if="toolResponses[idx]">
             <svg v-if="isToolSuccess(toolResponses[idx].content)" class="status-icon success" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" title="Success">

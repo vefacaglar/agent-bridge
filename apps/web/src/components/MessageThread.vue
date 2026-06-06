@@ -5,6 +5,8 @@ import type { MessageGroup } from '../lib/messageGroups';
 import { renderMarkdown, cleanMessageContent } from '../lib/markdown';
 import { formatTime } from '../lib/format';
 import ToolGroup from './ToolGroup.vue';
+import ReasoningPanel from './ReasoningPanel.vue';
+import CoderGroup from './CoderGroup.vue';
 
 const props = defineProps<{
   activeRun: Run | null;
@@ -59,6 +61,45 @@ function isPlanExpanded(messageId: string): boolean {
   return expandedPlans.value[messageId];
 }
 
+// Reasoning Accordion State (coordinated: newest open, older auto-collapsed).
+// Tracked separately from expandedPlans so the latest-open-others-closed rule
+// only applies to reasoning panels.
+const expandedReasoning = ref<Record<string, boolean>>({});
+
+// The most recent group (assistant or tool_group) that carries reasoning.
+const latestReasoningId = computed(() => {
+  for (let i = props.groupedMessages.length - 1; i >= 0; i--) {
+    const g = props.groupedMessages[i];
+    // Coder reasoning lives inside CoderGroup, which coordinates its own panels.
+    if (g.type !== 'coder_group' && g.message?.reasoningContent) {
+      return g.id;
+    }
+  }
+  return null;
+});
+
+function isReasoningExpanded(groupId: string): boolean {
+  const explicit = expandedReasoning.value[groupId];
+  if (explicit !== undefined) return explicit;
+  // Default: only the latest reasoning panel is open.
+  return groupId === latestReasoningId.value;
+}
+
+function toggleReasoning(groupId: string) {
+  expandedReasoning.value[groupId] = !isReasoningExpanded(groupId);
+}
+
+// When a new reasoning panel appears, collapse the previous latest and open the
+// new one — the old panel stays visible (and re-expandable), it just closes.
+watch(latestReasoningId, (newId, oldId) => {
+  if (oldId && oldId !== newId) {
+    expandedReasoning.value[oldId] = false;
+  }
+  if (newId) {
+    expandedReasoning.value[newId] = true;
+  }
+});
+
 function extractPlan(content: string): string | null {
   const match = content.match(/<plan>([\s\S]*?)<\/plan>/);
   return match ? match[1].trim() : null;
@@ -75,7 +116,10 @@ const hasSystemErrorInHistory = computed(() => {
 watch(() => props.groupedMessages, () => {
   if (!props.isRunning) return;
   nextTick(() => {
-    const activeReasoningBody = document.querySelector('.assistant-message:last-of-type .reasoning-terminal-container .plan-body');
+    // The live reasoning panel may sit in either an assistant message or a tool
+    // group, so scroll the last rendered reasoning body regardless of wrapper.
+    const reasoningBodies = document.querySelectorAll('.reasoning-terminal-container .plan-body');
+    const activeReasoningBody = reasoningBodies[reasoningBodies.length - 1];
     if (activeReasoningBody) {
       activeReasoningBody.scrollTop = activeReasoningBody.scrollHeight;
     }
@@ -201,13 +245,28 @@ const formattedElapsedTime = computed(() => {
         </div>
       </div>
 
-      <ToolGroup
-        v-else-if="group.type === 'tool_group'"
-        :thought="group.message.content"
-        :tool-calls="group.toolCalls"
-        :tool-responses="group.toolResponses"
-        :agent-role="group.message.agentRole"
-        :model="group.message.model"
+      <template v-else-if="group.type === 'tool_group'">
+        <!-- Reasoning persists even after the turn commits its tool calls. -->
+        <ReasoningPanel
+          v-if="group.message.reasoningContent"
+          :content="group.message.reasoningContent"
+          :expanded="isReasoningExpanded(group.id)"
+          @toggle="toggleReasoning(group.id)"
+        />
+        <ToolGroup
+          :thought="group.message.role === 'tool' ? '' : group.message.content"
+          :tool-calls="group.toolCalls"
+          :tool-responses="group.toolResponses"
+          :agent-role="group.message.agentRole"
+          :model="group.message.model"
+          @open-plan="emit('open-plan')"
+        />
+      </template>
+
+      <CoderGroup
+        v-else-if="group.type === 'coder_group'"
+        :children="group.children || []"
+        :active="isRunning && idx === groupedMessages.length - 1"
         @open-plan="emit('open-plan')"
       />
 
@@ -246,27 +305,12 @@ const formattedElapsedTime = computed(() => {
         </div>
 
         <!-- AI Reasoning (Inner Monologue) Accordion -->
-        <div v-if="group.message.reasoningContent" class="plan-terminal-container reasoning-terminal-container">
-          <header class="terminal-header" @click="togglePlan(group.message.id + '-reasoning')">
-            <div class="terminal-header-left">
-              <svg class="header-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="3"></circle>
-                <circle cx="12" cy="5" r="1"></circle>
-                <circle cx="12" cy="19" r="1"></circle>
-                <circle cx="5" cy="12" r="1"></circle>
-                <circle cx="19" cy="12" r="1"></circle>
-                <path d="M12 8v3M12 13v3M8 12h3M13 12h3"></path>
-              </svg>
-              <span class="terminal-title">Reasoning</span>
-            </div>
-            <button class="terminal-toggle-btn">
-              {{ isPlanExpanded(group.message.id + '-reasoning') ? 'Collapse' : 'Expand' }}
-            </button>
-          </header>
-          <div v-if="isPlanExpanded(group.message.id + '-reasoning')" class="terminal-body plan-body">
-            <pre class="plan-text">{{ group.message.reasoningContent }}</pre>
-          </div>
-        </div>
+        <ReasoningPanel
+          v-if="group.message.reasoningContent"
+          :content="group.message.reasoningContent"
+          :expanded="isReasoningExpanded(group.id)"
+          @toggle="toggleReasoning(group.id)"
+        />
 
         <div class="markdown-body" v-html="renderMarkdown(cleanMessageContent(group.message.content))"></div>
         <div class="assistant-response-footer" style="display: flex; align-items: center; gap: 8px; margin-top: 10px;">
@@ -579,14 +623,6 @@ const formattedElapsedTime = computed(() => {
 @keyframes blink {
   from, to { opacity: 1; }
   50% { opacity: 0; }
-}
-
-.reasoning-terminal-container {
-  border-color: rgba(207, 162, 147, 0.25);
-}
-
-.reasoning-terminal-container:hover {
-  border-color: rgba(207, 162, 147, 0.45);
 }
 
 .copy-button-icon {

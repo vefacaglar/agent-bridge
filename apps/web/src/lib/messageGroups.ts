@@ -2,11 +2,13 @@ import type { RunMessage } from '@agent-bridge/shared';
 import { formatJson } from './format';
 
 export interface MessageGroup {
-  type: 'user' | 'assistant' | 'tool_group' | 'system';
+  type: 'user' | 'assistant' | 'tool_group' | 'system' | 'coder_group';
   id: string;
   message: RunMessage;
   toolCalls: any[];
   toolResponses: RunMessage[];
+  /** Only set for `coder_group`: the sub-agent's own groups, rendered nested. */
+  children?: MessageGroup[];
 }
 
 /** Whether an assistant message carries serialized tool calls in rawResponse. */
@@ -45,6 +47,41 @@ export function formatToolArgs(args?: string): string {
  * tool-calling assistant message with the tool responses that follow it.
  */
 export function groupMessages(messages: RunMessage[]): MessageGroup[] {
+  return foldCoderGroups(buildFlatGroups(messages));
+}
+
+/**
+ * Collapses runs of consecutive coder (sub-agent) groups into a single
+ * `coder_group` so the UI can render them in one contained, scrollable box
+ * instead of letting sub-agent chatter spill into the main thread.
+ */
+function foldCoderGroups(flat: MessageGroup[]): MessageGroup[] {
+  const result: MessageGroup[] = [];
+  let i = 0;
+  while (i < flat.length) {
+    if (flat[i].message.agentRole === 'coder') {
+      const children: MessageGroup[] = [];
+      while (i < flat.length && flat[i].message.agentRole === 'coder') {
+        children.push(flat[i]);
+        i++;
+      }
+      result.push({
+        type: 'coder_group',
+        id: `coder-${children[0].id}`,
+        message: children[0].message,
+        toolCalls: [],
+        toolResponses: [],
+        children
+      });
+    } else {
+      result.push(flat[i]);
+      i++;
+    }
+  }
+  return result;
+}
+
+function buildFlatGroups(messages: RunMessage[]): MessageGroup[] {
   const result: MessageGroup[] = [];
   let i = 0;
 
