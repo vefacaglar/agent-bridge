@@ -83,6 +83,11 @@ const emit = defineEmits<{
   color: inherit;
 }
 
+/* Accordion toggle sits just to the right of the label, not pushed to the edge. */
+.reasoning-header .chevron-icon {
+  order: 1;
+}
+
 .reasoning-details {
   padding: 8px 0 12px;
   border-top: 1px dashed rgba(255, 255, 255, 0.08);

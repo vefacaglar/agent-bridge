@@ -767,6 +767,11 @@ function formatToolResult(name: string, contentJson: string): string {
   flex-shrink: 1;
 }
 
+/* Accordion toggle sits just to the right of the label, not pushed to the edge. */
+.tool-call-header .chevron-icon {
+  order: 1;
+}
+
 .status-icon {
   flex-shrink: 0;
   display: inline-block;
@@ -808,7 +813,7 @@ function formatToolResult(name: string, contentJson: string): string {
 .tool-call-details {
   padding: 8px 0 12px;
   background: transparent;
-  border-top: 1px dashed rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--border-soft);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -822,7 +827,7 @@ function formatToolResult(name: string, contentJson: string): string {
 }
 
 .response-section {
-  border-top: 1px dashed rgba(255, 255, 255, 0.05);
+  border-top: 1px solid var(--border-soft);
   padding-top: 8px;
 }
 
@@ -856,10 +861,14 @@ function formatToolResult(name: string, contentJson: string): string {
 }
 
 .delegated-result-card {
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.18);
-  padding: 12px 14px;
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+
+.delegated-result-card + .delegated-result-card {
+  border-top: 1px solid var(--border-soft);
+  padding-top: 10px;
 }
 
 .delegated-result-title {
@@ -893,10 +902,14 @@ function formatToolResult(name: string, contentJson: string): string {
 }
 
 .ask-answer-card {
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.18);
-  padding: 12px 14px;
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+
+.ask-answer-card + .ask-answer-card {
+  border-top: 1px solid var(--border-soft);
+  padding-top: 10px;
 }
 
 .ask-answer-header {

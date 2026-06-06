@@ -341,7 +341,8 @@ pre {
   width: min(800px, 100%);
   margin: 0 auto;
   flex-direction: column;
-  gap: 28px;
+  /* Per-child margins (see MessageThread) own the rhythm, not a blanket gap. */
+  gap: 0;
 }
 
 .empty-chat {

@@ -476,16 +476,26 @@ const formattedElapsedTime = computed(() => {
 </template>
 
 <style scoped>
-.messages-inner > .coder-shortcut-row + .coder-shortcut-row,
-.messages-inner > :deep(.tool-group-wrap) + .coder-shortcut-row,
-.messages-inner > .coder-shortcut-row + :deep(.tool-group-wrap),
-.messages-inner > :deep(.tool-group-wrap + .tool-group-wrap),
-.messages-inner > :deep(.plan-terminal-container) + .coder-shortcut-row,
-.messages-inner > .coder-shortcut-row + :deep(.plan-terminal-container),
-.messages-inner > :deep(.plan-terminal-container + .tool-group-wrap),
-.messages-inner > :deep(.tool-group-wrap + .plan-terminal-container),
-.messages-inner > :deep(.plan-terminal-container + .plan-terminal-container) {
-  margin-top: -26px !important;
+/* Vertical rhythm — one rule for every block type. The whole assistant turn
+   (reasoning, tool calls, coder rows, plan terminals, final prose) flows as a
+   single tightly-spaced stream; a user message opens a new turn with real air.
+   This replaces the old per-pair negative-margin patch that special-cased some
+   adjacencies and left reasoning panels with the full gap around them. */
+.messages-inner > * {
+  margin-top: 8px;
+}
+
+.messages-inner > .user-message-container {
+  margin-top: 30px;
+  margin-bottom: 14px;
+}
+
+.messages-inner > .plan-thread-link {
+  margin-top: 18px;
+}
+
+.messages-inner > *:first-child {
+  margin-top: 0;
 }
 /* Coder sub-agent messages: subtle left accent + monochrome badge so the
    architect's stream is visually distinct from delegated coder work. */
@@ -934,7 +944,6 @@ const formattedElapsedTime = computed(() => {
 }
 
 .coder-shortcut-row {
-  margin: 1px 0;
   width: 100%;
 }
 
@@ -967,6 +976,11 @@ const formattedElapsedTime = computed(() => {
   white-space: nowrap;
   min-width: 0;
   flex-shrink: 1;
+}
+
+/* Navigate-to-transcript chevron sits just to the right of the label. */
+.coder-shortcut-btn .arrow-right-icon {
+  order: 1;
 }
 
 .arrow-right-icon,
