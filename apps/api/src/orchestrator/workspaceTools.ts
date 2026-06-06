@@ -341,7 +341,7 @@ export const REMEMBER_TOOL = {
   type: "function" as const,
   function: {
     name: "remember",
-    description: "Save a DURABLE fact to remember across future sessions. Use this when you learn something that will stay useful beyond the current task: a user preference or working style, recurring feedback the user gives you about HOW to work, a stable fact about this project, or a reference (URL/ticket) worth keeping. Do NOT remember transient task details, one-off context, secrets, or anything already written in the code/config. Keep each memory to 1-3 sentences. Saving is silent (no confirmation); the user manages saved memories in Settings. If you are refining a memory that already exists (shown to you in 'Remembered context'), pass its id as update_id instead of creating a duplicate.",
+    description: "Save a DURABLE fact to remember across future sessions. Use this when you learn something that will stay useful beyond the current task: a user preference or working style, recurring feedback the user gives you about HOW to work, a stable fact about this project, or a reference (URL/ticket) worth keeping. The saved memory MUST be written in ENGLISH. Do NOT remember transient task details, one-off context, secrets, or anything already written in the code/config. Keep each memory to 1-3 sentences. Saving is silent (no confirmation); the user manages saved memories in Settings. If you are refining a memory that already exists (shown to you in 'Remembered context'), pass its id as update_id instead of creating a duplicate.",
     parameters: {
       type: "object",
       properties: {
@@ -357,7 +357,7 @@ export const REMEMBER_TOOL = {
         },
         content: {
           type: "string",
-          description: "The fact to remember, in 1-3 concise sentences."
+          description: "The fact to remember, in 1-3 concise sentences in ENGLISH."
         },
         update_id: {
           type: "number",
