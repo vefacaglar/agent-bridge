@@ -432,6 +432,9 @@ async function rejectPlan() {
 
 .chat-header {
   display: block;
+  /* Match the side cards' top inset so all three header rows share a baseline. */
+  margin-top: var(--shell-inset);
+  min-height: 0;
   padding: 0;
 }
 
@@ -439,7 +442,7 @@ async function rejectPlan() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 60px;
+  height: var(--top-bar-h);
   width: 100%;
   padding: 0 24px;
   box-sizing: border-box;

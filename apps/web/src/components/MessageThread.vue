@@ -741,11 +741,10 @@ const formattedElapsedTime = computed(() => {
   padding: 14px 16px;
   border: 1px solid var(--border-soft);
   border-radius: 16px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.025));
+  background: rgba(255, 255, 255, 0.06);
   box-shadow:
     0 12px 32px rgba(0, 0, 0, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.035);
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .user-message-container {

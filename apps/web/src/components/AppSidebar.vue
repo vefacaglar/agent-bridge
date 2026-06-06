@@ -213,7 +213,9 @@ function onDeleteProject(path: string, event: Event) {
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  padding: 0 0 4px 0;
+  height: var(--top-bar-h);
+  flex: 0 0 auto;
+  padding: 0;
   background: transparent;
   border: none;
   gap: 8px;
@@ -318,7 +320,7 @@ function onDeleteProject(path: string, event: Event) {
 }
 
 .project-header.active {
-  background: linear-gradient(90deg, rgba(164, 164, 162, 0.085), rgba(255, 255, 255, 0.035));
+  background: var(--sidebar-active);
   box-shadow: inset 0 0 0 1px rgba(164, 164, 162, 0.055);
   color: var(--text);
   font-weight: 500;

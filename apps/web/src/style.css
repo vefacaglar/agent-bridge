@@ -9,11 +9,12 @@
   --bg: #111111;
   --sidebar: #191918;
   --sidebar-active: #252523;
+  --card-bg: #1d1d1c;
   --surface: #1e1e1d;
   --surface-strong: #292927;
   --surface-elevated: #212120;
-  --border: #343431;
-  --border-soft: rgba(255, 255, 255, 0.07);
+  --border: #3d3d39;
+  --border-soft: rgba(255, 255, 255, 0.11);
   --text: #e3e3e2;
   --muted: #a4a4a2;
   --faint: #757574;
@@ -24,6 +25,17 @@
   --warning: #bca282;
   --info: #b0a0b8;
   --radius: 10px;
+
+  /* Shared top-bar geometry so the three columns' header rows line up:
+     side cards float with --shell-inset top margin, the middle column adds
+     the same inset, and every header band is --top-bar-h tall. This puts all
+     three control rows on one baseline and all dividers at the same y. */
+  --shell-inset: 12px;
+  --top-bar-h: 44px;
+  /* One gutter for the floating cards' interiors (sidebar + side panel) so
+     their content edges share a vertical line. The middle reading column keeps
+     its own wider gutter on purpose. */
+  --card-pad-x: 16px;
 }
 
 * {
@@ -35,8 +47,7 @@ body {
   min-width: 900px;
   min-height: 100vh;
   overflow: hidden;
-  background:
-    linear-gradient(180deg, #141414 0%, var(--bg) 32%, #0e0e0e 100%);
+  background: var(--bg);
 }
 
 button,
@@ -117,8 +128,8 @@ pre {
   border: 1px solid var(--border-soft);
   border-radius: 14px;
   margin: 12px;
-  background: linear-gradient(180deg, rgba(29, 29, 28, 0.96), rgba(23, 23, 22, 0.98));
-  padding: 16px;
+  background: var(--card-bg);
+  padding: 0 var(--card-pad-x) var(--card-pad-x);
   box-shadow:
     0 20px 60px rgba(0, 0, 0, 0.34),
     inset 0 1px 0 rgba(255, 255, 255, 0.035);
@@ -169,6 +180,7 @@ pre {
 .chat-history-item {
   width: 100%;
   border-radius: 8px;
+  border: 1px solid transparent;
   background: transparent;
   color: var(--text);
   text-align: left;
@@ -180,12 +192,23 @@ pre {
   font-size: 0.92rem;
 }
 
+/* Hover: a light wash. */
 .nav-action:hover,
 .project-item:hover,
+.chat-history-item:hover {
+  background: rgba(255, 255, 255, 0.045);
+}
+
+/* Active (selected): a solid raised surface + hairline border so the current
+   project / chat clearly stands apart from a mere hover. */
 .project-item.active,
-.chat-history-item:hover,
 .chat-history-item.active {
-  background: linear-gradient(90deg, rgba(164, 164, 162, 0.09), rgba(255, 255, 255, 0.035));
+  background: var(--sidebar-active);
+  border: 1px solid var(--border-soft);
+}
+
+.chat-history-item.active {
+  color: var(--text);
 }
 
 .nav-action.muted {

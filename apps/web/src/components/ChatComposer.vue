@@ -541,8 +541,7 @@ onBeforeUnmount(() => {
 
 .composer-input-box {
   position: relative;
-  background:
-    linear-gradient(180deg, rgba(36, 36, 35, 0.96), rgba(27, 27, 26, 0.98));
+  background: #242423;
   border: 1px solid rgba(255, 255, 255, 0.11);
   border-radius: 14px;
   padding: 13px 88px 13px 16px;
