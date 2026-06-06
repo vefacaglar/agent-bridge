@@ -60,6 +60,7 @@ onMounted(() => {
 });
 onUnmounted(() => {
   window.removeEventListener('keydown', handleEscape);
+  clearSidePanelToggleTimer();
 });
 
 const isSidebarCollapsed = ref(false);
@@ -96,9 +97,35 @@ const agentSummaries = computed(() => collectAgentSummaries(groupedMessages.valu
 // Closing it collapses every panel tab until the user re-opens a thread link or
 // switches chats.
 const sidePanelCollapsed = ref(false);
-const sidePanelOpen = computed(() =>
-  (!!currentPlan.value || workspaceChanges.value.length > 0 || agentSummaries.value.length > 0) && !sidePanelCollapsed.value
+const hasSidePanelContent = computed(() =>
+  !!currentPlan.value || workspaceChanges.value.length > 0 || agentSummaries.value.length > 0
 );
+const sidePanelOpen = computed(() =>
+  hasSidePanelContent.value && !sidePanelCollapsed.value
+);
+const showSidePanelToggle = ref(false);
+const SIDE_PANEL_TRANSITION_MS = 300;
+let sidePanelToggleTimer: ReturnType<typeof setTimeout> | null = null;
+
+function clearSidePanelToggleTimer() {
+  if (sidePanelToggleTimer) {
+    clearTimeout(sidePanelToggleTimer);
+    sidePanelToggleTimer = null;
+  }
+}
+
+watch([hasSidePanelContent, sidePanelOpen], ([hasContent, isOpen]) => {
+  clearSidePanelToggleTimer();
+  if (!hasContent || isOpen) {
+    showSidePanelToggle.value = false;
+    return;
+  }
+
+  sidePanelToggleTimer = setTimeout(() => {
+    showSidePanelToggle.value = true;
+    sidePanelToggleTimer = null;
+  }, SIDE_PANEL_TRANSITION_MS);
+}, { immediate: true });
 
 // Reset the collapsed state when switching chats so each run's panel shows.
 watch(activeRunId, () => { sidePanelCollapsed.value = false; });
@@ -163,7 +190,7 @@ async function rejectPlan() {
 </script>
 
 <template>
-  <div class="app-shell" :class="{ 'sidebar-collapsed': isSidebarCollapsed, 'panel-open': sidePanelOpen }">
+  <div class="app-shell" :class="{ 'sidebar-collapsed': isSidebarCollapsed, 'panel-available': hasSidePanelContent, 'panel-open': sidePanelOpen }">
     <AppSidebar
       :project-options="projects.projectOptions.value"
       :active-project-path="projects.activeProjectPath.value"
@@ -184,7 +211,7 @@ async function rejectPlan() {
       <header v-if="activeRun" class="chat-header">
         <div class="chat-header-inner">
           <div class="thread-title">
-            <button v-if="isSidebarCollapsed" class="expand-sidebar-btn" @click="toggleSidebar" title="Expand Sidebar">
+            <button v-if="isSidebarCollapsed" class="panel-toggle-btn expand-sidebar-btn" @click="toggleSidebar" title="Expand Sidebar">
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <rect width="18" height="18" x="3" y="3" rx="2" />
                 <path d="M9 3v18" />
@@ -202,6 +229,18 @@ async function rejectPlan() {
             
           </div>
           <div class="header-actions">
+            <button
+              v-if="showSidePanelToggle"
+              class="panel-toggle-btn"
+              type="button"
+              title="Open side panel"
+              @click="sidePanelCollapsed = false"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect width="18" height="18" x="3" y="3" rx="2" />
+                <path d="M15 3v18" />
+              </svg>
+            </button>
           </div>
         </div>
       </header>
@@ -289,7 +328,8 @@ async function rejectPlan() {
 
     <PlanPanel
       ref="planPanelRef"
-      v-if="sidePanelOpen"
+      v-if="hasSidePanelContent"
+      :class="{ collapsed: !sidePanelOpen }"
       :plan="currentPlan"
       :changes="workspaceChanges"
       :agents="agentSummaries"

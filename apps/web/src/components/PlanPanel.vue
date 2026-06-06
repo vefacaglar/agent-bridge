@@ -231,7 +231,12 @@ defineExpose({
           </span>
         </button>
       </div>
-      <button type="button" class="workspace-panel-close" title="Hide side panel" @click="$emit('close')">Close</button>
+      <button type="button" class="workspace-panel-close" title="Hide side panel" @click="$emit('close')">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect width="18" height="18" x="3" y="3" rx="2" />
+          <path d="M15 3v18" />
+        </svg>
+      </button>
     </header>
 
     <div ref="panelBody" class="workspace-panel-body">
@@ -444,6 +449,21 @@ defineExpose({
   background: var(--sidebar);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
   overflow: hidden;
+  opacity: 1;
+  transform: translateX(0);
+  transition:
+    margin 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.2s ease,
+    transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.2s ease;
+}
+
+.workspace-panel.collapsed {
+  margin: 12px 0;
+  border-color: transparent;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(16px);
 }
 
 .workspace-panel-header {
@@ -519,13 +539,18 @@ defineExpose({
 .workspace-panel-close {
   margin-left: auto;
   flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
   background: none;
   border: 1px solid var(--border);
   border-radius: 6px;
   color: var(--muted);
-  font-size: 0.72rem;
   cursor: pointer;
-  padding: 3px 9px;
+  padding: 0;
+  transition: all 0.2s ease;
 }
 
 .workspace-panel-close:hover {

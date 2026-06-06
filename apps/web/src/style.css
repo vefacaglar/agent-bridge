@@ -88,9 +88,17 @@ pre {
   grid-template-columns: 0px minmax(0, 1fr);
 }
 
+.app-shell.panel-available {
+  grid-template-columns: 360px minmax(0, 1fr) 0px;
+}
+
 .app-shell.plan-open,
 .app-shell.panel-open {
   grid-template-columns: 360px minmax(0, 1fr) minmax(420px, 560px);
+}
+
+.app-shell.panel-available.sidebar-collapsed {
+  grid-template-columns: 0px minmax(0, 1fr) 0px;
 }
 
 .app-shell.plan-open.sidebar-collapsed,
@@ -123,6 +131,7 @@ pre {
   pointer-events: none;
 }
 
+.panel-toggle-btn,
 .expand-sidebar-btn {
   display: flex;
   align-items: center;
@@ -135,9 +144,13 @@ pre {
   border: 1px solid var(--border);
   cursor: pointer;
   transition: all 0.2s ease;
+}
+
+.expand-sidebar-btn {
   margin-right: 12px;
 }
 
+.panel-toggle-btn:hover,
 .expand-sidebar-btn:hover {
   background: var(--surface-strong);
   color: var(--text);
