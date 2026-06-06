@@ -22,6 +22,43 @@ const dbPath = isTest ? ":memory:" : (process.env.AGENT_BRIDGE_DB_PATH || path.j
 console.log(`[Database] Connecting to SQLite database at: ${dbPath}`);
 export const db = new DatabaseSync(dbPath);
 
+try {
+  db.exec("PRAGMA busy_timeout = 10000");
+  if (dbPath !== ":memory:") {
+    db.exec("PRAGMA journal_mode = WAL");
+    db.exec("PRAGMA synchronous = NORMAL");
+  }
+} catch (err: any) {
+  console.warn(`[Database] Failed to apply SQLite concurrency pragmas: ${err.message}`);
+}
+
+function isDatabaseLocked(err: any): boolean {
+  const message = String(err?.message || err || "").toLowerCase();
+  const code = String(err?.code || "").toUpperCase();
+  return code === "SQLITE_BUSY" || code === "SQLITE_LOCKED" || message.includes("database is locked");
+}
+
+function wait(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+/**
+ * SQLite allows only one writer at a time. If another connection/process has
+ * the write lock, wait briefly and retry instead of surfacing "database is
+ * locked" to the run.
+ */
+export function runQueuedWrite<T>(operation: () => T): T {
+  const delays = [15, 30, 60, 120, 250, 500, 1000, 1500, 2000, 2500];
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return operation();
+    } catch (err) {
+      if (!isDatabaseLocked(err) || attempt >= delays.length) throw err;
+      wait(delays[attempt]);
+    }
+  }
+}
+
 // Create Runs Table
 db.exec(`
   CREATE TABLE IF NOT EXISTS runs (
@@ -186,4 +223,3 @@ try {
 }
 
 console.log("[Database] Database initialized and tables verified.");
-

@@ -113,6 +113,7 @@ IMPORTANT INSTRUCTION FOR PLANNING & CODING:
 - CRITICAL: You do NOT have any file-writing tools (no write_file, edit_file, delete_file, create_directory, move_file, run_command). The ONLY way to make changes to the project is to delegate the work to your coder sub-agent(s) via the 'delegate_tasks' tool. You physically cannot implement anything yourself.
 - Your job: inspect the workspace (read_file / list_directory / search_files), make the architectural decisions, then delegate ALL the actual code-writing by calling 'delegate_tasks'. You may launch between 1 and ${delegation.maxSubAgents} sub-agents in a single call.
 - Each entry in 'tasks' must be SELF-CONTAINED: a clear 'title' and detailed 'instructions' (which files to create/edit, the exact behavior/contract, and any context the coder needs) — the sub-agent does NOT see this conversation, only the instructions you give it.
+- DELEGATION LANGUAGE (MANDATORY): every delegated task 'title' and 'instructions' you send to 'delegate_tasks' or 'delegate_to_utility' MUST be written in ENGLISH, even when the user is speaking Turkish or another language. The sub-agent final output is English, so its input must be English too.
 - Decide concurrency yourself via the 'parallel' flag: set parallel=true ONLY when the sub-tasks touch DISJOINT files and cannot conflict; if they share files or one depends on another's output, set parallel=false (they run sequentially).
 - After sub-agents finish you receive their result summaries. Review them, read the resulting files to verify, and either delegate follow-up fixes or report back to the user.
 - Do NOT describe code changes as plain text expecting them to be applied — nothing happens unless you call 'delegate_tasks'.`;
@@ -121,8 +122,9 @@ IMPORTANT INSTRUCTION FOR PLANNING & CODING:
       prompt += `
 - UTILITY TIER: a cheaper, lighter model (${delegation.utilityModel}) is available via the 'delegate_to_utility' tool.
 - DEFAULT RULE: for tiny exploratory/mechanical work, delegate to utility BEFORE doing it yourself. This includes locating files, finding symbols/functions/routes, listing likely files, summarizing one file, checking whether a path exists, tracing a simple import/reference, or doing a simple rename/move.
+- PROJECT EXPLORATION RULE: when the user asks to inspect/explore/analyze/understand the project or codebase, your FIRST exploration step should normally be a 'delegate_to_utility' call with 1-3 small mapping tasks (for example: "identify the main app structure and entrypoints", "find likely files for the requested area", "summarize relevant config/package files"). Use the utility results as your map, then read only the exact files needed for architectural judgment.
 - Use your own read_file/search_files only when you already know the exact file you need for architectural review, when the lookup is inseparable from your decision, or when a utility result needs verification.
-- Keep utility tasks small and self-contained. Ask for short English answers such as "path:line + one sentence", not broad research dumps.
+- Keep utility tasks small and self-contained. Write the utility task title and instructions in ENGLISH. Ask for short English answers such as "path:line + one sentence", not broad research dumps.
 - Reserve 'delegate_tasks' (the coder) for substantial implementation work. Reserve your own context for decisions, review, and final synthesis.`;
     }
   }

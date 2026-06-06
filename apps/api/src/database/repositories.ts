@@ -1,5 +1,5 @@
 import type { Run, RunMessage, RunStatus, Project, PermissionRule, Plan, PlanTask } from "@agent-bridge/shared";
-import { db } from "./db.js";
+import { db, runQueuedWrite } from "./db.js";
 
 
 // Mapper from database row to Run model
@@ -56,7 +56,7 @@ export class RunRepository {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
-    stmt.run(
+    runQueuedWrite(() => stmt.run(
       run.id,
       run.title,
       run.task,
@@ -75,7 +75,7 @@ export class RunRepository {
       run.errorMessage || null,
       run.createdAt,
       run.updatedAt
-    );
+    ));
   }
 
   getById(id: string): Run | null {
@@ -136,7 +136,7 @@ export class RunRepository {
     values.push(id);
 
     const stmt = db.prepare(sql);
-    stmt.run(...values);
+    runQueuedWrite(() => stmt.run(...values));
   }
 }
 
@@ -150,7 +150,7 @@ export class MessageRepository {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
-    stmt.run(
+    runQueuedWrite(() => stmt.run(
       message.id,
       message.runId,
       message.role,
@@ -163,7 +163,7 @@ export class MessageRepository {
       message.reasoningContent || null,
       message.rawResponse || null,
       message.createdAt
-    );
+    ));
   }
 
   listByRunId(runId: string): RunMessage[] {
@@ -196,7 +196,7 @@ export class MessageRepository {
     values.push(id);
 
     const stmt = db.prepare(sql);
-    stmt.run(...values);
+    runQueuedWrite(() => stmt.run(...values));
   }
 }
 
@@ -260,7 +260,7 @@ export class PlanRepository {
     const existing = this.getActive(runId);
 
     if (existing && !input.startNew) {
-      db.prepare(`
+      runQueuedWrite(() => db.prepare(`
         UPDATE plans SET title = ?, body = ?, tasks = ?, status = 'active', updated_at = ? WHERE id = ?
       `).run(
         input.title?.trim() || existing.title,
@@ -268,20 +268,20 @@ export class PlanRepository {
         tasksJson,
         now,
         existing.id
-      );
+      ));
       return this.getActive(runId)!;
     }
 
     if (existing && input.startNew) {
-      db.prepare("UPDATE plans SET status = 'completed', updated_at = ? WHERE id = ?").run(now, existing.id);
+      runQueuedWrite(() => db.prepare("UPDATE plans SET status = 'completed', updated_at = ? WHERE id = ?").run(now, existing.id));
     }
 
     const id = `plan-${runId}-${Date.now()}`;
     const version = existing ? existing.version + 1 : 1;
-    db.prepare(`
+    runQueuedWrite(() => db.prepare(`
       INSERT INTO plans (id, run_id, title, body, tasks, status, version, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?)
-    `).run(id, runId, input.title?.trim() || "Plan", input.body ?? null, tasksJson, version, now, now);
+    `).run(id, runId, input.title?.trim() || "Plan", input.body ?? null, tasksJson, version, now, now));
 
     return this.getActive(runId)!;
   }
@@ -301,7 +301,7 @@ export class ProjectRepository {
       INSERT OR REPLACE INTO projects (path, name, created_at)
       VALUES (?, ?, ?)
     `);
-    stmt.run(project.path, project.name, project.createdAt);
+    runQueuedWrite(() => stmt.run(project.path, project.name, project.createdAt));
   }
 
   list(): Project[] {
@@ -312,7 +312,7 @@ export class ProjectRepository {
 
   delete(path: string): void {
     const stmt = db.prepare("DELETE FROM projects WHERE path = ?");
-    stmt.run(path);
+    runQueuedWrite(() => stmt.run(path));
   }
 
   get(path: string): Project | null {
@@ -356,26 +356,25 @@ export class PermissionRepository {
   }
 
   allowProject(projectPath: string, tool: string, command: string): void {
-    db.prepare(`
+    runQueuedWrite(() => db.prepare(`
       INSERT OR REPLACE INTO permissions (scope, project_path, tool, command, status)
       VALUES ('project', ?, ?, ?, 'allowed')
-    `).run(projectPath, tool, command);
+    `).run(projectPath, tool, command));
   }
 
   allowGlobal(tool: string, command: string): void {
-    db.prepare(`
+    runQueuedWrite(() => db.prepare(`
       INSERT OR REPLACE INTO permissions (scope, project_path, tool, command, status)
       VALUES ('global', '', ?, ?, 'allowed')
-    `).run(tool, command);
+    `).run(tool, command));
   }
 
   deleteById(id: number): boolean {
-    const info = db.prepare("DELETE FROM permissions WHERE id = ?").run(id);
+    const info = runQueuedWrite(() => db.prepare("DELETE FROM permissions WHERE id = ?").run(id));
     return info.changes > 0;
   }
 
   clear(): void {
-    db.prepare("DELETE FROM permissions").run();
+    runQueuedWrite(() => db.prepare("DELETE FROM permissions").run());
   }
 }
-
