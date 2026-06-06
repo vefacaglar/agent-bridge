@@ -159,6 +159,12 @@ export function useChatSession(options: ChatSessionOptions) {
         if (data.status !== 'awaiting_input') {
           pendingQuestionRequest.value = null;
         }
+        // The backend closes the SSE stream on a terminal status_changed, so a
+        // following run_completed event never arrives. Drive the queued-message
+        // send (and stream teardown) from the terminal status itself.
+        if (data.status === 'done') {
+          finishEventStream({ sendQueuedMessage: true });
+        }
       }
 
       if (data.type === 'permission_requested' && activeRun.value?.id === runId) {
@@ -225,10 +231,13 @@ export function useChatSession(options: ChatSessionOptions) {
     loadRuns();
 
     if (options.sendQueuedMessage && queuedTaskInput.value.trim()) {
+      // Capture + clear synchronously so a second finishEventStream call (e.g.
+      // both a terminal status_changed and run_completed arriving) can't re-send.
+      const queued = queuedTaskInput.value;
+      queuedTaskInput.value = '';
       requestAnimationFrame(() => {
-        if (!isRunning.value && queuedTaskInput.value.trim()) {
-          taskInput.value = queuedTaskInput.value;
-          queuedTaskInput.value = '';
+        if (!isRunning.value) {
+          taskInput.value = queued;
           handleSendTask();
         }
       });
@@ -331,10 +340,10 @@ export function useChatSession(options: ChatSessionOptions) {
     }
   }
 
-  async function handleQuestionAnswer(selections: string[][]) {
+  async function handleQuestionAnswer(payload: { selections: string[][]; notes: string[] }) {
     if (!activeRunId.value) return;
     try {
-      await api.answerQuestion(activeRunId.value, selections);
+      await api.answerQuestion(activeRunId.value, payload.selections, payload.notes);
       pendingQuestionRequest.value = null;
     } catch (err: any) {
       await showAlert(err.message || 'Connection error.');

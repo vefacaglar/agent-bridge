@@ -182,6 +182,25 @@ function formatToolParams(name: string, argumentsJson: string): string {
         return `Source: ${args.source_path || ''}\nDestination: ${args.destination_path || ''}`;
       case 'search_files':
         return `Query: "${args.query || ''}"${args.path ? `\nIn path: ${args.path}` : ''}`;
+      case 'ask_user_question': {
+        if (!Array.isArray(args.questions) || args.questions.length === 0) return '';
+        return args.questions
+          .map((q: any, idx: number) => {
+            const head = typeof q?.header === 'string' && q.header.trim() ? `${q.header.trim()} — ` : '';
+            const text = typeof q?.question === 'string' ? q.question.trim() : '';
+            const opts = Array.isArray(q?.options)
+              ? q.options
+                  .map((o: any) => {
+                    const label = typeof o?.label === 'string' ? o.label : '';
+                    const desc = typeof o?.description === 'string' && o.description.trim() ? ` — ${o.description.trim()}` : '';
+                    return `   • ${label}${desc}`;
+                  })
+                  .join('\n')
+              : '';
+            return `${idx + 1}. ${head}${text}${opts ? `\n${opts}` : ''}`;
+          })
+          .join('\n\n');
+      }
       case 'delegate_tasks':
       case 'delegate_to_utility': {
         if (!Array.isArray(args.tasks) || args.tasks.length === 0) return '';
@@ -220,6 +239,28 @@ function parseDelegatedResult(contentJson: string): { title: string; summary: st
   } catch (e) {
     return null;
   }
+}
+
+/** Parsed answers for an ask_user_question result, ready for the Q&A card. */
+function parseAskAnswers(contentJson: string): { header: string; question: string; selected: string[]; note: string }[] | null {
+  if (!contentJson) return null;
+  try {
+    const res = JSON.parse(contentJson);
+    if (!Array.isArray(res.answers)) return null;
+    return res.answers.map((a: any) => ({
+      header: typeof a?.header === 'string' ? a.header.trim() : '',
+      question: typeof a?.question === 'string' ? a.question.trim() : '',
+      selected: Array.isArray(a?.selected) ? a.selected.filter((s: any) => typeof s === 'string') : [],
+      note: typeof a?.note === 'string' ? a.note.trim() : ''
+    }));
+  } catch (e) {
+    return null;
+  }
+}
+
+function shouldRenderAskAnswers(name: string, contentJson: string): boolean {
+  if (name !== 'ask_user_question') return false;
+  return !!parseAskAnswers(contentJson)?.length;
 }
 
 function shouldRenderDelegatedResult(name: string, contentJson: string): boolean {
@@ -420,7 +461,25 @@ function formatToolResult(name: string, contentJson: string): string {
           <div class="detail-section response-section">
             <div class="detail-label">Result:</div>
             <div
-              v-if="toolResponses[idx] && shouldRenderDelegatedResult(tc.function?.name, toolResponses[idx].content)"
+              v-if="toolResponses[idx] && shouldRenderAskAnswers(tc.function?.name, toolResponses[idx].content)"
+              class="ask-answer-list"
+            >
+              <section
+                v-for="(ans, aIdx) in parseAskAnswers(toolResponses[idx].content)"
+                :key="aIdx"
+                class="ask-answer-card"
+              >
+                <div v-if="ans.header" class="ask-answer-header">{{ ans.header }}</div>
+                <div class="ask-answer-question">{{ ans.question }}</div>
+                <ul v-if="ans.selected.length" class="ask-answer-choices">
+                  <li v-for="(choice, cIdx) in ans.selected" :key="cIdx">{{ choice }}</li>
+                </ul>
+                <div v-else class="ask-answer-empty">Seçim yapılmadı</div>
+                <div v-if="ans.note" class="ask-answer-note">“{{ ans.note }}”</div>
+              </section>
+            </div>
+            <div
+              v-else-if="toolResponses[idx] && shouldRenderDelegatedResult(tc.function?.name, toolResponses[idx].content)"
               class="delegated-result-list"
             >
               <section
@@ -718,6 +777,75 @@ function formatToolResult(name: string, contentJson: string): string {
   display: block;
   max-width: 100%;
   overflow-x: auto;
+}
+
+.ask-answer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ask-answer-card {
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.18);
+  padding: 12px 14px;
+}
+
+.ask-answer-header {
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ask-answer-question {
+  margin-bottom: 8px;
+  color: var(--text);
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.ask-answer-choices {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ask-answer-choices li {
+  position: relative;
+  padding-left: 18px;
+  color: var(--text);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.ask-answer-choices li::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  color: var(--success);
+  font-weight: 700;
+}
+
+.ask-answer-empty {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-style: italic;
+}
+
+.ask-answer-note {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
 }
 
 .tool-running-shimmer {

@@ -44,7 +44,7 @@ const emit = defineEmits<{
   (e: 'cancel'): void;
   (e: 'quick-reply', option: string): void;
   (e: 'permission-decision', decision: PermissionDecision): void;
-  (e: 'question-answer', selections: string[][]): void;
+  (e: 'question-answer', payload: { selections: string[][]; notes: string[] }): void;
   (e: 'select-project', path: string): void;
 }>();
 

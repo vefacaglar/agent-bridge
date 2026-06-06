@@ -95,11 +95,15 @@ export function renderMarkdown(content: string, idPrefix?: string): string {
   }
 }
 
-/** Strips internal <plan>...</plan> and <task_list>...</task_list> blocks before displaying assistant text. */
+/** Strips internal <plan>...</plan> and <task_list>...</task_list> blocks before displaying assistant text.
+ *  Also strips a not-yet-closed block (open tag with no closing tag) so a partial block being
+ *  streamed in is hidden instead of rendering raw markdown until generation finishes. */
 export function cleanMessageContent(content: string): string {
   return content
     .replace(/<plan>[\s\S]*?<\/plan>/g, '')
     .replace(/<task_list>[\s\S]*?<\/task_list>/g, '')
+    .replace(/<plan>[\s\S]*$/g, '')
+    .replace(/<task_list>[\s\S]*$/g, '')
     .trim();
 }
 

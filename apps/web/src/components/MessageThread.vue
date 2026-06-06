@@ -889,20 +889,4 @@ const formattedElapsedTime = computed(() => {
   animation: messageEnter 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-.assistant-message :deep(.markdown-body) {
-  -webkit-mask-image: linear-gradient(to bottom, black 0%, black calc(100% - 36px), transparent 100%);
-  mask-image: linear-gradient(to bottom, black 0%, black calc(100% - 36px), transparent 100%);
-  -webkit-mask-size: 100% calc(100% + 36px);
-  mask-size: 100% calc(100% + 36px);
-  -webkit-mask-position: 0 0;
-  mask-position: 0 0;
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  transition: mask-position 0.6s cubic-bezier(0.16, 1, 0.3, 1), -webkit-mask-position 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.assistant-message.is-generating :deep(.markdown-body) {
-  -webkit-mask-position: 0 -36px;
-  mask-position: 0 -36px;
-}
 </style>

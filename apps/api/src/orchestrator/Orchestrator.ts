@@ -9,6 +9,12 @@ import { WORKSPACE_TOOLS, UPDATE_PLAN_TOOL, DELEGATE_TASKS_TOOL, DELEGATE_UTILIT
 
 type PermissionDecision = "allow_once" | "allow_project" | "allow_always" | "deny";
 
+/** The user's reply to an ask_user_question request, aligned to the questions order. */
+interface QuestionAnswerInput {
+  selections: string[][];  // chosen option labels per question
+  notes: string[];         // free-text comment per question ("" if none)
+}
+
 /** One execution attempt for a delegated task: a model paired with its toolset. */
 interface SubAgentTier {
   providerId: string;
@@ -35,9 +41,10 @@ export class Orchestrator {
   // their approval prompts must be shown one at a time, not overwrite each other.
   private permissionChain = new Map<string, Promise<void>>();
   // Pending ask_user_question requests, keyed by runId. Resolved with the user's
-  // selections (one string[] per question, aligned to the questions order).
+  // answer: chosen option labels AND a free-text note per question (both aligned
+  // to the questions order).
   private pendingQuestions = new Map<string, {
-    resolve: (selections: string[][]) => void;
+    resolve: (answer: QuestionAnswerInput) => void;
     questions: UserQuestion[];
   }>();
 
@@ -66,10 +73,10 @@ export class Orchestrator {
 
   // --- User question handling ----------------------------------------------
 
-  resolveQuestion(runId: string, selections: string[][]): boolean {
+  resolveQuestion(runId: string, answer: QuestionAnswerInput): boolean {
     const pending = this.pendingQuestions.get(runId);
     if (pending) {
-      pending.resolve(selections);
+      pending.resolve(answer);
       this.pendingQuestions.delete(runId);
       return true;
     }
@@ -87,9 +94,9 @@ export class Orchestrator {
    * No serialization chain is needed — only the main agent (a single sequential
    * loop) ever asks questions; sub-agents never get the tool.
    */
-  private async requestUserAnswer(runId: string, questions: UserQuestion[]): Promise<string[][]> {
-    if (!this.activeRuns.has(runId)) return [];
-    return await new Promise<string[][]>((resolve) => {
+  private async requestUserAnswer(runId: string, questions: UserQuestion[]): Promise<QuestionAnswerInput> {
+    if (!this.activeRuns.has(runId)) return { selections: [], notes: [] };
+    return await new Promise<QuestionAnswerInput>((resolve) => {
       this.pendingQuestions.set(runId, { resolve, questions });
       this.emitStatus(runId, "awaiting_input");
       eventBus.emit(`run:${runId}`, { type: "question_requested", runId, questions });
@@ -183,7 +190,7 @@ export class Orchestrator {
     // returns and the loop can unwind.
     const pendingQ = this.pendingQuestions.get(runId);
     if (pendingQ) {
-      pendingQ.resolve([]);
+      pendingQ.resolve({ selections: [], notes: [] });
       this.pendingQuestions.delete(runId);
     }
 
@@ -929,7 +936,7 @@ export class Orchestrator {
       return JSON.stringify({ success: false, error: "No valid questions (each needs a question and at least one option)." });
     }
 
-    const selections = await this.requestUserAnswer(runId, questions);
+    const { selections, notes } = await this.requestUserAnswer(runId, questions);
 
     // If the run was cancelled while waiting, don't flip status back — let the
     // loop's next cancellation check unwind it.
@@ -938,11 +945,15 @@ export class Orchestrator {
     }
     this.emitStatus(runId, "generating");
 
-    const answers = questions.map((q, i) => ({
-      question: q.question,
-      header: q.header,
-      selected: selections[i] ?? []
-    }));
+    const answers = questions.map((q, i) => {
+      const note = (notes[i] ?? "").trim();
+      return {
+        question: q.question,
+        header: q.header,
+        selected: selections[i] ?? [],
+        ...(note ? { note } : {})
+      };
+    });
     return JSON.stringify({ success: true, answers });
   }
 
