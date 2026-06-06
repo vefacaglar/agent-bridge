@@ -8,13 +8,15 @@ import ReasoningPanel from './ReasoningPanel.vue';
 const props = defineProps<{
   children: MessageGroup[];
   active?: boolean;
+  /** The sub-agent's name (its delegated task title), shown in the header. */
+  title?: string;
 }>();
 
 const emit = defineEmits<{
   (e: 'open-plan'): void;
 }>();
 
-const expanded = ref(true);
+const expanded = ref(false);
 
 // The coder model label, taken from the first child that carries one.
 const model = computed(() => props.children.find(c => c.message.model)?.message.model ?? '');
@@ -66,6 +68,7 @@ watch(() => props.children.map(c => c.message.content + (c.message.reasoningCont
     <header class="coder-group-header" @click="expanded = !expanded">
       <div class="coder-group-head-left">
         <span class="agent-badge coder-badge">Coder</span>
+        <span v-if="title" class="coder-group-title">{{ title }}</span>
         <span v-if="model" class="coder-group-model">{{ model }}</span>
         <span v-if="active" class="coder-group-status">working…</span>
         <span v-else-if="stepCount" class="coder-group-steps">{{ stepCount }} step{{ stepCount === 1 ? '' : 's' }}</span>
@@ -143,6 +146,16 @@ watch(() => props.children.map(c => c.message.content + (c.message.reasoningCont
   padding: 1px 6px;
 }
 
+.coder-group-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
 .coder-group-model {
   font-size: 0.72rem;
   color: var(--faint);
@@ -150,6 +163,7 @@ watch(() => props.children.map(c => c.message.content + (c.message.reasoningCont
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .coder-group-status {

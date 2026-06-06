@@ -31,6 +31,7 @@ function mapRowToMessage(row: any): RunMessage {
     runId: row.run_id,
     role: row.role as "system" | "user" | "assistant" | "tool",
     agentRole: row.agent_role || undefined,
+    agentName: row.agent_name || undefined,
     providerId: row.provider_id || undefined,
     providerDisplayName: row.provider_display_name || undefined,
     model: row.model || undefined,
@@ -136,10 +137,10 @@ export class MessageRepository {
   create(message: RunMessage): void {
     const stmt = db.prepare(`
       INSERT INTO messages (
-        id, run_id, role, agent_role,
+        id, run_id, role, agent_role, agent_name,
         provider_id, provider_display_name, model,
         content, reasoning_content, raw_response, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
@@ -147,6 +148,7 @@ export class MessageRepository {
       message.runId,
       message.role,
       message.agentRole || null,
+      message.agentName || null,
       message.providerId || null,
       message.providerDisplayName || null,
       message.model || null,

@@ -9,6 +9,8 @@ export interface MessageGroup {
   toolResponses: RunMessage[];
   /** Only set for `coder_group`: the sub-agent's own groups, rendered nested. */
   children?: MessageGroup[];
+  /** Only set for `coder_group`: the sub-agent's name (its delegated task title). */
+  title?: string;
 }
 
 /** Whether an assistant message carries serialized tool calls in rawResponse. */
@@ -51,28 +53,48 @@ export function groupMessages(messages: RunMessage[]): MessageGroup[] {
 }
 
 /**
- * Collapses runs of consecutive coder (sub-agent) groups into a single
- * `coder_group` so the UI can render them in one contained, scrollable box
- * instead of letting sub-agent chatter spill into the main thread.
+ * Collapses runs of consecutive coder (sub-agent) groups into per-sub-agent
+ * `coder_group` boxes — one window per delegated sub-agent — so each coder gets
+ * its own contained, scrollable box instead of all coders merging into one.
+ *
+ * Sub-agents are identified by `agentName` (the delegated task title). Parallel
+ * sub-agents interleave their messages by timestamp, so we partition each
+ * contiguous coder block by `agentName` (first-appearance order) rather than
+ * relying on adjacency. Two separate delegate_tasks calls are split anyway by
+ * the architect's own messages sitting between them.
  */
 function foldCoderGroups(flat: MessageGroup[]): MessageGroup[] {
   const result: MessageGroup[] = [];
   let i = 0;
   while (i < flat.length) {
     if (flat[i].message.agentRole === 'coder') {
-      const children: MessageGroup[] = [];
+      const block: MessageGroup[] = [];
       while (i < flat.length && flat[i].message.agentRole === 'coder') {
-        children.push(flat[i]);
+        block.push(flat[i]);
         i++;
       }
-      result.push({
-        type: 'coder_group',
-        id: `coder-${children[0].id}`,
-        message: children[0].message,
-        toolCalls: [],
-        toolResponses: [],
-        children
-      });
+
+      // Partition the block into one bucket per sub-agent, keeping each
+      // sub-agent's messages in order and preserving first-appearance order.
+      const buckets = new Map<string, MessageGroup[]>();
+      for (const g of block) {
+        const key = g.message.agentName || 'coder';
+        const bucket = buckets.get(key);
+        if (bucket) bucket.push(g);
+        else buckets.set(key, [g]);
+      }
+
+      for (const [name, children] of buckets) {
+        result.push({
+          type: 'coder_group',
+          id: `coder-${children[0].id}`,
+          message: children[0].message,
+          toolCalls: [],
+          toolResponses: [],
+          children,
+          title: name === 'coder' ? undefined : name
+        });
+      }
     } else {
       result.push(flat[i]);
       i++;

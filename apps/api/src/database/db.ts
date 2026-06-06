@@ -67,6 +67,7 @@ db.exec(`
     run_id TEXT NOT NULL,
     role TEXT NOT NULL,
     agent_role TEXT,
+    agent_name TEXT,
     provider_id TEXT,
     provider_display_name TEXT,
     model TEXT,
@@ -81,6 +82,13 @@ db.exec(`
 // Migration: Add reasoning_content column to messages if it doesn't already exist
 try {
   db.exec("ALTER TABLE messages ADD COLUMN reasoning_content TEXT");
+} catch (e) {
+  // Ignored if column already exists
+}
+
+// Migration: Add agent_name column (per coder sub-agent identity) if missing.
+try {
+  db.exec("ALTER TABLE messages ADD COLUMN agent_name TEXT");
 } catch (e) {
   // Ignored if column already exists
 }

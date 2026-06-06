@@ -113,6 +113,16 @@ const hasSystemErrorInHistory = computed(() => {
   return props.groupedMessages.some(g => g.type === 'system');
 });
 
+// Index of the last non-coder group. Any coder_group after it belongs to the
+// in-flight delegation batch, so every such window (parallel sub-agents too)
+// shows the live "working…" state, not just the last one.
+const lastNonCoderIdx = computed(() => {
+  for (let i = props.groupedMessages.length - 1; i >= 0; i--) {
+    if (props.groupedMessages[i].type !== 'coder_group') return i;
+  }
+  return -1;
+});
+
 watch(() => props.groupedMessages, () => {
   if (!props.isRunning) return;
   nextTick(() => {
@@ -266,7 +276,8 @@ const formattedElapsedTime = computed(() => {
       <CoderGroup
         v-else-if="group.type === 'coder_group'"
         :children="group.children || []"
-        :active="isRunning && idx === groupedMessages.length - 1"
+        :title="group.title"
+        :active="isRunning && idx > lastNonCoderIdx"
         @open-plan="emit('open-plan')"
       />
 

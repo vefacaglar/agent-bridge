@@ -55,6 +55,13 @@ export interface RunMessage {
   runId: string;
   role: "system" | "user" | "assistant" | "tool";
   agentRole?: "planner" | "coder" | "reviewer" | "user";
+  /**
+   * For delegated coder sub-agents: the sub-task title that identifies WHICH
+   * sub-agent produced this message. Lets the UI render each coder in its own
+   * window instead of merging all coders into one box. Undefined for the
+   * architect/main agent.
+   */
+  agentName?: string;
   providerId?: string;
   providerDisplayName?: string;
   model?: string;

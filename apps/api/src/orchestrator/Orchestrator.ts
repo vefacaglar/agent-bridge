@@ -357,6 +357,7 @@ export class Orchestrator {
       systemPrompt: string;
       tools: any[];
       agentRole?: RunMessage["agentRole"];
+      agentName?: string;
     }
   ): Promise<string> {
     const checkCancelled = () => {
@@ -393,6 +394,7 @@ export class Orchestrator {
           runId,
           role: "assistant",
           agentRole: opts.agentRole,
+          agentName: opts.agentName,
           providerId: opts.providerId,
           providerDisplayName: opts.providerDisplayName,
           model: opts.model,
@@ -416,6 +418,7 @@ export class Orchestrator {
         runId,
         role: "assistant",
         agentRole: opts.agentRole,
+        agentName: opts.agentName,
         providerId: opts.providerId,
         providerDisplayName: opts.providerDisplayName,
         model: opts.model,
@@ -449,6 +452,7 @@ export class Orchestrator {
             runId,
             role: "tool",
             agentRole: opts.agentRole,
+            agentName: opts.agentName,
             content: result,
             createdAt: new Date().toISOString()
           };
@@ -519,7 +523,10 @@ export class Orchestrator {
         model: run.coderModel!,
         systemPrompt,
         tools: [...WORKSPACE_TOOLS],
-        agentRole: "coder"
+        agentRole: "coder",
+        // Tag every message with the sub-task title so the UI can render each
+        // coder sub-agent in its own window instead of merging them.
+        agentName: task.title
       });
       return { title: task.title, summary: summary || "(no summary returned)" };
     };

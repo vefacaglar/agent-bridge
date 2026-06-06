@@ -367,9 +367,13 @@ Implementation notes:
 - Sub-agents share the run's `runId`, so cancellation and the permission flow just
   work; because parallel sub-agents share the single pending-permission slot, their
   approval prompts are serialized via `permissionChain` (one prompt at a time).
-- Coder prompt is `buildCoderSystemPrompt`; the web UI badges coder messages
-  (`MessageThread.vue`, `ToolGroup.vue`). Presets are managed in Settings →
-  Agents (`AgentPresetsTab.vue`).
+- Each sub-agent's messages are tagged with `agentName` (the delegated task
+  title) in addition to `agentRole: "coder"`. The web UI uses `agentName` to
+  render EACH coder sub-agent in its own collapsible window — `groupMessages`
+  (`messageGroups.ts`) partitions a contiguous coder block by `agentName`, and
+  `CoderGroup.vue` shows the title as the window header. Parallel sub-agents
+  interleave by timestamp but still split into separate windows. Presets are
+  managed in Settings → Agents (`AgentPresetsTab.vue`).
 
 ---
 
