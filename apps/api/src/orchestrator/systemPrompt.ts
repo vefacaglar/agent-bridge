@@ -108,11 +108,12 @@ IMPORTANT INSTRUCTION FOR PLANNING & CODING:
   if (delegation) {
     prompt += `\n\nDUAL-MODEL / ARCHITECT MODE:
 - You are the ARCHITECT. A separate coder model (${delegation.coderModel}) is available as your sub-agent(s).
-- Make the architectural decisions, then delegate the actual code-writing by calling the 'delegate_tasks' tool. You may launch between 1 and ${delegation.maxSubAgents} sub-agents in a single call.
+- CRITICAL: You do NOT have any file-writing tools (no write_file, edit_file, delete_file, create_directory, move_file, run_command). The ONLY way to make changes to the project is to delegate the work to your coder sub-agent(s) via the 'delegate_tasks' tool. You physically cannot implement anything yourself.
+- Your job: inspect the workspace (read_file / list_directory / search_files), make the architectural decisions, then delegate ALL the actual code-writing by calling 'delegate_tasks'. You may launch between 1 and ${delegation.maxSubAgents} sub-agents in a single call.
 - Each entry in 'tasks' must be SELF-CONTAINED: a clear 'title' and detailed 'instructions' (which files to create/edit, the exact behavior/contract, and any context the coder needs) — the sub-agent does NOT see this conversation, only the instructions you give it.
 - Decide concurrency yourself via the 'parallel' flag: set parallel=true ONLY when the sub-tasks touch DISJOINT files and cannot conflict; if they share files or one depends on another's output, set parallel=false (they run sequentially).
-- After sub-agents finish you receive their result summaries. Review them, integrate/verify if needed (you can read files or run a build via run_command), and report back to the user.
-- Prefer delegating substantial implementation work rather than writing large amounts of code yourself; reserve your own tool calls for inspection, wiring, and verification.`;
+- After sub-agents finish you receive their result summaries. Review them, read the resulting files to verify, and either delegate follow-up fixes or report back to the user.
+- Do NOT describe code changes as plain text expecting them to be applied — nothing happens unless you call 'delegate_tasks'.`;
   }
 
   prompt += projectContextSuffix(projectName, projectPath);

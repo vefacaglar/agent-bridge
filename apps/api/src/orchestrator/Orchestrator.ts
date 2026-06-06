@@ -278,10 +278,17 @@ export class Orchestrator {
 
       // Plan mode is planning-only: expose ONLY read-only tools plus update_plan,
       // so the model literally cannot mutate the workspace or run commands there.
-      // Other modes get the full toolset (+ delegate_tasks when a coder is set).
+      // When a coder is configured the architect is also held to read-only tools:
+      // it physically cannot write code / run commands itself, so the only way to
+      // implement is to delegate (weak models otherwise ignore the soft "prefer
+      // delegating" instruction and do all the work directly).
+      // Plain single-model runs get the full toolset.
+      const readonlyTools = WORKSPACE_TOOLS.filter(t => READONLY_TOOLS.has(t.function.name));
       const baseTools = run.mode === "plan"
-        ? [...WORKSPACE_TOOLS.filter(t => READONLY_TOOLS.has(t.function.name)), UPDATE_PLAN_TOOL]
-        : [...WORKSPACE_TOOLS];
+        ? [...readonlyTools, UPDATE_PLAN_TOOL]
+        : delegation
+          ? [...readonlyTools]
+          : [...WORKSPACE_TOOLS];
       const withDelegate = delegation ? [...baseTools, DELEGATE_TASKS_TOOL] : baseTools;
       // set_chat_title is available to the main agent in every mode (it only
       // renames the run); coder sub-agents never get it.

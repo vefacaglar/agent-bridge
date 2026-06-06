@@ -337,7 +337,14 @@ the model picker in the composer (`useComposerSettings.selectedPresetId`). When 
 preset is selected the run is plain single-model and behaves exactly as before.
 
 When (and only when) a coder model is configured, the architect loop is given an
-extra `delegate_tasks` tool:
+extra `delegate_tasks` tool — and, importantly, is **stripped of every
+file-mutating / command tool**. With a coder configured the architect keeps only
+the read-only tools (`read_file`, `list_directory`, `search_files`) plus
+`delegate_tasks` (and `set_chat_title`). It physically cannot `write_file`,
+`edit_file`, `run_command`, etc., so the only way for it to change the project is
+to delegate. This is deliberate: weak architect models otherwise ignore the soft
+"prefer delegating" guidance and just do all the work themselves. (Tool set-up
+lives in `Orchestrator.drive()`.)
 
 ```txt
 delegate_tasks(tasks[{ title, instructions, files? }], parallel?)
