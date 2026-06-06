@@ -305,7 +305,10 @@ const formattedElapsedTime = computed(() => {
       <article
         v-else-if="group.type === 'assistant'"
         class="assistant-message"
-        :class="{ 'coder-message': group.message.agentRole === 'coder' }"
+        :class="{ 
+          'coder-message': group.message.agentRole === 'coder',
+          'is-generating': isRunning && idx === groupedMessages.length - 1
+        }"
       >
         <div class="assistant-meta">
           <span v-if="group.message.agentRole === 'coder'" class="agent-badge coder-badge">Coder</span>
@@ -344,7 +347,10 @@ const formattedElapsedTime = computed(() => {
           @toggle="toggleReasoning(group.id)"
         />
 
-        <div class="markdown-body" v-html="renderMarkdown(cleanMessageContent(group.message.content), group.message.id)"></div>
+        <div 
+          class="markdown-body" 
+          v-html="renderMarkdown(cleanMessageContent(group.message.content), group.message.id)"
+        ></div>
         <div class="assistant-response-footer" style="display: flex; align-items: center; gap: 8px; margin-top: 10px;">
           <button 
             class="copy-button-icon" 
@@ -861,5 +867,31 @@ const formattedElapsedTime = computed(() => {
   0% { opacity: .2; }
   20% { opacity: 1; }
   100% { opacity: .2; }
+}
+
+@keyframes messageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.user-message-container,
+.assistant-message,
+.plan-thread-link,
+:deep(.tool-group-wrap),
+:deep(.coder-group),
+:deep(.reasoning-terminal-container) {
+  animation: messageEnter 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.assistant-message.is-generating :deep(.markdown-body) {
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,1) calc(100% - 36px), rgba(0,0,0,0) 100%);
+  mask-image: linear-gradient(to bottom, rgba(0,0,0,1) calc(100% - 36px), rgba(0,0,0,0) 100%);
+  transition: all 0.25s ease-out;
 }
 </style>
