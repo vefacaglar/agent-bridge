@@ -1,11 +1,11 @@
-import type { Run, RunStatus, RunMessage, ChatMessage, PlanTask } from "@agent-bridge/shared";
+import type { Run, RunStatus, RunMessage, ChatMessage, PlanTask, UserQuestion } from "@agent-bridge/shared";
 import type { ModelProvider } from "../providers/ModelProvider.js";
 import { RunRepository, MessageRepository, PlanRepository } from "../database/repositories.js";
 import { ProviderRegistry } from "../providers/ProviderRegistry.js";
 import { eventBus } from "./eventBus.js";
 import { db } from "../database/db.js";
 import { buildSystemPrompt, buildCoderSystemPrompt, buildUtilitySystemPrompt } from "./systemPrompt.js";
-import { WORKSPACE_TOOLS, UPDATE_PLAN_TOOL, DELEGATE_TASKS_TOOL, DELEGATE_UTILITY_TOOL, UTILITY_TOOLS, SET_TITLE_TOOL, executeWorkspaceToolAsync, buildPermissionPreview, DANGEROUS_TOOLS, READONLY_TOOLS, MODIFYING_TOOLS, permissionKey } from "./workspaceTools.js";
+import { WORKSPACE_TOOLS, UPDATE_PLAN_TOOL, DELEGATE_TASKS_TOOL, DELEGATE_UTILITY_TOOL, UTILITY_TOOLS, SET_TITLE_TOOL, ASK_QUESTION_TOOL, executeWorkspaceToolAsync, buildPermissionPreview, DANGEROUS_TOOLS, READONLY_TOOLS, MODIFYING_TOOLS, permissionKey } from "./workspaceTools.js";
 
 type PermissionDecision = "allow_once" | "allow_project" | "allow_always" | "deny";
 
@@ -34,6 +34,12 @@ export class Orchestrator {
   // sub-agents share one runId and the pending-permission slot is single, so
   // their approval prompts must be shown one at a time, not overwrite each other.
   private permissionChain = new Map<string, Promise<void>>();
+  // Pending ask_user_question requests, keyed by runId. Resolved with the user's
+  // selections (one string[] per question, aligned to the questions order).
+  private pendingQuestions = new Map<string, {
+    resolve: (selections: string[][]) => void;
+    questions: UserQuestion[];
+  }>();
 
   constructor(
     private runRepo: RunRepository,
@@ -56,6 +62,38 @@ export class Orchestrator {
 
   getPendingPermission(runId: string) {
     return this.pendingPermissions.get(runId);
+  }
+
+  // --- User question handling ----------------------------------------------
+
+  resolveQuestion(runId: string, selections: string[][]): boolean {
+    const pending = this.pendingQuestions.get(runId);
+    if (pending) {
+      pending.resolve(selections);
+      this.pendingQuestions.delete(runId);
+      return true;
+    }
+    return false;
+  }
+
+  getPendingQuestion(runId: string) {
+    return this.pendingQuestions.get(runId);
+  }
+
+  /**
+   * Pauses the run and asks the user one or more multiple-choice questions,
+   * resolving with their selections (one string[] per question). Mirrors the
+   * permission flow: emits the request, flips status to awaiting_input, and waits.
+   * No serialization chain is needed — only the main agent (a single sequential
+   * loop) ever asks questions; sub-agents never get the tool.
+   */
+  private async requestUserAnswer(runId: string, questions: UserQuestion[]): Promise<string[][]> {
+    if (!this.activeRuns.has(runId)) return [];
+    return await new Promise<string[][]>((resolve) => {
+      this.pendingQuestions.set(runId, { resolve, questions });
+      this.emitStatus(runId, "awaiting_input");
+      eventBus.emit(`run:${runId}`, { type: "question_requested", runId, questions });
+    });
   }
 
   /**
@@ -140,6 +178,13 @@ export class Orchestrator {
     if (pending) {
       pending.resolve("deny");
       this.pendingPermissions.delete(runId);
+    }
+    // Likewise resolve any pending question (with no selections) so its tool call
+    // returns and the loop can unwind.
+    const pendingQ = this.pendingQuestions.get(runId);
+    if (pendingQ) {
+      pendingQ.resolve([]);
+      this.pendingQuestions.delete(runId);
     }
 
     if (this.activeRuns.has(runId)) {
@@ -349,9 +394,10 @@ export class Orchestrator {
       // The utility-delegation tool is offered only when a utility model is
       // configured (and the run can delegate at all).
       const withUtility = delegation?.utilityModel ? [...withDelegate, DELEGATE_UTILITY_TOOL] : withDelegate;
-      // set_chat_title is available to the main agent in every mode (it only
-      // renames the run); sub-agents never get it.
-      const tools = [...withUtility, SET_TITLE_TOOL];
+      // set_chat_title and ask_user_question are available to the main agent in
+      // every mode (they only rename the run / ask the user); sub-agents never
+      // get them.
+      const tools = [...withUtility, SET_TITLE_TOOL, ASK_QUESTION_TOOL];
 
       const systemPrompt = buildSystemPrompt(
         run.projectName,
@@ -394,6 +440,7 @@ export class Orchestrator {
     } finally {
       this.activeRuns.delete(runId);
       this.permissionChain.delete(runId);
+      this.pendingQuestions.delete(runId);
     }
   }
 
@@ -769,6 +816,12 @@ export class Orchestrator {
       return this.executeSetTitle(runId, toolCall);
     }
 
+    // ask_user_question pauses the run for user input (no filesystem/network
+    // I/O); allowed in every mode and never goes through the permission flow.
+    if (toolCall.function?.name === "ask_user_question") {
+      return this.executeAskQuestion(runId, toolCall);
+    }
+
     // delegate_tasks fans out to coder sub-agents; the orchestrator runs their
     // loops itself (the sub-agents' own tool calls are gated normally).
     if (toolCall.function?.name === "delegate_tasks") {
@@ -836,6 +889,61 @@ export class Orchestrator {
     } catch (err: any) {
       return JSON.stringify({ success: false, error: err?.message ?? "Failed to set title." });
     }
+  }
+
+  /**
+   * Handles an ask_user_question call: validates/normalizes the questions, pauses
+   * the run for the user's selections, and returns those selections to the model
+   * as the tool result. Never throws — failures come back as a JSON error.
+   */
+  private async executeAskQuestion(runId: string, toolCall: any): Promise<string> {
+    let args: any;
+    try {
+      args = JSON.parse(toolCall.function.arguments || "{}");
+    } catch (e: any) {
+      return JSON.stringify({ success: false, error: `Invalid ask_user_question arguments: ${e.message}` });
+    }
+
+    const rawQuestions = Array.isArray(args.questions) ? args.questions : [];
+    const questions: UserQuestion[] = rawQuestions
+      .filter((q: any) => q && typeof q.question === "string" && q.question.trim() && Array.isArray(q.options))
+      .slice(0, 4)
+      .map((q: any) => ({
+        question: String(q.question),
+        header: typeof q.header === "string" ? q.header.trim().slice(0, 12) : "",
+        multiSelect: !!q.multiSelect,
+        options: q.options
+          .map((o: any) =>
+            typeof o === "string"
+              ? { label: o }
+              : o && typeof o.label === "string"
+                ? { label: String(o.label), description: typeof o.description === "string" ? o.description : undefined }
+                : null
+          )
+          .filter((o: any): o is { label: string; description?: string } => !!o && !!o.label.trim())
+          .slice(0, 4)
+      }))
+      .filter((q: UserQuestion) => q.options.length > 0);
+
+    if (questions.length === 0) {
+      return JSON.stringify({ success: false, error: "No valid questions (each needs a question and at least one option)." });
+    }
+
+    const selections = await this.requestUserAnswer(runId, questions);
+
+    // If the run was cancelled while waiting, don't flip status back — let the
+    // loop's next cancellation check unwind it.
+    if (!this.activeRuns.has(runId)) {
+      return JSON.stringify({ success: false, error: "Cancelled before the user answered." });
+    }
+    this.emitStatus(runId, "generating");
+
+    const answers = questions.map((q, i) => ({
+      question: q.question,
+      header: q.header,
+      selected: selections[i] ?? []
+    }));
+    return JSON.stringify({ success: true, answers });
   }
 
   /**

@@ -9,6 +9,7 @@ import { MODES_LIST, type ChatMode, type ModelOption } from '../composables/useC
 import type { AgentPreset } from '@agent-bridge/shared';
 import ConfirmationCard from './ConfirmationCard.vue';
 import PermissionCard from './PermissionCard.vue';
+import QuestionCard from './QuestionCard.vue';
 
 const props = defineProps<{
   taskInput: string;
@@ -25,6 +26,7 @@ const props = defineProps<{
   confirmationGroup: MessageGroup | null;
   showPermission: boolean;
   permissionRequest: any;
+  questionRequest: any;
   isLanding?: boolean;
   projectOptions?: { path: string; name: string }[];
   activeProjectPath?: string;
@@ -42,6 +44,7 @@ const emit = defineEmits<{
   (e: 'cancel'): void;
   (e: 'quick-reply', option: string): void;
   (e: 'permission-decision', decision: PermissionDecision): void;
+  (e: 'question-answer', selections: string[][]): void;
   (e: 'select-project', path: string): void;
 }>();
 
@@ -314,6 +317,11 @@ onBeforeUnmount(() => {
       <PermissionCard
         :request="showPermission ? permissionRequest : null"
         @decide="emit('permission-decision', $event)"
+      />
+
+      <QuestionCard
+        :request="questionRequest"
+        @submit="emit('question-answer', $event)"
       />
 
       <!-- Token info bar (placed outside the input box) -->

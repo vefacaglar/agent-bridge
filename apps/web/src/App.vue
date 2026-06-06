@@ -33,6 +33,7 @@ const {
   focusSignal,
   showPermissionModal,
   pendingPermissionRequest,
+  pendingQuestionRequest,
   groupedMessages,
   visibleTitle,
   activeConfirmationGroup,
@@ -223,11 +224,13 @@ async function rejectPlan() {
           :confirmation-group="activeConfirmationGroup"
           :show-permission="showPermissionModal"
           :permission-request="pendingPermissionRequest"
+          :question-request="pendingQuestionRequest"
           :messages="messages"
           @send="chat.handleSendTask"
           @queue="chat.handleQueueTask"
           @quick-reply="chat.sendQuickReply"
           @permission-decision="chat.handlePermissionDecision"
+          @question-answer="chat.handleQuestionAnswer"
           @cancel="chat.cancelActiveRun"
         />
       </template>
@@ -249,6 +252,7 @@ async function rejectPlan() {
             :confirmation-group="activeConfirmationGroup"
             :show-permission="showPermissionModal"
             :permission-request="pendingPermissionRequest"
+            :question-request="pendingQuestionRequest"
             :is-landing="true"
             :project-options="projects.projectOptions.value"
             :active-project-path="projects.activeProjectPath.value"
@@ -257,6 +261,7 @@ async function rejectPlan() {
             @queue="chat.handleQueueTask"
             @quick-reply="chat.sendQuickReply"
             @permission-decision="chat.handlePermissionDecision"
+            @question-answer="chat.handleQuestionAnswer"
             @select-project="selectProject"
             @cancel="chat.cancelActiveRun"
           />

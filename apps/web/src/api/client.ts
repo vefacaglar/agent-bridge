@@ -112,6 +112,15 @@ export const api = {
     if (!response.ok) throw new Error(await errorMessage(response, 'Permission decision could not be processed.'));
   },
 
+  async answerQuestion(runId: string, selections: string[][]): Promise<void> {
+    const response = await fetch(`${API_BASE}/api/runs/${runId}/answer`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ selections })
+    });
+    if (!response.ok) throw new Error(await errorMessage(response, 'Answer could not be submitted.'));
+  },
+
   async createProject(path: string, name: string): Promise<Project> {
     const response = await fetch(`${API_BASE}/api/projects`, {
       method: 'POST',

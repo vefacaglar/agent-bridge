@@ -202,6 +202,27 @@ export function registerRunRoutes(server: FastifyInstance, ctx: AppContext) {
     return { success: true };
   });
 
+  // Resolve a pending ask_user_question request with the user's selections.
+  // Body: { selections: string[][] } — one array of chosen labels per question,
+  // aligned to the questions order.
+  server.post("/api/runs/:id/answer", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { selections } = request.body as { selections: unknown };
+
+    if (!Array.isArray(selections) || !selections.every(s => Array.isArray(s) && s.every(v => typeof v === "string"))) {
+      reply.status(400);
+      return { error: "Invalid selections: expected an array of string arrays." };
+    }
+
+    const resolved = ctx.orchestrator.resolveQuestion(id, selections as string[][]);
+    if (!resolved) {
+      reply.status(400);
+      return { error: "No pending question found for this run" };
+    }
+
+    return { success: true };
+  });
+
   // Run history list.
   server.get("/api/runs", async () => {
     return ctx.runRepo.list();

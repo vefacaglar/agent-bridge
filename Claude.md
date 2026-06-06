@@ -287,6 +287,7 @@ search_files(query, path?)
 run_command(command)
 fetch_url(url)
 set_chat_title(title)
+ask_user_question(questions)                    main agent, every mode
 update_plan(title, tasks, body?, start_new?)   plan mode only
 delegate_tasks(tasks, parallel?)               preset build modes only
 delegate_to_utility(tasks, parallel?)          preset build modes only
@@ -309,12 +310,30 @@ running. Its standing grants are scoped per host (approving one site does not
 approve the whole web). Because it is the only async tool, the orchestrator
 executes tools through `executeWorkspaceToolAsync`.
 
-`set_chat_title`, `update_plan`, `delegate_tasks`, and `delegate_to_utility` are
-orchestrator tools. They do not execute through the filesystem helper directly:
-title and plan update local run/plan state, while delegation starts nested
+`set_chat_title`, `ask_user_question`, `update_plan`, `delegate_tasks`, and
+`delegate_to_utility` are orchestrator tools. They do not execute through the
+filesystem helper directly: title and plan update local run/plan state,
+`ask_user_question` pauses the run for user input, and delegation starts nested
 `runAgentLoop()` calls in the same run.
 
 Do not add git integration or further network tools without an explicit request.
+
+### Ask the User (`ask_user_question`)
+
+The main agent gets an `ask_user_question(questions)` tool in every mode (coder/
+utility sub-agents do not). It lets the model ask 1–4 multiple-choice questions
+(`{ question, header, multiSelect, options[{ label, description? }] }`) when it is
+blocked on a decision only the user can make. Like the permission flow it performs
+no filesystem/network I/O: `Orchestrator.executeAskQuestion` validates/normalizes
+the questions, then `requestUserAnswer` flips the run to status `awaiting_input`,
+emits a `question_requested` SSE event, and waits. The web client
+(`useChatSession.pendingQuestionRequest`, `QuestionCard.vue` above the composer)
+renders the questions; submitting posts the chosen labels to
+`POST /api/runs/:id/answer` (`{ selections: string[][] }`, aligned to the questions
+order), which calls `Orchestrator.resolveQuestion`. The selections are fed back to
+the model as the tool result (`{ success, answers[{ question, header, selected }] }`)
+and the run resumes (`generating`). Cancellation resolves a pending question with
+no selections so the loop unwinds.
 
 ### Session Title (`set_chat_title`)
 
@@ -438,10 +457,14 @@ export type RunStatus =
   | "created"
   | "generating"
   | "awaiting_permission"
+  | "awaiting_input"
   | "done"
   | "failed"
   | "cancelled";
 ```
+
+`awaiting_input` is the non-terminal state used while an `ask_user_question` call
+waits for the user's answer (sibling to `awaiting_permission`).
 
 ---
 
@@ -477,6 +500,7 @@ message_updated
 model_snapshot_locked
 permission_requested
 plan_updated
+question_requested
 run_title_changed
 run_completed
 run_failed

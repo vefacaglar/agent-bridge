@@ -1,7 +1,7 @@
 import type { RunStatus } from '@agent-bridge/shared';
 
 /** Run statuses that mean a run is still actively processing. */
-export const ACTIVE_STATUSES: RunStatus[] = ['created', 'generating', 'awaiting_permission'];
+export const ACTIVE_STATUSES: RunStatus[] = ['created', 'generating', 'awaiting_permission', 'awaiting_input'];
 
 /** Default workspace path used when a run has no explicit project path. */
 export const DEFAULT_PROJECT_PATH = '/Users/vefa/Projects/agent-bridge';
@@ -14,6 +14,7 @@ const STATUS_LABELS: Record<RunStatus, string> = {
   created: 'queued',
   generating: 'generating',
   awaiting_permission: 'waiting permission',
+  awaiting_input: 'waiting for you',
   done: 'completed',
   failed: 'failed',
   cancelled: 'cancelled'
@@ -28,7 +29,7 @@ export function statusClass(status?: RunStatus): string {
   if (!status) return 'idle';
   if (status === 'done') return 'success';
   if (status === 'failed' || status === 'cancelled') return 'danger';
-  if (status === 'awaiting_permission') return 'warning';
+  if (status === 'awaiting_permission' || status === 'awaiting_input') return 'warning';
   if (ACTIVE_STATUSES.includes(status)) return 'active';
   return 'idle';
 }

@@ -49,6 +49,8 @@ export function useChatSession(options: ChatSessionOptions) {
 
   const showPermissionModal = ref(false);
   const pendingPermissionRequest = ref<any>(null);
+  // The active ask_user_question request (questions to render), or null.
+  const pendingQuestionRequest = ref<any>(null);
 
   let eventSource: EventSource | null = null;
 
@@ -154,11 +156,18 @@ export function useChatSession(options: ChatSessionOptions) {
           showPermissionModal.value = false;
           pendingPermissionRequest.value = null;
         }
+        if (data.status !== 'awaiting_input') {
+          pendingQuestionRequest.value = null;
+        }
       }
 
       if (data.type === 'permission_requested' && activeRun.value?.id === runId) {
         pendingPermissionRequest.value = data;
         showPermissionModal.value = true;
+      }
+
+      if (data.type === 'question_requested' && activeRun.value?.id === runId) {
+        pendingQuestionRequest.value = data;
       }
 
       if (data.type === 'message_created' && activeRun.value?.id === runId) {
@@ -322,6 +331,16 @@ export function useChatSession(options: ChatSessionOptions) {
     }
   }
 
+  async function handleQuestionAnswer(selections: string[][]) {
+    if (!activeRunId.value) return;
+    try {
+      await api.answerQuestion(activeRunId.value, selections);
+      pendingQuestionRequest.value = null;
+    } catch (err: any) {
+      await showAlert(err.message || 'Connection error.');
+    }
+  }
+
   async function handlePermissionDecision(decision: PermissionDecision) {
     if (!activeRunId.value) return;
     try {
@@ -351,6 +370,7 @@ export function useChatSession(options: ChatSessionOptions) {
     focusSignal,
     showPermissionModal,
     pendingPermissionRequest,
+    pendingQuestionRequest,
     groupedMessages,
     visibleTitle,
     activeConfirmationGroup,
@@ -363,6 +383,7 @@ export function useChatSession(options: ChatSessionOptions) {
     sendQuickReply,
     cancelActiveRun,
     handlePermissionDecision,
+    handleQuestionAnswer,
     disconnect
   };
 }

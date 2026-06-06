@@ -2,6 +2,7 @@ export type RunStatus =
   | "created"
   | "generating"
   | "awaiting_permission"
+  | "awaiting_input"
   | "done"
   | "failed"
   | "cancelled";
@@ -164,10 +165,32 @@ export type RunEvent =
       plan: Plan;
     }
   | {
+      type: "question_requested";
+      runId: string;
+      questions: UserQuestion[];
+    }
+  | {
       type: "run_title_changed";
       runId: string;
       title: string;
     };
+
+// One selectable answer in a user question. `description` is optional helper text.
+export interface UserQuestionOption {
+  label: string;
+  description?: string;
+}
+
+// A multiple-choice question the assistant asks the user via the ask_user_question
+// tool. The run pauses (status "awaiting_input") until the user answers, mirroring
+// the permission flow. `header` is a very short chip label; `multiSelect` allows
+// picking more than one option.
+export interface UserQuestion {
+  question: string;
+  header: string;
+  multiSelect: boolean;
+  options: UserQuestionOption[];
+}
 
 // A single step the assistant tracks inside a plan.
 export interface PlanTask {

@@ -276,6 +276,61 @@ export const SET_TITLE_TOOL = {
 };
 
 /**
+ * Lets the main agent ask the user one or more multiple-choice questions when it
+ * needs a decision only the user can make. Performs no filesystem/network I/O —
+ * the orchestrator pauses the run, surfaces the questions to the UI, and feeds
+ * the chosen answers back as the tool result. Available to the main agent in
+ * every mode; sub-agents never get it.
+ */
+export const ASK_QUESTION_TOOL = {
+  type: "function" as const,
+  function: {
+    name: "ask_user_question",
+    description: "Ask the user one or more multiple-choice questions when you are blocked on a decision that is genuinely theirs to make — one you cannot resolve from the request, the code, or sensible defaults. Do NOT use it for choices with an obvious default or facts you can verify yourself; in those cases pick the obvious option and proceed. The run pauses until the user answers, and you receive their selections back. Keep questions short and the options concrete and mutually exclusive (unless multiSelect is set). Ask 1-4 questions, each with 2-4 options.",
+    parameters: {
+      type: "object",
+      properties: {
+        questions: {
+          type: "array",
+          description: "The questions to ask (1-4).",
+          items: {
+            type: "object",
+            properties: {
+              question: {
+                type: "string",
+                description: "The full question text, clear and specific, ending with a question mark."
+              },
+              header: {
+                type: "string",
+                description: "A very short label for the question (max 12 chars), e.g. \"Auth method\", \"Library\"."
+              },
+              multiSelect: {
+                type: "boolean",
+                description: "True to let the user pick more than one option; false for a single choice."
+              },
+              options: {
+                type: "array",
+                description: "The available choices (2-4). Each must be a distinct option.",
+                items: {
+                  type: "object",
+                  properties: {
+                    label: { type: "string", description: "The choice text shown to the user (concise)." },
+                    description: { type: "string", description: "Optional one-line explanation of what this choice means." }
+                  },
+                  required: ["label"]
+                }
+              }
+            },
+            required: ["question", "header", "options"]
+          }
+        }
+      },
+      required: ["questions"]
+    }
+  }
+};
+
+/**
  * Architect-only tool (dual-model runs). Lets the architect model delegate one
  * or more self-contained coding tasks to coder sub-agents running the configured
  * coder model. Performs no direct filesystem/network I/O itself — the orchestrator
