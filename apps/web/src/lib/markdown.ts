@@ -104,6 +104,7 @@ export function cleanMessageContent(content: string): string {
     .replace(/<task_list>[\s\S]*?<\/task_list>/g, '')
     .replace(/<plan>[\s\S]*$/g, '')
     .replace(/<task_list>[\s\S]*$/g, '')
+    .replace(/<\/?confirm\b[^>]*>/ig, '')
     .trim();
 }
 
