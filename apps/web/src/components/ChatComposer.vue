@@ -12,6 +12,7 @@ import PermissionCard from './PermissionCard.vue';
 
 const props = defineProps<{
   taskInput: string;
+  queuedTaskInput: string;
   isRunning: boolean;
   currentMode: ChatMode;
   bypassPermissions: boolean;
@@ -37,6 +38,7 @@ const emit = defineEmits<{
   (e: 'update:selectedModel', value: string): void;
   (e: 'update:selectedPresetId', value: string): void;
   (e: 'send'): void;
+  (e: 'queue'): void;
   (e: 'cancel'): void;
   (e: 'quick-reply', option: string): void;
   (e: 'permission-decision', decision: PermissionDecision): void;
@@ -83,6 +85,8 @@ const contextTokens = computed(() => {
 const canSend = computed(() => {
   return !props.isRunning && props.selectedModel && (props.taskInput.trim() || attachedFiles.value.length > 0);
 });
+
+const hasQueuedMessage = computed(() => props.queuedTaskInput.trim().length > 0);
 
 const isButtonDisabled = computed(() => {
   if (props.isRunning) return false;
@@ -151,6 +155,11 @@ function removeAttachment(idx: number) {
 }
 
 function handleSend() {
+  if (props.isRunning) {
+    handleQueue();
+    return;
+  }
+
   if (!canSend.value) return;
 
   if (attachedFiles.value.length > 0) {
@@ -170,6 +179,27 @@ function handleSend() {
     });
   } else {
     emit('send');
+  }
+}
+
+function handleQueue() {
+  if (!props.taskInput.trim() && attachedFiles.value.length === 0) return;
+
+  if (attachedFiles.value.length > 0) {
+    let finalTask = props.taskInput;
+    for (const file of attachedFiles.value) {
+      if (file.isImage) {
+        finalTask += `\n\n![${file.name}](${file.content})`;
+      } else {
+        const syntaxLang = file.extension ? file.extension.toLowerCase() : '';
+        finalTask += `\n\n### File: ${file.name}\n\`\`\`${syntaxLang}\n${file.content}\n\`\`\``;
+      }
+    }
+    emit('update:taskInput', finalTask);
+    attachedFiles.value = [];
+    nextTick(() => emit('queue'));
+  } else {
+    emit('queue');
   }
 }
 
@@ -293,6 +323,11 @@ onBeforeUnmount(() => {
         </span>
       </div>
 
+      <div v-if="hasQueuedMessage" class="queued-message-preview">
+        <span class="queued-label">Queued</span>
+        <span class="queued-text">{{ queuedTaskInput }}</span>
+      </div>
+
       <div class="composer-input-box" style="position: relative; z-index: 2;">
         <!-- Attached Files List -->
         <div v-if="attachedFiles.length > 0" class="composer-attachments">
@@ -318,8 +353,7 @@ onBeforeUnmount(() => {
         <textarea
           ref="textarea"
           :value="taskInput"
-          :disabled="isRunning"
-          placeholder="Type a message..."
+          :placeholder="isRunning ? 'Queue a follow-up...' : 'Type a message...'"
           @input="emit('update:taskInput', ($event.target as HTMLTextAreaElement).value)"
           @keydown.enter.exact.prevent="handleSend"
         />
@@ -556,6 +590,38 @@ onBeforeUnmount(() => {
 .context-tokens {
   color: var(--faint);
   font-weight: 500;
+}
+
+.queued-message-preview {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 9px 12px;
+  background: #101012;
+  border: 1px solid #242428;
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-style: italic;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28);
+}
+
+.queued-label {
+  flex: 0 0 auto;
+  color: var(--faint);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.queued-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @keyframes pulseDot {

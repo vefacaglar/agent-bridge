@@ -9,6 +9,8 @@ export type PermissionDecision = 'allow_once' | 'allow_project' | 'allow_always'
 export interface AgentRunFields {
   coderProviderId?: string;
   coderModel?: string;
+  utilityProviderId?: string;
+  utilityModel?: string;
   agentPreset?: string;
 }
 
@@ -143,4 +145,3 @@ export const api = {
     return response.json() as Promise<{ success: boolean; models?: string[]; error?: string }>;
   }
 };
-

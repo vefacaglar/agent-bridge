@@ -122,7 +122,13 @@ export function registerRunRoutes(server: FastifyInstance, ctx: AppContext) {
     // Allow switching the agent preset (or back to single model) mid-conversation.
     // The web client always sends the current selection, so reflect it verbatim.
     const body = request.body as Record<string, unknown>;
-    if ("agentPreset" in body || "coderModel" in body) {
+    if (
+      "agentPreset" in body ||
+      "coderModel" in body ||
+      "coderProviderId" in body ||
+      "utilityModel" in body ||
+      "utilityProviderId" in body
+    ) {
       updates.agentPreset = agentPreset || undefined;
       updates.coderProviderId = coderProviderId || undefined;
       updates.coderModel = coderModel || undefined;

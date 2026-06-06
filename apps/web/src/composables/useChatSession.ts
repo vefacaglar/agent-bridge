@@ -13,7 +13,13 @@ interface ChatSessionOptions {
   // The effective main/architect model (preset architect or single-model pick)
   // and the optional dual-model fields, both derived in useComposerSettings.
   effectiveModel: ComputedRef<{ providerId: string; model: string }>;
-  agentRunFields: ComputedRef<{ coderProviderId?: string; coderModel?: string; agentPreset?: string }>;
+  agentRunFields: ComputedRef<{
+    coderProviderId?: string;
+    coderModel?: string;
+    utilityProviderId?: string;
+    utilityModel?: string;
+    agentPreset?: string;
+  }>;
   currentMode: Ref<string>;
   bypassPermissions: Ref<boolean>;
   activeProject: ComputedRef<{ path: string; name: string } | undefined>;
@@ -38,6 +44,7 @@ export function useChatSession(options: ChatSessionOptions) {
   const currentPlan = ref<Plan | null>(null);
 
   const taskInput = ref('');
+  const queuedTaskInput = ref('');
   const focusSignal = ref(0);
 
   const showPermissionModal = ref(false);
@@ -127,6 +134,7 @@ export function useChatSession(options: ChatSessionOptions) {
     messages.value = [];
     currentPlan.value = null;
     taskInput.value = '';
+    queuedTaskInput.value = '';
     requestFocus();
   }
 
@@ -180,7 +188,7 @@ export function useChatSession(options: ChatSessionOptions) {
 
       if (data.type === 'run_completed') {
         if (activeRun.value?.id === runId) updateRunStatus(runId, 'done');
-        finishEventStream();
+        finishEventStream({ sendQueuedMessage: true });
       }
 
       if (data.type === 'run_failed') {
@@ -201,11 +209,21 @@ export function useChatSession(options: ChatSessionOptions) {
     if (run) run.status = status;
   }
 
-  function finishEventStream() {
+  function finishEventStream(options: { sendQueuedMessage?: boolean } = {}) {
     eventSource?.close();
     eventSource = null;
     isRunning.value = false;
     loadRuns();
+
+    if (options.sendQueuedMessage && queuedTaskInput.value.trim()) {
+      requestAnimationFrame(() => {
+        if (!isRunning.value && queuedTaskInput.value.trim()) {
+          taskInput.value = queuedTaskInput.value;
+          queuedTaskInput.value = '';
+          handleSendTask();
+        }
+      });
+    }
   }
 
   // --- Sending -------------------------------------------------------------
@@ -271,7 +289,18 @@ export function useChatSession(options: ChatSessionOptions) {
 
   async function sendQuickReply(option: string) {
     taskInput.value = option;
-    await handleSendTask();
+    if (isRunning.value) {
+      handleQueueTask();
+    } else {
+      await handleSendTask();
+    }
+  }
+
+  function handleQueueTask() {
+    if (!isRunning.value || !taskInput.value.trim()) return;
+    queuedTaskInput.value = taskInput.value;
+    taskInput.value = '';
+    requestFocus();
   }
 
   async function cancelActiveRun() {
@@ -318,6 +347,7 @@ export function useChatSession(options: ChatSessionOptions) {
     isRunning,
     currentPlan,
     taskInput,
+    queuedTaskInput,
     focusSignal,
     showPermissionModal,
     pendingPermissionRequest,
@@ -329,6 +359,7 @@ export function useChatSession(options: ChatSessionOptions) {
     selectRun,
     startNewRunSetup,
     handleSendTask,
+    handleQueueTask,
     sendQuickReply,
     cancelActiveRun,
     handlePermissionDecision,

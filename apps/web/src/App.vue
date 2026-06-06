@@ -28,6 +28,7 @@ const {
   activeRun,
   isRunning,
   taskInput,
+  queuedTaskInput,
   focusSignal,
   showPermissionModal,
   pendingPermissionRequest,
@@ -213,6 +214,7 @@ async function rejectPlan() {
           v-model:selected-model="settings.selectedModelCombined.value"
           v-model:selected-preset-id="settings.selectedPresetId.value"
           :is-running="isRunning"
+          :queued-task-input="queuedTaskInput"
           :model-options="settings.modelOptions.value"
           :active-model-display-name="settings.activeModelDisplayName.value"
           :agent-presets="agentPresets"
@@ -222,6 +224,7 @@ async function rejectPlan() {
           :permission-request="pendingPermissionRequest"
           :messages="messages"
           @send="chat.handleSendTask"
+          @queue="chat.handleQueueTask"
           @quick-reply="chat.sendQuickReply"
           @permission-decision="chat.handlePermissionDecision"
           @cancel="chat.cancelActiveRun"
@@ -237,6 +240,7 @@ async function rejectPlan() {
             v-model:selected-model="settings.selectedModelCombined.value"
             v-model:selected-preset-id="settings.selectedPresetId.value"
             :is-running="isRunning"
+            :queued-task-input="queuedTaskInput"
             :model-options="settings.modelOptions.value"
             :active-model-display-name="settings.activeModelDisplayName.value"
             :agent-presets="agentPresets"
@@ -249,6 +253,7 @@ async function rejectPlan() {
             :active-project-path="projects.activeProjectPath.value"
             :messages="messages"
             @send="chat.handleSendTask"
+            @queue="chat.handleQueueTask"
             @quick-reply="chat.sendQuickReply"
             @permission-decision="chat.handlePermissionDecision"
             @select-project="selectProject"
