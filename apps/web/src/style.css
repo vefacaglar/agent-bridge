@@ -981,6 +981,11 @@ pre {
   font-size: 0.9rem;
 }
 
+/* Reduce saturation of highlight.js code block syntax colors to match muted theme */
+.hljs {
+  filter: saturate(55%);
+}
+
 .markdown-body pre {
   margin: 0;
   padding: 14px;
