@@ -681,6 +681,9 @@ const formattedElapsedTime = computed(() => {
   padding-right: 8px;
 }
 
+.user-markdown-body {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
 .user-markdown-body :deep(p) {
   margin: 0;
 }
