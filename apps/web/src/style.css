@@ -62,8 +62,8 @@ pre {
   font-family: inherit;
 }
 
-.grayscale-emoji {
-  filter: grayscale(100%) opacity(0.85);
+.muted-emoji {
+  filter: saturate(30%) opacity(0.85);
   display: inline-block;
 }
 
