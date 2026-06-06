@@ -23,19 +23,20 @@ const yesLabel = computed(() => (options.value.includes('Evet') ? 'Evet' : 'Yes'
         <strong>Confirm prompt action?</strong>
       </div>
       <div class="confirm-card-footer">
-        <button class="composer-confirm-btn no" @click="emit('reply', noLabel)">No</button>
-        <button class="composer-confirm-btn yes" @click="emit('reply', yesLabel)">Yes</button>
+        <button class="composer-confirm-btn no" @click="emit('reply', noLabel)">{{ noLabel }}</button>
+        <button class="composer-confirm-btn yes" @click="emit('reply', yesLabel)">{{ yesLabel }}</button>
       </div>
     </div>
   </transition>
 </template>
 
 <style scoped>
+/* In normal flow at the top of the composer container so the pinned task list
+   above it stays visible (the card no longer overlaps it). When the card closes
+   the task list returns to sitting right above the composer. */
 .composer-confirmation-card {
-  position: absolute;
-  bottom: calc(100% - 6px);
-  left: 12px;
-  right: 12px;
+  position: relative;
+  margin: 0 0 10px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
