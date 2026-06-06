@@ -39,18 +39,29 @@ function copyResult(idx: number, text: string) {
   }, 2000);
 }
 
-function getParamsHeaderLabel(name: string): string {
+function getSingleBoxHeaderLabel(name: string, argumentsJson: string): string {
   if (name === 'run_command') return 'bash';
-  return 'parameters';
+  if (name === 'read_file' || name === 'write_file' || name === 'edit_file') {
+    const path = getToolPath(argumentsJson);
+    return path.split('/').pop() || name;
+  }
+  return name;
 }
 
-function getResultHeaderLabel(name: string, argumentsJson: string): string {
-  if (name === 'run_command') return 'output';
-  if (name === 'read_file') {
-    const path = getToolPath(argumentsJson);
-    return path.split('/').pop() || 'result';
+function formatSingleBoxContent(name: string, argumentsJson: string, response: any): string {
+  const params = hasToolParams(name, argumentsJson) ? formatToolParams(name, argumentsJson) : '';
+  const result = response ? formatToolResult(name, response.content) : 'Running...';
+  
+  if (params && result) {
+    return `Parameters:\n${params}\n\nResult:\n${result}`;
   }
-  return 'result';
+  if (params) {
+    return `Parameters:\n${params}`;
+  }
+  if (result) {
+    return result;
+  }
+  return '';
 }
 
 /** Title of an update_plan call, for the clickable plan card. */
@@ -179,6 +190,34 @@ function getToolLabel(name: string, args: string): string {
   }
 }
 
+function formatObjectToLines(obj: any): string {
+  if (obj === null || obj === undefined) return '';
+  if (typeof obj !== 'object') return String(obj);
+  
+  if (Array.isArray(obj)) {
+    return obj.map(item => formatObjectToLines(item)).filter(Boolean).join('\n');
+  }
+  
+  return Object.entries(obj)
+    .map(([key, val]) => {
+      if (typeof val === 'boolean' || val === null || val === undefined) {
+        return '';
+      }
+      
+      if (key === 'exitCode') {
+        return '';
+      }
+      
+      if (typeof val === 'object') {
+        return formatObjectToLines(val);
+      }
+      
+      return `${key}: ${String(val).trim()}`;
+    })
+    .filter(Boolean)
+    .join('\n');
+}
+
 function truncateText(str: string, maxLen: number = 1000): string {
   if (!str) return '';
   if (str.length <= maxLen) return str;
@@ -215,6 +254,10 @@ function formatToolParams(name: string, argumentsJson: string): string {
         return `Source: ${args.source_path || ''}\nDestination: ${args.destination_path || ''}`;
       case 'search_files':
         return `Query: "${args.query || ''}"${args.path ? `\nIn path: ${args.path}` : ''}`;
+      case 'fetch_url':
+        return `URL: ${args.url || ''}`;
+      case 'set_chat_title':
+        return `Title: ${args.title || ''}`;
       case 'ask_user_question': {
         if (!Array.isArray(args.questions) || args.questions.length === 0) return '';
         return args.questions
@@ -246,7 +289,7 @@ function formatToolParams(name: string, argumentsJson: string): string {
           .join('\n\n');
       }
       default:
-        return JSON.stringify(args, null, 2);
+        return formatObjectToLines(args);
     }
   } catch (e) {
     return argumentsJson;
@@ -371,10 +414,12 @@ function formatToolResult(name: string, contentJson: string): string {
       case 'create_directory':
       case 'move_file':
         return res.message || 'Success';
+      case 'set_chat_title':
+        return `Chat title updated to: ${res.title || 'Success'}`;
       default:
         if (res.content !== undefined) return res.content;
         if (res.message !== undefined) return res.message;
-        return JSON.stringify(res, null, 2);
+        return formatObjectToLines(res);
     }
   } catch (e) {
     return contentJson;
@@ -487,11 +532,12 @@ function formatToolResult(name: string, contentJson: string): string {
         </header>
 
         <div v-if="detailsExpanded[idx]" class="tool-call-details">
-          <div v-if="hasToolParams(tc.function?.name, tc.function?.arguments)" class="detail-section">
-            <div class="detail-label">Parameters:</div>
-            <div class="code-block-wrapper">
+          <!-- If it has custom result cards (Q&A or Delegated sub-agents) -->
+          <template v-if="toolResponses[idx] && (shouldRenderAskAnswers(tc.function?.name, toolResponses[idx].content) || shouldRenderDelegatedResult(tc.function?.name, toolResponses[idx].content))">
+            <!-- Parameters (inside standard wrapper) -->
+            <div v-if="hasToolParams(tc.function?.name, tc.function?.arguments)" class="code-block-wrapper">
               <div class="code-block-header">
-                <span class="code-block-lang">{{ getParamsHeaderLabel(tc.function?.name) }}</span>
+                <span class="code-block-lang">{{ getSingleBoxHeaderLabel(tc.function?.name, tc.function?.arguments) }} (params)</span>
                 <button 
                   class="code-block-copy-btn" 
                   :class="{ copied: copiedParameters[idx] }" 
@@ -502,11 +548,10 @@ function formatToolResult(name: string, contentJson: string): string {
               </div>
               <pre class="faint-code"><code>{{ formatToolParams(tc.function?.name, tc.function?.arguments) }}</code></pre>
             </div>
-          </div>
-          <div class="detail-section response-section">
-            <div class="detail-label">Result:</div>
+            
+            <!-- Custom Result Cards (outside wrapper) -->
             <div
-              v-if="toolResponses[idx] && shouldRenderAskAnswers(tc.function?.name, toolResponses[idx].content)"
+              v-if="shouldRenderAskAnswers(tc.function?.name, toolResponses[idx].content)"
               class="ask-answer-list"
             >
               <section
@@ -524,7 +569,7 @@ function formatToolResult(name: string, contentJson: string): string {
               </section>
             </div>
             <div
-              v-else-if="toolResponses[idx] && shouldRenderDelegatedResult(tc.function?.name, toolResponses[idx].content)"
+              v-else-if="shouldRenderDelegatedResult(tc.function?.name, toolResponses[idx].content)"
               class="delegated-result-list"
             >
               <section
@@ -536,23 +581,24 @@ function formatToolResult(name: string, contentJson: string): string {
                 <div class="delegated-result-body markdown-body" v-html="renderMarkdown(section.summary)"></div>
               </section>
             </div>
-            <div v-else-if="toolResponses[idx]" class="code-block-wrapper">
+          </template>
+
+          <!-- Standard Tool Case (single wrapper for both params and results) -->
+          <template v-else>
+            <div class="code-block-wrapper">
               <div class="code-block-header">
-                <span class="code-block-lang">{{ getResultHeaderLabel(tc.function?.name, tc.function?.arguments) }}</span>
+                <span class="code-block-lang">{{ getSingleBoxHeaderLabel(tc.function?.name, tc.function?.arguments) }}</span>
                 <button 
                   class="code-block-copy-btn" 
                   :class="{ copied: copiedResults[idx] }" 
-                  @click.stop="copyResult(idx, formatToolResult(tc.function?.name, toolResponses[idx].content))"
+                  @click.stop="copyResult(idx, formatSingleBoxContent(tc.function?.name, tc.function?.arguments, toolResponses[idx]))"
                 >
                   {{ copiedResults[idx] ? 'Copied!' : 'Copy' }}
                 </button>
               </div>
-              <pre class="faint-code"><code>{{ formatToolResult(tc.function?.name, toolResponses[idx].content) }}</code></pre>
+              <pre class="faint-code"><code>{{ formatSingleBoxContent(tc.function?.name, tc.function?.arguments, toolResponses[idx]) }}</code></pre>
             </div>
-            <div v-else class="tool-running-shimmer">
-              <div class="shimmer-bar"></div>
-            </div>
-          </div>
+          </template>
         </div>
       </div>
       </template>

@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
-
-const props = defineProps<{
+defineProps<{
   content: string;
   expanded: boolean;
 }>();
@@ -9,16 +7,6 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'toggle'): void;
 }>();
-
-const copied = ref(false);
-
-function copyContent() {
-  navigator.clipboard.writeText(props.content);
-  copied.value = true;
-  setTimeout(() => {
-    copied.value = false;
-  }, 2000);
-}
 </script>
 
 <template>
@@ -42,16 +30,6 @@ function copyContent() {
     </header>
     <div v-if="expanded" class="reasoning-details">
       <div class="code-block-wrapper">
-        <div class="code-block-header">
-          <span class="code-block-lang">reasoning</span>
-          <button 
-            class="code-block-copy-btn" 
-            :class="{ copied }" 
-            @click.stop="copyContent"
-          >
-            {{ copied ? 'Copied!' : 'Copy' }}
-          </button>
-        </div>
         <pre class="reasoning-text plan-body"><code>{{ content }}</code></pre>
       </div>
     </div>
