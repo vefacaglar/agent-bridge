@@ -62,6 +62,11 @@ pre {
   font-family: inherit;
 }
 
+.grayscale-emoji {
+  filter: grayscale(100%) opacity(0.85);
+  display: inline-block;
+}
+
 ::-webkit-scrollbar {
   width: 8px;
 }
@@ -332,6 +337,30 @@ pre {
 
 .assistant-message pre {
   font-size: 0.96rem;
+}
+
+.markdown-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  font-size: 0.9rem;
+  display: block;
+  overflow-x: auto;
+}
+
+.markdown-body th,
+.markdown-body td {
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+}
+
+.markdown-body th {
+  background: var(--surface-strong);
+  font-weight: 600;
+}
+
+.markdown-body tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .assistant-meta {

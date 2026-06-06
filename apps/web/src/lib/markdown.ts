@@ -39,7 +39,17 @@ marked.use({
 export function renderMarkdown(content: string): string {
   if (!content) return '';
   try {
-    return marked.parse(content) as string;
+    const html = marked.parse(content) as string;
+    
+    // Process text nodes to wrap emojis in grayscale spans
+    // Splitting by HTML tags guarantees that even indices are text nodes and odd indices are tags.
+    const parts = html.split(/(<[^>]+>)/g);
+    for (let i = 0; i < parts.length; i++) {
+      if (i % 2 === 0) {
+        parts[i] = parts[i].replace(/(\p{Emoji_Presentation}|\p{Extended_Pictographic})/gu, '<span class="grayscale-emoji">$1</span>');
+      }
+    }
+    return parts.join('');
   } catch (err) {
     console.error('Markdown parsing error:', err);
     return content;
