@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue';
 import type { MessageGroup } from '../lib/messageGroups';
-import { renderMarkdown, cleanMessageContent } from '../lib/markdown';
+import { renderMarkdown, cleanMessageContent, capturePreScrollStates, restorePreScrollStates } from '../lib/markdown';
 import ToolGroup from './ToolGroup.vue';
 import ReasoningPanel from './ReasoningPanel.vue';
 
@@ -60,11 +60,38 @@ function thoughtFor(child: MessageGroup): string {
 
 // Keep the latest sub-agent output in view while it streams.
 const bodyEl = ref<HTMLElement | null>(null);
+
+function isAtBottom(el: HTMLElement, threshold = 60) {
+  return el.scrollHeight - el.scrollTop - el.clientHeight <= threshold;
+}
+
 watch(() => props.children.map(c => c.message.content + (c.message.reasoningContent ?? '')).join(''), () => {
-  if (!props.active || !expanded.value) return;
+  if (!props.active || !expanded.value || !bodyEl.value) return;
+
+  const wasAtBottom = isAtBottom(bodyEl.value);
+  const prevScrollTop = bodyEl.value.scrollTop;
+  const preScrollStates = capturePreScrollStates(bodyEl.value);
+
   nextTick(() => {
-    if (bodyEl.value) bodyEl.value.scrollTop = bodyEl.value.scrollHeight;
+    if (bodyEl.value) {
+      if (wasAtBottom) {
+        bodyEl.value.scrollTop = bodyEl.value.scrollHeight;
+      } else {
+        bodyEl.value.scrollTop = prevScrollTop;
+      }
+      restorePreScrollStates(bodyEl.value, preScrollStates);
+    }
   });
+});
+
+watch(expanded, (isExpanded) => {
+  if (isExpanded) {
+    nextTick(() => {
+      if (bodyEl.value) {
+        bodyEl.value.scrollTop = bodyEl.value.scrollHeight;
+      }
+    });
+  }
 });
 </script>
 
@@ -101,7 +128,7 @@ watch(() => props.children.map(c => c.message.content + (c.message.reasoningCont
         <div
           v-else-if="child.type === 'assistant' && cleanMessageContent(child.message.content)"
           class="coder-text markdown-body"
-          v-html="renderMarkdown(cleanMessageContent(child.message.content))"
+          v-html="renderMarkdown(cleanMessageContent(child.message.content), child.message.id)"
         ></div>
       </template>
     </div>

@@ -1,25 +1,55 @@
 import { Marked } from 'marked';
+import hljs from 'highlight.js';
+import 'highlight.js/styles/github-dark.css';
 
 const marked = new Marked({ gfm: true, breaks: true });
+
+let codeBlockCounter = 0;
+let currentPrefix = '';
 
 marked.use({
   renderer: {
     code(token: { text: string; lang?: string; escaped?: boolean }) {
       const code = token.text;
-      const lang = token.lang || 'code';
+      const lang = token.lang || '';
 
-      // Escape HTML entities to prevent rendering issues in raw code blocks.
-      const safeCode = code
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
+      let highlightedCode = '';
+      let hasHighlighting = false;
+
+      if (lang && hljs.getLanguage(lang)) {
+        try {
+          highlightedCode = hljs.highlight(code, { language: lang }).value;
+          hasHighlighting = true;
+        } catch (e) {
+          console.error('highlight.js error:', e);
+        }
+      } else if (!lang) {
+        try {
+          const result = hljs.highlightAuto(code);
+          highlightedCode = result.value;
+          hasHighlighting = true;
+        } catch (e) {
+          // ignore
+        }
+      }
+
+      // Escape HTML entities as fallback to prevent rendering issues in raw code blocks.
+      if (!hasHighlighting) {
+        highlightedCode = code
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;');
+      }
+
+      const displayLang = lang || 'code';
+      const blockId = currentPrefix ? `${currentPrefix}-code-${codeBlockCounter++}` : `code-block-${codeBlockCounter++}`;
 
       return `
         <div class="code-block-wrapper">
           <div class="code-block-header">
-            <span class="code-block-lang">${lang}</span>
+            <span class="code-block-lang">${displayLang}</span>
             <button class="code-block-copy-btn" onclick="
               const codeText = this.closest('.code-block-wrapper').querySelector('code').innerText;
               navigator.clipboard.writeText(codeText);
@@ -28,7 +58,7 @@ marked.use({
               setTimeout(() => { this.innerText = 'Copy'; this.classList.remove('copied'); }, 2000);
             ">Copy</button>
           </div>
-          <pre><code class="language-${lang}">${safeCode}</code></pre>
+          <pre id="${blockId}"><code class="hljs language-${displayLang}">${highlightedCode}</code></pre>
         </div>
       `;
     }
@@ -36,8 +66,10 @@ marked.use({
 });
 
 /** Renders markdown to HTML, falling back to raw text on parse errors. */
-export function renderMarkdown(content: string): string {
+export function renderMarkdown(content: string, idPrefix?: string): string {
   if (!content) return '';
+  codeBlockCounter = 0;
+  currentPrefix = idPrefix || '';
   try {
     const html = marked.parse(content) as string;
     
@@ -62,4 +94,56 @@ export function cleanMessageContent(content: string): string {
     .replace(/<plan>[\s\S]*?<\/plan>/g, '')
     .replace(/<task_list>[\s\S]*?<\/task_list>/g, '')
     .trim();
+}
+
+export interface PreScrollState {
+  scrollTop: number;
+  scrollHeight: number;
+  clientHeight: number;
+  wasAtBottom: boolean;
+}
+
+/**
+ * Captures scroll state of all pre elements inside a container.
+ */
+export function capturePreScrollStates(container: HTMLElement | null): Map<string, PreScrollState> {
+  const states = new Map<string, PreScrollState>();
+  if (!container) return states;
+
+  const preElements = container.querySelectorAll('pre[id]');
+  preElements.forEach((el) => {
+    const pre = el as HTMLElement;
+    const wasAtBottom = pre.scrollHeight - pre.scrollTop - pre.clientHeight <= 60;
+    states.set(pre.id, {
+      scrollTop: pre.scrollTop,
+      scrollHeight: pre.scrollHeight,
+      clientHeight: pre.clientHeight,
+      wasAtBottom
+    });
+  });
+
+  return states;
+}
+
+/**
+ * Restores scroll state of all pre elements inside a container.
+ */
+export function restorePreScrollStates(container: HTMLElement | null, states: Map<string, PreScrollState>) {
+  if (!container) return;
+
+  const preElements = container.querySelectorAll('pre[id]');
+  preElements.forEach((el) => {
+    const pre = el as HTMLElement;
+    if (states.has(pre.id)) {
+      const state = states.get(pre.id)!;
+      if (state.wasAtBottom) {
+        pre.scrollTop = pre.scrollHeight;
+      } else {
+        pre.scrollTop = state.scrollTop;
+      }
+    } else {
+      // New code block being generated: default to auto-scrolling to the bottom.
+      pre.scrollTop = pre.scrollHeight;
+    }
+  });
 }

@@ -2,7 +2,7 @@
 import { ref, watch, nextTick, onUnmounted } from 'vue';
 import type { Run, Plan } from '@agent-bridge/shared';
 import type { MessageGroup } from '../lib/messageGroups';
-import { renderMarkdown, cleanMessageContent } from '../lib/markdown';
+import { renderMarkdown, cleanMessageContent, capturePreScrollStates, restorePreScrollStates } from '../lib/markdown';
 import { formatTime } from '../lib/format';
 import ToolGroup from './ToolGroup.vue';
 import ReasoningPanel from './ReasoningPanel.vue';
@@ -24,6 +24,7 @@ const emit = defineEmits<{
 const planDoneCount = computed(() => props.plan?.tasks.filter(t => t.status === 'completed').length ?? 0);
 
 const copiedMessageId = ref<string | null>(null);
+const containerEl = ref<HTMLElement | null>(null);
 
 function copyTextWithStatus(value: string, messageId: string) {
   navigator.clipboard.writeText(value);
@@ -125,14 +126,34 @@ const lastNonCoderIdx = computed(() => {
 
 watch(() => props.groupedMessages, () => {
   if (!props.isRunning) return;
+
+  // Query the current active reasoning body before DOM updates to check if it's at the bottom.
+  // Fall back to true if no reasoning panel exists yet so it scrolls on first render.
+  const reasoningBodiesBefore = document.querySelectorAll('.reasoning-terminal-container .plan-body');
+  const activeReasoningBodyBefore = reasoningBodiesBefore[reasoningBodiesBefore.length - 1] as HTMLElement | undefined;
+  const wasAtBottom = activeReasoningBodyBefore 
+    ? (activeReasoningBodyBefore.scrollHeight - activeReasoningBodyBefore.scrollTop - activeReasoningBodyBefore.clientHeight <= 60)
+    : true;
+  const prevScrollTop = activeReasoningBodyBefore ? activeReasoningBodyBefore.scrollTop : 0;
+
+  // Capture all pre elements scroll states in the container
+  const preScrollStates = capturePreScrollStates(containerEl.value);
+
   nextTick(() => {
     // The live reasoning panel may sit in either an assistant message or a tool
     // group, so scroll the last rendered reasoning body regardless of wrapper.
-    const reasoningBodies = document.querySelectorAll('.reasoning-terminal-container .plan-body');
-    const activeReasoningBody = reasoningBodies[reasoningBodies.length - 1];
-    if (activeReasoningBody) {
-      activeReasoningBody.scrollTop = activeReasoningBody.scrollHeight;
+    const reasoningBodiesAfter = document.querySelectorAll('.reasoning-terminal-container .plan-body');
+    const activeReasoningBodyAfter = reasoningBodiesAfter[reasoningBodiesAfter.length - 1] as HTMLElement | undefined;
+    if (activeReasoningBodyAfter) {
+      if (wasAtBottom) {
+        activeReasoningBodyAfter.scrollTop = activeReasoningBodyAfter.scrollHeight;
+      } else {
+        activeReasoningBodyAfter.scrollTop = prevScrollTop;
+      }
     }
+
+    // Restore pre scroll states in the container
+    restorePreScrollStates(containerEl.value, preScrollStates);
   });
 }, { deep: true });
 
@@ -199,10 +220,10 @@ const formattedElapsedTime = computed(() => {
 <template>
   <div v-if="!activeRun" class="empty-chat"></div>
 
-  <div v-else class="messages-inner" @click="handleImageClick">
+  <div v-else ref="containerEl" class="messages-inner" @click="handleImageClick">
     <div class="user-message-container">
       <article class="user-bubble">
-        <div class="user-markdown-body" v-html="renderMarkdown(activeRun.task)"></div>
+        <div class="user-markdown-body" v-html="renderMarkdown(activeRun.task, activeRun.id)"></div>
       </article>
       <div class="user-response-footer">
         <button 
@@ -236,7 +257,7 @@ const formattedElapsedTime = computed(() => {
     <template v-for="(group, idx) in groupedMessages" :key="group.id">
       <div v-if="group.type === 'user'" class="user-message-container">
         <article class="user-bubble">
-          <div class="user-markdown-body" v-html="renderMarkdown(group.message.content)"></div>
+          <div class="user-markdown-body" v-html="renderMarkdown(group.message.content, group.message.id)"></div>
         </article>
         <div class="user-response-footer">
           <button 
@@ -323,7 +344,7 @@ const formattedElapsedTime = computed(() => {
           @toggle="toggleReasoning(group.id)"
         />
 
-        <div class="markdown-body" v-html="renderMarkdown(cleanMessageContent(group.message.content))"></div>
+        <div class="markdown-body" v-html="renderMarkdown(cleanMessageContent(group.message.content), group.message.id)"></div>
         <div class="assistant-response-footer" style="display: flex; align-items: center; gap: 8px; margin-top: 10px;">
           <button 
             class="copy-button-icon" 
