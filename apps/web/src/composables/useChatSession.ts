@@ -38,7 +38,7 @@ export function useChatSession(options: ChatSessionOptions) {
   const runs = options.runs;
   const messages = ref<RunMessage[]>([]);
 
-  const activeRunId = ref<string | null>(null);
+  const activeRunId = ref<string | null>(localStorage.getItem('activeRunId'));
   const activeRun = ref<Run | null>(null);
   const isRunning = ref(false);
   const currentPlan = ref<Plan | null>(null);
@@ -108,6 +108,7 @@ export function useChatSession(options: ChatSessionOptions) {
     eventSource = null;
 
     activeRunId.value = run.id;
+    localStorage.setItem('activeRunId', run.id);
     activeRun.value = { ...run };
     options.activeProjectPath.value = run.projectPath || options.activeProjectPath.value;
     taskInput.value = '';
@@ -132,6 +133,7 @@ export function useChatSession(options: ChatSessionOptions) {
     eventSource = null;
     isRunning.value = false;
     activeRunId.value = null;
+    localStorage.removeItem('activeRunId');
     activeRun.value = null;
     messages.value = [];
     currentPlan.value = null;
@@ -295,6 +297,7 @@ export function useChatSession(options: ChatSessionOptions) {
         });
         taskInput.value = '';
         activeRunId.value = run.id;
+        localStorage.setItem('activeRunId', run.id);
         activeRun.value = run;
         runs.value.unshift(run);
         connectEventSource(run.id);

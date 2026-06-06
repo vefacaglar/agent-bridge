@@ -965,10 +965,6 @@ defineExpose({
   filter: brightness(1.1);
 }
 
-.agent-row.expanded {
-  border-color: var(--muted);
-}
-
 .agent-transcript-body {
   margin-top: 14px;
   padding-top: 12px;

@@ -51,13 +51,14 @@ export function useAppShell() {
   }
 
   function selectProject(projectPath: string) {
-    if (chat.isRunning.value) return;
-    if (projects.activeProjectPath.value === projectPath) {
-      projects.activeProjectPath.value = '';
-    } else {
+    if (projects.activeProjectPath.value !== projectPath) {
       projects.activeProjectPath.value = projectPath;
-      chat.startNewRunSetup();
     }
+  }
+
+  function selectProjectAndNewChat(projectPath: string) {
+    projects.activeProjectPath.value = projectPath;
+    chat.startNewRunSetup();
   }
 
   async function submitProject() {
@@ -78,7 +79,13 @@ export function useAppShell() {
     await chat.loadRuns();
 
     if (runs.value.length > 0) {
-      await chat.selectRun(runs.value[0]);
+      const storedRunId = localStorage.getItem('activeRunId');
+      const storedRun = storedRunId ? runs.value.find(r => r.id === storedRunId) : null;
+      if (storedRun) {
+        await chat.selectRun(storedRun);
+      } else {
+        await chat.selectRun(runs.value[0]);
+      }
     } else if (projects.projectOptions.value.length > 0) {
       projects.activeProjectPath.value = projects.projectOptions.value[0].path;
     }
@@ -100,6 +107,7 @@ export function useAppShell() {
     chat,
     isMac,
     selectProject,
+    selectProjectAndNewChat,
     submitProject,
     deleteProject
   };

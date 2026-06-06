@@ -1,4 +1,4 @@
-import { computed, ref, type Ref } from 'vue';
+import { computed, ref, watch, type Ref } from 'vue';
 import type { Run, Project } from '@agent-bridge/shared';
 import { api } from '../api/client';
 import { DEFAULT_PROJECT_PATH } from '../lib/format';
@@ -11,7 +11,11 @@ import { useCustomDialog } from './useCustomDialog';
 export function useProjects(runs: Ref<Run[]>) {
   const { showAlert, showConfirm } = useCustomDialog();
   const projects = ref<Project[]>([]);
-  const activeProjectPath = ref(DEFAULT_PROJECT_PATH);
+  const activeProjectPath = ref(localStorage.getItem('activeProjectPath') || DEFAULT_PROJECT_PATH);
+
+  watch(activeProjectPath, (newVal) => {
+    localStorage.setItem('activeProjectPath', newVal);
+  });
 
   const showAddProjectModal = ref(false);
   const newProjectName = ref('');

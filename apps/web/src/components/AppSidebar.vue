@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, watch } from 'vue';
 import type { Run } from '@agent-bridge/shared';
 import { DEFAULT_PROJECT_PATH } from '../lib/format';
 
@@ -21,33 +21,73 @@ const emit = defineEmits<{
   (e: 'new-chat'): void;
   (e: 'add-project'): void;
   (e: 'select-project', path: string): void;
+  (e: 'select-project-and-new-chat', path: string): void;
   (e: 'select-run', run: Run): void;
   (e: 'delete-project', path: string): void;
   (e: 'open-settings'): void;
   (e: 'toggle-sidebar'): void;
 }>();
 
-const visibleLimit = ref(4);
+const expandedProjects = ref<Record<string, boolean>>((() => {
+  try {
+    const stored = localStorage.getItem('expandedProjects');
+    return stored ? JSON.parse(stored) : {};
+  } catch (e) {
+    return {};
+  }
+})());
+const visibleLimits = ref<Record<string, number>>({});
 
-// Reset visible runs limit when project directory changes
-watch(() => props.activeProjectPath, () => {
-  visibleLimit.value = 4;
-});
-
-const filteredRuns = computed(() =>
-  props.runs.filter(run => (run.projectPath || DEFAULT_PROJECT_PATH) === props.activeProjectPath)
+// Keep the active project expanded automatically
+watch(
+  () => props.activeProjectPath,
+  (newPath) => {
+    if (newPath) {
+      expandedProjects.value[newPath] = true;
+    }
+  },
+  { immediate: true }
 );
 
-const displayedRuns = computed(() =>
-  filteredRuns.value.slice(0, visibleLimit.value)
+watch(
+  expandedProjects,
+  (newVal) => {
+    localStorage.setItem('expandedProjects', JSON.stringify(newVal));
+  },
+  { deep: true }
 );
 
-const hasMoreRuns = computed(() =>
-  filteredRuns.value.length > visibleLimit.value
-);
+function handleProjectClick(path: string) {
+  expandedProjects.value[path] = !expandedProjects.value[path];
+  emit('select-project', path);
+}
 
-function loadMore() {
-  visibleLimit.value += 10;
+function getRunsForProject(projectPath: string): Run[] {
+  return props.runs.filter(run => (run.projectPath || DEFAULT_PROJECT_PATH) === projectPath);
+}
+
+function getLimitForProject(projectPath: string): number {
+  return visibleLimits.value[projectPath] ?? 4;
+}
+
+function getDisplayedRunsForProject(projectPath: string): Run[] {
+  const limit = getLimitForProject(projectPath);
+  return getRunsForProject(projectPath).slice(0, limit);
+}
+
+function hasMoreRunsForProject(projectPath: string): boolean {
+  const limit = getLimitForProject(projectPath);
+  return getRunsForProject(projectPath).length > limit;
+}
+
+function loadMoreForProject(projectPath: string) {
+  visibleLimits.value[projectPath] = getLimitForProject(projectPath) + 10;
+}
+
+function onNewChatForProject(path: string, event: Event) {
+  event.stopPropagation();
+  expandedProjects.value[path] = true;
+  emit('select-project-and-new-chat', path);
 }
 
 function onDeleteProject(path: string, event: Event) {
@@ -102,7 +142,7 @@ function onDeleteProject(path: string, event: Event) {
           <div
             class="project-header"
             :class="{ active: project.path === activeProjectPath }"
-            @click="emit('select-project', project.path)"
+            @click="handleProjectClick(project.path)"
           >
             <div class="project-header-left">
               <!-- Open Folder SVG when active -->
@@ -115,20 +155,28 @@ function onDeleteProject(path: string, event: Event) {
               </svg>
               <span class="project-name-text">{{ project.name }}</span>
             </div>
-            <button class="delete-project-btn" title="Remove Project" @click="onDeleteProject(project.path, $event)">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M3 6h18"/>
-                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
-                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
-              </svg>
-            </button>
+            <div class="project-header-actions">
+              <button class="new-chat-project-btn" title="New Session" @click="onNewChatForProject(project.path, $event)">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 20h9"/>
+                  <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+                </svg>
+              </button>
+              <button class="delete-project-btn" title="Remove Project" @click="onDeleteProject(project.path, $event)">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 6h18"/>
+                  <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                  <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                </svg>
+              </button>
+            </div>
           </div>
 
           <Transition name="expand">
-            <div v-if="project.path === activeProjectPath" class="project-chats-list">
-              <div v-if="displayedRuns.length === 0" class="empty-sidebar">No chats in this project.</div>
+            <div v-if="expandedProjects[project.path]" class="project-chats-list">
+              <div v-if="getRunsForProject(project.path).length === 0" class="empty-sidebar">No chats in this project.</div>
               <button
-                v-for="run in displayedRuns"
+                v-for="run in getDisplayedRunsForProject(project.path)"
                 :key="run.id"
                 class="chat-history-item"
                 :class="{ active: run.id === activeRunId }"
@@ -137,10 +185,10 @@ function onDeleteProject(path: string, event: Event) {
                 <span>{{ run.title }}</span>
               </button>
               <button
-                v-if="hasMoreRuns"
+                v-if="hasMoreRunsForProject(project.path)"
                 type="button"
                 class="load-more-btn"
-                @click="loadMore"
+                @click="loadMoreForProject(project.path)"
               >
                 load more...
               </button>
@@ -292,6 +340,13 @@ function onDeleteProject(path: string, event: Event) {
   gap: 4px;
 }
 
+.project-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.new-chat-project-btn,
 .delete-project-btn {
   background: transparent;
   color: var(--faint);
@@ -305,8 +360,14 @@ function onDeleteProject(path: string, event: Event) {
   transition: all 0.2s ease;
 }
 
+.project-header:hover .new-chat-project-btn,
 .project-header:hover .delete-project-btn {
   opacity: 1;
+}
+
+.new-chat-project-btn:hover {
+  color: var(--text);
+  background: var(--sidebar-active);
 }
 
 .delete-project-btn:hover {

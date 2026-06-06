@@ -71,6 +71,10 @@ export function useChatAutoScroll(
           scrollToUserMessage();
         } else if (!isThinking && (forceScroll || wasAtBottom)) {
           scrollToBottom();
+          if (forceScroll) {
+            setTimeout(scrollToBottom, 50);
+            setTimeout(scrollToBottom, 150);
+          }
         }
       });
     },
@@ -81,6 +85,8 @@ export function useChatAutoScroll(
   watch(container, (newVal) => {
     if (newVal) {
       nextTick(scrollToBottom);
+      setTimeout(scrollToBottom, 50);
+      setTimeout(scrollToBottom, 150);
     }
   });
 

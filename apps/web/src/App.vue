@@ -23,6 +23,7 @@ const {
   chat,
   isMac,
   selectProject,
+  selectProjectAndNewChat,
   submitProject,
   deleteProject
 } = useAppShell();
@@ -172,6 +173,7 @@ async function rejectPlan() {
       @new-chat="chat.startNewRunSetup"
       @add-project="projects.openAddProjectModal"
       @select-project="selectProject"
+      @select-project-and-new-chat="selectProjectAndNewChat"
       @select-run="chat.selectRun"
       @delete-project="deleteProject"
       @open-settings="openSettings"
