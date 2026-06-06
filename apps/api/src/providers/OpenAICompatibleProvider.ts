@@ -125,10 +125,11 @@ export class OpenAICompatibleProvider implements ModelProvider {
 
     if (onChunk) {
       body.stream = true;
-      // Ask for a trailing usage chunk so streamed agent-loop calls can still
-      // report token + prompt-cache accounting (otherwise usage is lost). Most
-      // OpenAI-compatible servers honor this or harmlessly ignore it.
-      body.stream_options = { include_usage: true };
+      // NOTE: we deliberately do NOT set stream_options.include_usage here.
+      // Some OpenAI-compatible gateways (e.g. commandcode/MiniMax) stop emitting
+      // tool_calls entirely once that field is present, which silently breaks
+      // every workspace tool. If a provider includes a usage chunk on its own we
+      // still capture it below, but we never request one.
     }
 
     // Idle (inactivity) timeout: the timer resets whenever data arrives, so a
