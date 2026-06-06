@@ -22,6 +22,7 @@ export interface AgentSummary {
   status: 'running' | 'done';
   tokenEstimate: number;
   toolUseCount: number;
+  children?: MessageGroup[];
 }
 
 /** Whether an assistant message carries serialized tool calls in rawResponse. */
@@ -85,7 +86,8 @@ export function collectAgentSummaries(groups: MessageGroup[], isRunning: boolean
         toolUseCount: children.reduce((sum, child) => {
           if (child.type !== 'tool_group') return sum;
           return sum + Math.max(child.toolCalls.length, 1);
-        }, 0)
+        }, 0),
+        children
       };
     });
 }

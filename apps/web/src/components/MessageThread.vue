@@ -6,7 +6,6 @@ import { renderMarkdown, cleanMessageContent, capturePreScrollStates, restorePre
 import { formatTime } from '../lib/format';
 import ToolGroup from './ToolGroup.vue';
 import ReasoningPanel from './ReasoningPanel.vue';
-import CoderGroup from './CoderGroup.vue';
 
 const props = defineProps<{
   activeRun: Run | null;
@@ -20,6 +19,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'open-plan'): void;
   (e: 'open-agents'): void;
+  (e: 'view-agent', id: string): void;
 }>();
 
 // Progress summary shown on the in-thread plan link.
@@ -307,14 +307,32 @@ const formattedElapsedTime = computed(() => {
         />
       </template>
 
-      <CoderGroup
-        v-else-if="group.type === 'coder_group'"
-        :data-agent-group-id="group.id"
-        :children="group.children || []"
-        :title="group.title"
-        :active="isRunning && idx > lastNonCoderIdx"
-        @open-plan="emit('open-plan')"
-      />
+      <div v-else-if="group.type === 'coder_group'" class="coder-shortcut-card-wrap" :data-agent-group-id="group.id">
+        <button
+          type="button"
+          class="coder-shortcut-card"
+          @click="emit('view-agent', group.id)"
+        >
+          <div class="coder-shortcut-head">
+            <span class="agent-badge coder-badge">
+              {{ group.children?.[0]?.message.agentRole === 'utility' ? 'Utility' : 'Coder' }}
+            </span>
+            <div class="coder-shortcut-meta">
+              <span class="coder-shortcut-status-dot" :class="isRunning && idx > lastNonCoderIdx ? 'running' : 'done'"></span>
+              <span class="coder-shortcut-status-text">
+                {{ isRunning && idx > lastNonCoderIdx ? 'working…' : 'completed' }}
+              </span>
+            </div>
+          </div>
+          <span class="coder-shortcut-title">{{ group.title }}</span>
+          <div class="coder-shortcut-foot">
+            <span class="coder-shortcut-action">View transcript</span>
+            <svg class="arrow-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 12h14M12 5l7 7-7 7"/>
+            </svg>
+          </div>
+        </button>
+      </div>
 
       <article
         v-else-if="group.type === 'assistant'"
@@ -447,7 +465,7 @@ const formattedElapsedTime = computed(() => {
 </template>
 
 <style scoped>
-.messages-inner > :deep(.coder-group + .coder-group),
+.messages-inner > :deep(.coder-shortcut-card-wrap + .coder-shortcut-card-wrap),
 .messages-inner > :deep(.tool-group-wrap + .tool-group-wrap),
 .messages-inner > :deep(.plan-terminal-container + .tool-group-wrap),
 .messages-inner > :deep(.tool-group-wrap + .plan-terminal-container),
@@ -897,10 +915,111 @@ const formattedElapsedTime = computed(() => {
 .user-message-container,
 .assistant-message,
 .plan-thread-link,
+.coder-shortcut-card-wrap,
 :deep(.tool-group-wrap),
-:deep(.coder-group),
 :deep(.reasoning-terminal-container) {
   animation: messageEnter 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.coder-shortcut-card-wrap {
+  margin: 1px 0;
+  width: 100%;
+}
+
+.coder-shortcut-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-left: 2.5px solid var(--muted);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.1s ease;
+}
+
+.coder-shortcut-card:hover {
+  border-color: var(--muted);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.coder-shortcut-card:active {
+  transform: scale(0.995);
+}
+
+.coder-shortcut-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.coder-shortcut-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.coder-shortcut-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.coder-shortcut-status-dot.running {
+  background: #5ea2eb;
+  animation: shimmerPulse 1.5s infinite ease-in-out;
+}
+
+.coder-shortcut-status-dot.done {
+  background: var(--success);
+}
+
+.coder-shortcut-status-text {
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.coder-shortcut-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.coder-shortcut-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.74rem;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 8px;
+  align-self: flex-start;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.coder-shortcut-card:hover .coder-shortcut-foot {
+  color: var(--text);
+  border-color: var(--muted);
+}
+
+.arrow-icon {
+  transition: transform 0.15s ease;
+}
+
+.coder-shortcut-card:hover .arrow-icon {
+  transform: translateX(2px);
 }
 
 </style>

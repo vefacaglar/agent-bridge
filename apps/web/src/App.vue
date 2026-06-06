@@ -102,13 +102,12 @@ const sidePanelOpen = computed(() =>
 // Reset the collapsed state when switching chats so each run's panel shows.
 watch(activeRunId, () => { sidePanelCollapsed.value = false; });
 
+const planPanelRef = ref<any>(null);
+
 async function openAgentTranscript(agentId: string) {
   sidePanelCollapsed.value = false;
   await nextTick();
-  const target = Array
-    .from(document.querySelectorAll<HTMLElement>('[data-agent-group-id]'))
-    .find(el => el.dataset.agentGroupId === agentId) ?? null;
-  target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  planPanelRef.value?.expandAgentTranscript?.(agentId);
 }
 
 // --- Plan approval actions (Start / Revise / Reject) ----------------------
@@ -216,6 +215,7 @@ async function rejectPlan() {
             :agent-summaries="agentSummaries"
             @open-plan="sidePanelCollapsed = false"
             @open-agents="sidePanelCollapsed = false"
+            @view-agent="openAgentTranscript"
           />
         </section>
 
@@ -286,6 +286,7 @@ async function rejectPlan() {
     </main>
 
     <PlanPanel
+      ref="planPanelRef"
       v-if="sidePanelOpen"
       :plan="currentPlan"
       :changes="workspaceChanges"

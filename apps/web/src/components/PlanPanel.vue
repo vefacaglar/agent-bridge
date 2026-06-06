@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, nextTick } from 'vue';
 import type { Plan } from '@agent-bridge/shared';
 import type { AgentSummary } from '../lib/messageGroups';
-import { renderMarkdown } from '../lib/markdown';
+import { renderMarkdown, cleanMessageContent } from '../lib/markdown';
 import { changeDiffRows, type WorkspaceChange } from '../lib/workspaceChanges';
+import ToolGroup from './ToolGroup.vue';
+import ReasoningPanel from './ReasoningPanel.vue';
 
 const props = defineProps<{
   plan: Plan | null;
@@ -122,9 +124,45 @@ function compactNumber(value: number): string {
   return String(value);
 }
 
-function viewAgent(id: string) {
-  emit('view-agent', id);
+// Inline accordion collapse states
+const expandedTranscripts = ref<Record<string, boolean>>({});
+const expandedReasoning = ref<Record<string, boolean>>({});
+
+function isReasoningExpanded(childId: string, children: any[]): boolean {
+  const explicit = expandedReasoning.value[childId];
+  if (explicit !== undefined) return explicit;
+  
+  // By default, only expand the latest reasoning panel of the agent's children
+  let latestId = null;
+  for (let i = children.length - 1; i >= 0; i--) {
+    if (children[i].message.reasoningContent) {
+      latestId = children[i].id;
+      break;
+    }
+  }
+  return childId === latestId;
 }
+
+function toggleReasoning(childId: string) {
+  expandedReasoning.value[childId] = !expandedReasoning.value[childId];
+}
+
+function thoughtFor(child: any): string {
+  return child.message.role === 'tool' ? '' : child.message.content;
+}
+
+function expandAgentTranscript(agentId: string) {
+  activeTab.value = 'agents';
+  expandedTranscripts.value[agentId] = true;
+  nextTick(() => {
+    const el = document.querySelector(`[data-agent-row-id="${agentId}"]`);
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+}
+
+defineExpose({
+  expandAgentTranscript
+});
 </script>
 
 <template>
@@ -195,9 +233,10 @@ function viewAgent(id: string) {
             v-for="agent in agents"
             :key="agent.id"
             class="agent-row"
-            :class="{ running: agent.status === 'running' }"
+            :class="{ running: agent.status === 'running', expanded: expandedTranscripts[agent.id] }"
+            :data-agent-row-id="agent.id"
           >
-            <div class="agent-row-main">
+            <div class="agent-row-main" @click="expandedTranscripts[agent.id] = !expandedTranscripts[agent.id]" style="cursor: pointer;">
               <span class="agent-status-dot" :class="agent.status"></span>
               <div class="agent-row-text">
                 <h3>{{ agent.title }}</h3>
@@ -211,7 +250,54 @@ function viewAgent(id: string) {
               <span>{{ compactNumber(agent.tokenEstimate) }} tokens</span>
               <span>{{ agent.toolUseCount }} tool {{ agent.toolUseCount === 1 ? 'use' : 'uses' }}</span>
               <span>{{ agent.status === 'running' ? 'Running' : 'Done' }}</span>
-              <button type="button" class="agent-transcript-btn" @click="viewAgent(agent.id)">View transcript</button>
+              <button 
+                type="button" 
+                class="agent-transcript-btn" 
+                @click="expandedTranscripts[agent.id] = !expandedTranscripts[agent.id]"
+                :title="expandedTranscripts[agent.id] ? 'Hide transcript' : 'View transcript'"
+              >
+                <svg 
+                  class="chevron-icon" 
+                  :class="{ rotated: expandedTranscripts[agent.id] }" 
+                  xmlns="http://www.w3.org/2000/svg" 
+                  width="14" 
+                  height="14" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  stroke-width="2.5" 
+                  stroke-linecap="round" 
+                  stroke-linejoin="round"
+                >
+                  <path d="m6 9 6 6 6-6"></path>
+                </svg>
+              </button>
+            </div>
+
+            <!-- Inline Accordion Transcript -->
+            <div v-if="expandedTranscripts[agent.id] && agent.children" class="agent-transcript-body">
+              <template v-for="child in agent.children" :key="child.id">
+                <ReasoningPanel
+                  v-if="child.message.reasoningContent"
+                  :content="child.message.reasoningContent"
+                  :expanded="isReasoningExpanded(child.id, agent.children)"
+                  @toggle="toggleReasoning(child.id)"
+                />
+
+                <ToolGroup
+                  v-if="child.type === 'tool_group'"
+                  :thought="thoughtFor(child)"
+                  :tool-calls="child.toolCalls"
+                  :tool-responses="child.toolResponses"
+                  @open-plan="activeTab = 'plan'"
+                />
+
+                <div
+                  v-else-if="child.type === 'assistant' && cleanMessageContent(child.message.content)"
+                  class="coder-text markdown-body"
+                  v-html="renderMarkdown(cleanMessageContent(child.message.content), child.message.id)"
+                ></div>
+              </template>
             </div>
           </article>
         </div>
@@ -532,9 +618,10 @@ function viewAgent(id: string) {
 .agent-transcript-btn {
   padding: 0;
   background: transparent;
-  color: #5ea2eb;
+  color: var(--faint);
   cursor: pointer;
   font-size: 0.76rem;
+  transition: color 0.15s ease;
 }
 
 .agent-transcript-btn:hover {
@@ -876,5 +963,35 @@ function viewAgent(id: string) {
   background: var(--danger);
   color: #ffffff;
   filter: brightness(1.1);
+}
+
+.agent-row.expanded {
+  border-color: var(--muted);
+}
+
+.agent-transcript-body {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.coder-text {
+  color: #deded8;
+  line-height: 1.6;
+  font-size: 0.88rem;
+  margin: 8px 0;
+}
+
+.chevron-icon {
+  transition: transform 0.2s ease;
+  color: inherit;
+  display: block;
+}
+
+.chevron-icon.rotated {
+  transform: rotate(180deg);
 }
 </style>
