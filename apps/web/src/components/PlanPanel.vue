@@ -443,11 +443,13 @@ defineExpose({
   display: flex;
   flex-direction: column;
   min-height: 0;
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
   margin: 12px 12px 12px 0;
-  background: var(--sidebar);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  background: linear-gradient(180deg, rgba(31, 30, 28, 0.96), rgba(22, 22, 21, 0.98));
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.035);
   overflow: hidden;
   opacity: 1;
   transform: translateX(0);
@@ -470,8 +472,8 @@ defineExpose({
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px;
-  border-bottom: 1px solid var(--border);
+  padding: 12px;
+  border-bottom: 1px solid var(--border-soft);
   flex: 0 0 auto;
 }
 
@@ -500,8 +502,8 @@ defineExpose({
   min-height: 30px;
   padding: 5px 10px;
   border: 1px solid transparent;
-  border-radius: 7px;
-  background: transparent;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.015);
   color: var(--muted);
   font-size: 0.82rem;
   cursor: pointer;
@@ -515,8 +517,8 @@ defineExpose({
 
 .panel-tab:hover,
 .panel-tab.active {
-  background: var(--surface);
-  border-color: var(--border);
+  background: rgba(255, 255, 255, 0.055);
+  border-color: rgba(255, 255, 255, 0.11);
   color: var(--text);
 }
 
@@ -544,7 +546,7 @@ defineExpose({
   justify-content: center;
   width: 32px;
   height: 32px;
-  background: none;
+  background: rgba(255, 255, 255, 0.02);
   border: 1px solid var(--border);
   border-radius: 6px;
   color: var(--muted);
@@ -555,14 +557,15 @@ defineExpose({
 
 .workspace-panel-close:hover {
   color: var(--text);
-  background: var(--surface-strong);
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.16);
 }
 
 .workspace-panel-body {
   min-height: 0;
   flex: 1;
   overflow-y: auto;
-  padding: 16px;
+  padding: 18px;
 }
 
 .panel-section-heading {
@@ -613,18 +616,27 @@ defineExpose({
 .agent-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .agent-row {
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
+  padding: 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+  transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+}
+
+.agent-row:hover {
+  border-color: rgba(255, 255, 255, 0.13);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
 }
 
 .agent-row.running {
-  border-color: rgba(94, 162, 235, 0.35);
+  border-color: rgba(150, 167, 143, 0.36);
 }
 
 .agent-row-main {
@@ -649,7 +661,8 @@ defineExpose({
 }
 
 .agent-status-dot.done {
-  background: var(--success);
+  background: #9fb99f;
+  box-shadow: 0 0 0 4px rgba(159, 185, 159, 0.1);
 }
 
 .agent-row-text {
@@ -660,7 +673,7 @@ defineExpose({
   margin: 0;
   color: var(--text);
   font-size: 0.9rem;
-  font-weight: 600;
+  font-weight: 650;
   line-height: 1.35;
   overflow-wrap: anywhere;
 }

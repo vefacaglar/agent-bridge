@@ -1,22 +1,24 @@
 :root {
-  font-family: Raleway, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #e5e5e5;
-  background: #161616;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #e8e6df;
+  background: #10100f;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 
-  --bg: #161616;
-  --sidebar: #1e1e1e;
-  --sidebar-active: #2b2b2b;
-  --surface: #222222;
-  --surface-strong: #2c2c2c;
-  --border: #333333;
-  --text: #e5e5e5;
-  --muted: #a3a3a3;
-  --faint: #737373;
-  --planner: #b88f82;
-  --executor: #8da08b;
+  --bg: #10100f;
+  --sidebar: #181817;
+  --sidebar-active: #24231f;
+  --surface: #1d1c1a;
+  --surface-strong: #282621;
+  --surface-elevated: #201f1d;
+  --border: #34312b;
+  --border-soft: rgba(255, 255, 255, 0.07);
+  --text: #e8e6df;
+  --muted: #aaa59a;
+  --faint: #766f63;
+  --planner: #9eb8ad;
+  --executor: #96a78f;
   --danger: #b88282;
   --success: #88a890;
   --warning: #bca282;
@@ -33,7 +35,8 @@ body {
   min-width: 900px;
   min-height: 100vh;
   overflow: hidden;
-  background: var(--bg);
+  background:
+    linear-gradient(180deg, #141311 0%, var(--bg) 32%, #0d0d0c 100%);
 }
 
 button,
@@ -111,12 +114,14 @@ pre {
   min-height: 0;
   flex-direction: column;
   gap: 12px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
   margin: 12px;
-  background: var(--sidebar);
+  background: linear-gradient(180deg, rgba(31, 30, 28, 0.96), rgba(23, 23, 22, 0.98));
   padding: 16px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.035);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   opacity: 1;
   overflow: hidden;
@@ -138,8 +143,8 @@ pre {
   justify-content: center;
   width: 32px;
   height: 32px;
-  border-radius: 6px;
-  background: transparent;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
   color: var(--muted);
   border: 1px solid var(--border);
   cursor: pointer;
@@ -152,7 +157,8 @@ pre {
 
 .panel-toggle-btn:hover,
 .expand-sidebar-btn:hover {
-  background: var(--surface-strong);
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.16);
   color: var(--text);
 }
 
@@ -179,7 +185,7 @@ pre {
 .project-item.active,
 .chat-history-item:hover,
 .chat-history-item.active {
-  background: var(--sidebar-active);
+  background: linear-gradient(90deg, rgba(158, 184, 173, 0.15), rgba(255, 255, 255, 0.04));
 }
 
 .nav-action.muted {
@@ -248,7 +254,7 @@ pre {
   min-width: 0;
   min-height: 0;
   flex-direction: column;
-  background: var(--bg);
+  background: transparent;
 }
 
 .chat-header {
@@ -256,7 +262,7 @@ pre {
   align-items: center;
   justify-content: space-between;
   min-height: 58px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--border-soft);
   padding: 0 18px;
 }
 

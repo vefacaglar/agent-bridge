@@ -439,7 +439,7 @@ async function rejectPlan() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 58px;
+  min-height: 60px;
   width: 100%;
   padding: 0 24px;
   box-sizing: border-box;
@@ -453,7 +453,7 @@ async function rejectPlan() {
 .project-breadcrumb {
   display: flex;
   align-items: center;
-  font-size: 0.95rem;
+  font-size: 0.93rem;
   font-weight: 500;
   color: var(--text);
   min-width: 0;
@@ -467,7 +467,7 @@ async function rejectPlan() {
 }
 
 .breadcrumb-project {
-  color: var(--muted);
+  color: rgba(170, 165, 154, 0.82);
   font-weight: 400;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -484,7 +484,8 @@ async function rejectPlan() {
 }
 
 .breadcrumb-chat-title {
-  font-weight: 600;
+  color: var(--text);
+  font-weight: 650;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

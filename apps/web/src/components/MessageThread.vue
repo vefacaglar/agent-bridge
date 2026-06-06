@@ -738,6 +738,14 @@ const formattedElapsedTime = computed(() => {
 .user-bubble {
   max-width: 100%;
   align-self: stretch;
+  padding: 14px 16px;
+  border: 1px solid var(--border-soft);
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.025));
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.035);
 }
 
 .user-message-container {
@@ -756,7 +764,10 @@ const formattedElapsedTime = computed(() => {
 }
 
 .user-markdown-body {
-  font-family: 'Plus Jakarta Sans', sans-serif;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.94rem;
+  line-height: 1.55;
 }
 .user-markdown-body :deep(p) {
   margin: 0;
@@ -934,6 +945,15 @@ const formattedElapsedTime = computed(() => {
 :deep(.tool-group-wrap),
 :deep(.reasoning-terminal-container) {
   animation: messageEnter 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.assistant-message {
+  color: rgba(232, 230, 223, 0.9);
+  line-height: 1.65;
+}
+
+.assistant-meta {
+  color: rgba(118, 111, 99, 0.84);
 }
 
 .coder-shortcut-row {

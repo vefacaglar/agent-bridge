@@ -226,8 +226,8 @@ function onDeleteProject(path: string, event: Event) {
   justify-content: center;
   width: 32px;
   height: 32px;
-  border-radius: 6px;
-  background: transparent;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
   color: var(--muted);
   cursor: pointer;
   transition: all 0.2s ease;
@@ -236,7 +236,7 @@ function onDeleteProject(path: string, event: Event) {
 
 .search-btn:hover,
 .collapse-btn:hover {
-  background: var(--sidebar-active);
+  background: rgba(255, 255, 255, 0.07);
   color: var(--text);
 }
 
@@ -283,7 +283,7 @@ function onDeleteProject(path: string, event: Event) {
   align-items: center;
   justify-content: space-between;
   padding: 8px 10px;
-  border-radius: 6px;
+  border-radius: 8px;
   color: var(--muted);
   cursor: pointer;
   user-select: none;
@@ -313,11 +313,13 @@ function onDeleteProject(path: string, event: Event) {
 }
 
 .project-header:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.045);
   color: var(--text);
 }
 
 .project-header.active {
+  background: linear-gradient(90deg, rgba(158, 184, 173, 0.13), rgba(255, 255, 255, 0.035));
+  box-shadow: inset 0 0 0 1px rgba(158, 184, 173, 0.08);
   color: var(--text);
   font-weight: 500;
 }
@@ -331,7 +333,7 @@ function onDeleteProject(path: string, event: Event) {
 }
 
 .project-chats-list {
-  padding: 4px 6px 8px 16px;
+  padding: 4px 6px 8px 18px;
   margin-top: 0;
   border-left: none;
   margin-left: 0;
@@ -367,7 +369,7 @@ function onDeleteProject(path: string, event: Event) {
 
 .new-chat-project-btn:hover {
   color: var(--text);
-  background: var(--sidebar-active);
+  background: rgba(255, 255, 255, 0.07);
 }
 
 .delete-project-btn:hover {

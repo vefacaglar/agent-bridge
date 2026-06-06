@@ -541,17 +541,23 @@ onBeforeUnmount(() => {
 
 .composer-input-box {
   position: relative;
-  background: #1a1a1c;
-  border: 1px solid #2d2d30;
-  border-radius: 12px;
-  padding: 10px 86px 10px 14px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  background:
+    linear-gradient(180deg, rgba(38, 37, 34, 0.96), rgba(27, 26, 24, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 14px;
+  padding: 13px 88px 13px 16px;
+  box-shadow:
+    0 18px 45px rgba(0, 0, 0, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.045);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
 .composer-input-box:focus-within {
-  border-color: #444;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+  border-color: rgba(158, 184, 173, 0.42);
+  box-shadow:
+    0 20px 55px rgba(0, 0, 0, 0.38),
+    0 0 0 1px rgba(158, 184, 173, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.055);
 }
 
 .composer-token-info {
@@ -596,7 +602,7 @@ onBeforeUnmount(() => {
 }
 
 .context-tokens {
-  color: var(--faint);
+  color: rgba(170, 165, 154, 0.78);
   font-weight: 500;
 }
 
@@ -640,7 +646,7 @@ onBeforeUnmount(() => {
 .composer-input-box textarea {
   display: block;
   width: 100%;
-  min-height: 44px;
+  min-height: 48px;
   max-height: 180px;
   resize: none;
   overflow-y: auto;
@@ -648,7 +654,7 @@ onBeforeUnmount(() => {
   outline: none;
   background: transparent;
   color: var(--text);
-  font-size: 0.95rem;
+  font-size: 0.96rem;
   line-height: 1.5;
   padding: 0;
   margin: 0;
@@ -656,23 +662,26 @@ onBeforeUnmount(() => {
 
 .composer-send-btn {
   position: absolute;
-  bottom: 10px;
-  right: 10px;
+  bottom: 11px;
+  right: 11px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
-  background: var(--text);
-  color: var(--bg);
+  width: 32px;
+  height: 32px;
+  background: #e6e7df;
+  color: #11110f;
   border: none;
-  border-radius: 6px;
+  border-radius: 9px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
+  transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease;
 }
 
 .composer-send-btn:hover:not(:disabled) {
   opacity: 0.95;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
 }
 
 .composer-send-btn:disabled {
@@ -697,8 +706,8 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 10px;
-  padding: 0 4px;
+  margin-top: 11px;
+  padding: 0 6px;
 }
 
 .mode-selector-wrap,
@@ -713,8 +722,8 @@ onBeforeUnmount(() => {
 .mode-pill-btn {
   display: flex;
   align-items: center;
-  background: #1a1a1c;
-  border: 1px solid #2d2d30;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--border-soft);
   border-radius: 8px;
   padding: 6px 12px;
   color: var(--muted);
@@ -726,9 +735,9 @@ onBeforeUnmount(() => {
 }
 
 .mode-pill-btn:hover {
-  border-color: #444;
+  border-color: rgba(255, 255, 255, 0.15);
   color: var(--text);
-  background: #202022;
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .mode-pill-text {
@@ -854,19 +863,20 @@ onBeforeUnmount(() => {
 }
 
 .model-select-display-btn {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.025);
   color: var(--muted);
   font-size: 0.8rem;
   cursor: pointer;
   transition: color 0.2s ease;
-  padding: 4px 6px;
-  border-radius: 4px;
-  border: 0;
+  padding: 4px 8px;
+  border-radius: 7px;
+  border: 1px solid transparent;
 }
 
 .model-select-display-btn:hover {
   color: var(--text);
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 .model-select-display-btn:disabled {
