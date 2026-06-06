@@ -624,14 +624,21 @@ defineExpose({
   padding: 14px;
   border: 1px solid var(--border-soft);
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.025);
+  background: rgba(255, 255, 255, 0.03);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
   transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
 }
 
 .agent-row:hover {
   border-color: rgba(255, 255, 255, 0.13);
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+/* An open card reads as a raised, distinct container so its transcript is
+   clearly "inside" it rather than spilling onto the flat panel. */
+.agent-row.expanded {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--border);
 }
 
 .agent-row.running {
@@ -1046,13 +1053,15 @@ defineExpose({
   filter: brightness(1.1);
 }
 
+/* Minimal: the transcript just gets breathing room and a hairline separator —
+   no box, no inset, full width. Grouping comes from spacing, not chrome. */
 .agent-transcript-body {
-  margin-top: 14px;
+  margin-top: 12px;
   padding-top: 12px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--border-soft);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .coder-text {

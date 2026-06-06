@@ -552,28 +552,6 @@ const formattedElapsedTime = computed(() => {
   padding: 2px 8px;
 }
 
-.welcome-gradient-logo {
-  width: 68px;
-  height: 68px;
-  border-radius: 20px;
-  margin: 0 auto 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 850;
-  font-size: 1.6rem;
-  background: linear-gradient(135deg, var(--success), var(--planner));
-  color: var(--bg);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
-  animation: logoPulse 4s infinite alternate;
-}
-
-@keyframes logoPulse {
-  0% { transform: scale(1); filter: brightness(1); }
-  100% { transform: scale(1.05); filter: brightness(1.1); }
-}
-
-
 
 /* Terminal Container Styling */
 .plan-terminal-container,
