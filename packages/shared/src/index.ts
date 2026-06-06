@@ -54,7 +54,7 @@ export interface RunMessage {
   id: string;
   runId: string;
   role: "system" | "user" | "assistant" | "tool";
-  agentRole?: "planner" | "coder" | "reviewer" | "user";
+  agentRole?: "planner" | "coder" | "reviewer" | "user" | "utility";
   /**
    * For delegated coder sub-agents: the sub-task title that identifies WHICH
    * sub-agent produced this message. Lets the UI render each coder in its own
@@ -87,6 +87,9 @@ export interface Run {
   // All three are empty for ordinary single-model runs.
   coderProviderId?: string;
   coderModel?: string;
+  // Optional lightweight "utility" tier (set from the preset's utility endpoint).
+  utilityProviderId?: string;
+  utilityModel?: string;
   agentPreset?: string;
   errorMessage?: string;
   createdAt: string;
@@ -109,6 +112,11 @@ export interface AgentPreset {
   architect: AgentPresetEndpoint;
   coder: AgentPresetEndpoint;
   maxSubAgents: number;
+  // Optional lightweight tier: a cheap model the architect can delegate tiny
+  // mechanical tasks to (locating files/symbols, summarizing, simple renames)
+  // via delegate_to_utility, keeping the architect's context lean. Absent =>
+  // the run has no utility tier.
+  utility?: AgentPresetEndpoint;
 }
 
 export type RunEvent =

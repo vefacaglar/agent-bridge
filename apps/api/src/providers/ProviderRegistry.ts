@@ -17,6 +17,7 @@ interface AgentPresetBlock {
   architect: { providerId: string; model: string };
   coder: { providerId: string; model: string };
   maxSubAgents?: number;
+  utility?: { providerId: string; model: string };
 }
 
 interface ConfigSchema {
@@ -95,7 +96,10 @@ export class ProviderRegistry {
       displayName: block.displayName || id,
       architect: { providerId: block.architect.providerId, model: block.architect.model },
       coder: { providerId: block.coder.providerId, model: block.coder.model },
-      maxSubAgents: Math.min(3, Math.max(1, block.maxSubAgents ?? 3))
+      maxSubAgents: Math.min(3, Math.max(1, block.maxSubAgents ?? 3)),
+      utility: block.utility
+        ? { providerId: block.utility.providerId, model: block.utility.model }
+        : undefined
     }));
   }
 

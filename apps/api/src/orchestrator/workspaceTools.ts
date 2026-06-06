@@ -317,6 +317,45 @@ export const DELEGATE_TASKS_TOOL = {
   }
 };
 
+/**
+ * Lightweight tier tool. Lets the architect delegate tiny, mechanical tasks
+ * (locating files/symbols, summarizing a file, simple renames/moves) to a cheap
+ * "utility" sub-agent running the configured utility model in this same workspace.
+ * The sub-agent only gets read/list/search + move_file, does the noisy churn in
+ * its own context, and returns a SHORT distilled answer — keeping the architect's
+ * context lean. Like delegate_tasks it performs no direct I/O itself (the
+ * orchestrator runs the sub-agent loop), so it is not in DANGEROUS_TOOLS.
+ */
+export const DELEGATE_UTILITY_TOOL = {
+  type: "function" as const,
+  function: {
+    name: "delegate_to_utility",
+    description: "Delegate TINY, mechanical task(s) to a cheap utility sub-agent (a smaller model) to keep your own context lean. Ideal for: locating where a file/symbol/function lives, summarizing a file, or simple renames/moves. The utility sub-agent can ONLY read/list/search files and move (rename) them — it cannot write or edit code. Each task is self-contained (the sub-agent does NOT see this conversation) and returns a SHORT answer (e.g. a file:line or a one-paragraph summary). Use delegate_tasks (the coder) for substantial implementation; use this only for cheap lookups/renames. Set parallel=true only when tasks are independent.",
+    parameters: {
+      type: "object",
+      properties: {
+        tasks: {
+          type: "array",
+          description: "The tiny tasks to delegate (1 to 3). Each runs in its own utility sub-agent.",
+          items: {
+            type: "object",
+            properties: {
+              title: { type: "string", description: "Short title for this lookup/task." },
+              instructions: { type: "string", description: "Complete, self-contained instructions and exactly what short answer to return. The sub-agent only sees this text." }
+            },
+            required: ["title", "instructions"]
+          }
+        },
+        parallel: {
+          type: "boolean",
+          description: "Run the utility sub-agents concurrently. Set true only when the tasks are independent."
+        }
+      },
+      required: ["tasks"]
+    }
+  }
+};
+
 /** Tools that must always be gated behind an explicit permission prompt. */
 export const DANGEROUS_TOOLS = new Set(["run_command", "fetch_url"]);
 
@@ -326,6 +365,14 @@ export const DANGEROUS_TOOLS = new Set(["run_command", "fetch_url"]);
  * planning-only, no-changes mode). Everything else is blocked there.
  */
 export const READONLY_TOOLS = new Set(["read_file", "list_directory", "search_files"]);
+
+/**
+ * Tools available to a utility sub-agent: read-only inspection plus move_file
+ * (rename/move). No write/edit/delete/create — utility work is lookups + safe
+ * renames only.
+ */
+export const UTILITY_TOOL_NAMES = new Set([...READONLY_TOOLS, "move_file"]);
+export const UTILITY_TOOLS = WORKSPACE_TOOLS.filter(t => UTILITY_TOOL_NAMES.has(t.function.name));
 
 /**
  * The key a standing permission grant is scoped to. For run_command the grant

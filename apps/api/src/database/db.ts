@@ -52,7 +52,7 @@ try {
 
 // Migration: Add dual-model (architect + coder) columns to runs. All nullable;
 // populated only when a run uses an agent preset that delegates to a coder model.
-for (const col of ["coder_provider_id", "coder_model", "agent_preset"]) {
+for (const col of ["coder_provider_id", "coder_model", "agent_preset", "utility_provider_id", "utility_model"]) {
   try {
     db.exec(`ALTER TABLE runs ADD COLUMN ${col} TEXT`);
   } catch (e) {

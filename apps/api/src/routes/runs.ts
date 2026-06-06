@@ -10,7 +10,7 @@ type PermissionDecision = (typeof PERMISSION_DECISIONS)[number];
 export function registerRunRoutes(server: FastifyInstance, ctx: AppContext) {
   // Create and trigger a new orchestration run.
   server.post("/api/runs", async (request, reply) => {
-    const { task, projectPath, projectName, providerId, model, mode, coderProviderId, coderModel, agentPreset } = request.body as {
+    const { task, projectPath, projectName, providerId, model, mode, coderProviderId, coderModel, utilityProviderId, utilityModel, agentPreset } = request.body as {
       task: string;
       projectPath?: string;
       projectName?: string;
@@ -19,6 +19,8 @@ export function registerRunRoutes(server: FastifyInstance, ctx: AppContext) {
       mode?: string;
       coderProviderId?: string;
       coderModel?: string;
+      utilityProviderId?: string;
+      utilityModel?: string;
       agentPreset?: string;
     };
 
@@ -48,6 +50,8 @@ export function registerRunRoutes(server: FastifyInstance, ctx: AppContext) {
       mode: mode || "accept_edits",
       coderProviderId: coderProviderId || undefined,
       coderModel: coderModel || undefined,
+      utilityProviderId: utilityProviderId || undefined,
+      utilityModel: utilityModel || undefined,
       agentPreset: agentPreset || undefined,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -81,13 +85,15 @@ export function registerRunRoutes(server: FastifyInstance, ctx: AppContext) {
   // Continue a run with follow-up instructions in the same thread.
   server.post("/api/runs/:id/continue", async (request, reply) => {
     const { id } = request.params as { id: string };
-    const { task, providerId, model, mode, coderProviderId, coderModel, agentPreset } = request.body as {
+    const { task, providerId, model, mode, coderProviderId, coderModel, utilityProviderId, utilityModel, agentPreset } = request.body as {
       task: string;
       providerId?: string;
       model?: string;
       mode?: string;
       coderProviderId?: string;
       coderModel?: string;
+      utilityProviderId?: string;
+      utilityModel?: string;
       agentPreset?: string;
     };
 
@@ -120,6 +126,8 @@ export function registerRunRoutes(server: FastifyInstance, ctx: AppContext) {
       updates.agentPreset = agentPreset || undefined;
       updates.coderProviderId = coderProviderId || undefined;
       updates.coderModel = coderModel || undefined;
+      updates.utilityProviderId = utilityProviderId || undefined;
+      updates.utilityModel = utilityModel || undefined;
     }
     if (Object.keys(updates).length > 0) {
       ctx.runRepo.update(id, updates);

@@ -17,6 +17,8 @@ function mapRowToRun(row: any): Run {
     mode: row.mode || "accept_edits",
     coderProviderId: row.coder_provider_id || undefined,
     coderModel: row.coder_model || undefined,
+    utilityProviderId: row.utility_provider_id || undefined,
+    utilityModel: row.utility_model || undefined,
     agentPreset: row.agent_preset || undefined,
     errorMessage: row.error_message || undefined,
     createdAt: row.created_at,
@@ -49,8 +51,9 @@ export class RunRepository {
         id, title, task, project_path, project_name, status,
         provider_id, provider_display_name, model, mode,
         coder_provider_id, coder_model, agent_preset,
+        utility_provider_id, utility_model,
         error_message, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
@@ -67,6 +70,8 @@ export class RunRepository {
       run.coderProviderId || null,
       run.coderModel || null,
       run.agentPreset || null,
+      run.utilityProviderId || null,
+      run.utilityModel || null,
       run.errorMessage || null,
       run.createdAt,
       run.updatedAt
@@ -101,6 +106,8 @@ export class RunRepository {
       mode: "mode",
       coderProviderId: "coder_provider_id",
       coderModel: "coder_model",
+      utilityProviderId: "utility_provider_id",
+      utilityModel: "utility_model",
       agentPreset: "agent_preset",
       errorMessage: "error_message",
       createdAt: "created_at"

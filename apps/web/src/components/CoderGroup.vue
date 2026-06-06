@@ -18,7 +18,12 @@ const emit = defineEmits<{
 
 const expanded = ref(false);
 
-// The coder model label, taken from the first child that carries one.
+// Sub-agent role drives the badge: coder vs the lighter utility tier.
+const badgeLabel = computed(() =>
+  props.children[0]?.message.agentRole === 'utility' ? 'Utility' : 'Coder'
+);
+
+// The sub-agent model label, taken from the first child that carries one.
 const model = computed(() => props.children.find(c => c.message.model)?.message.model ?? '');
 
 // Number of tool steps the sub-agent(s) ran, for a compact summary in the header.
@@ -67,7 +72,7 @@ watch(() => props.children.map(c => c.message.content + (c.message.reasoningCont
   <div class="coder-group" :class="{ 'is-active': active }">
     <header class="coder-group-header" @click="expanded = !expanded">
       <div class="coder-group-head-left">
-        <span class="agent-badge coder-badge">Coder</span>
+        <span class="agent-badge coder-badge">{{ badgeLabel }}</span>
         <span v-if="title" class="coder-group-title">{{ title }}</span>
         <span v-if="model" class="coder-group-model">{{ model }}</span>
         <span v-if="active" class="coder-group-status">working…</span>

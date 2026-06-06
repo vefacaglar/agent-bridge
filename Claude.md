@@ -375,6 +375,34 @@ Implementation notes:
   interleave by timestamp but still split into separate windows. Presets are
   managed in Settings → Agents (`AgentPresetsTab.vue`).
 
+### Optional Utility Tier (`delegate_to_utility`)
+
+A preset may additionally define an **optional** `utility` endpoint — a cheap,
+lightweight model the architect offloads tiny mechanical chores to (locating
+files/symbols, summarizing a file, simple renames) so its expensive context stays
+lean. It is purely additive: presets without a `utility` block, and single-model
+runs, behave exactly as before.
+
+When (and only when) a `utility` model is configured *and* the run can delegate
+(coder present, build-type mode), the architect also gets a `delegate_to_utility`
+tool:
+
+```txt
+delegate_to_utility(tasks[{ title, instructions }], parallel?)
+```
+
+It mirrors `delegate_tasks` but runs each task (capped at 3) through `runAgentLoop`
+on the run's `utilityProviderId`/`utilityModel`, tagged `agentRole: "utility"` +
+`agentName`. Crucially the utility sub-agent gets a **restricted toolset**
+(`UTILITY_TOOLS` = read-only `read_file`/`list_directory`/`search_files` **plus
+`move_file`** for renames — no write/edit/delete/create/run_command) and the
+`buildUtilitySystemPrompt` prompt instructing it to return a SHORT answer. Handled
+by `Orchestrator.executeUtilityTasks`. In the web UI utility sub-agents reuse the
+coder window machinery (`foldCoderGroups` folds both `coder` and `utility` roles;
+`CoderGroup.vue` badges the box "Utility" vs "Coder"). Run fields:
+`utility_provider_id` / `utility_model` columns; preset metadata carries an
+optional `utility` endpoint.
+
 ---
 
 ## Run States

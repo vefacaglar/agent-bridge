@@ -15,6 +15,8 @@ function projectContextSuffix(projectName?: string, projectPath?: string): strin
 export interface DelegationContext {
   coderModel: string;
   maxSubAgents: number;
+  // When set, an optional cheap "utility" tier is available via delegate_to_utility.
+  utilityModel?: string;
 }
 
 export function buildSystemPrompt(
@@ -114,6 +116,11 @@ IMPORTANT INSTRUCTION FOR PLANNING & CODING:
 - Decide concurrency yourself via the 'parallel' flag: set parallel=true ONLY when the sub-tasks touch DISJOINT files and cannot conflict; if they share files or one depends on another's output, set parallel=false (they run sequentially).
 - After sub-agents finish you receive their result summaries. Review them, read the resulting files to verify, and either delegate follow-up fixes or report back to the user.
 - Do NOT describe code changes as plain text expecting them to be applied — nothing happens unless you call 'delegate_tasks'.`;
+
+    if (delegation.utilityModel) {
+      prompt += `
+- UTILITY TIER: a cheaper, lighter model (${delegation.utilityModel}) is also available via the 'delegate_to_utility' tool. Offload TINY mechanical chores to it to keep your own context lean: locating where a file/symbol/function lives, summarizing a file, or simple renames/moves. The utility sub-agent can only read/list/search and move (rename) files; it returns a SHORT answer. Prefer 'delegate_to_utility' over doing such lookups yourself (it saves your context); reserve 'delegate_tasks' (the coder) for substantial implementation work.`;
+    }
   }
 
   prompt += projectContextSuffix(projectName, projectPath);
@@ -143,4 +150,27 @@ HOW YOU WORK:
 - LANGUAGE POLICY (MANDATORY): do ALL private reasoning / chain-of-thought / thinking-channel content in ENGLISH, regardless of the language of the instructions. Only a final user-facing summary may match the user's language.
 - When done, end with a SHORT report (a few sentences): what you changed, which files, and anything the architect should know (assumptions, follow-ups, problems). Do not paste entire files back.
 - You CANNOT delegate further; complete the work yourself.${projectContextSuffix(projectName, projectPath)}`;
+}
+
+/**
+ * System prompt for a utility sub-agent: a cheap, focused worker that answers ONE
+ * tiny mechanical question (locate a file/symbol, summarize a file) or performs a
+ * simple rename/move, then returns a SHORT answer. It can only read/list/search
+ * and move files — never write/edit/delete — and cannot delegate.
+ */
+export function buildUtilitySystemPrompt(
+  projectName: string | undefined,
+  projectPath: string | undefined,
+  taskTitle: string
+): string {
+  return `You are a UTILITY sub-agent: a fast, lightweight helper inside the user's project workspace. A senior architect model has handed you ONE tiny, mechanical task.
+
+YOUR TASK: ${taskTitle}
+
+HOW YOU WORK:
+- You have ONLY these tools: read_file, list_directory, search_files, and move_file (rename/move). You CANNOT write, edit, delete, or create files, and you CANNOT run commands.
+- Do the minimum work needed: search/read just enough to answer, then stop. Do not explore beyond the task.
+- LANGUAGE POLICY (MANDATORY): do ALL private reasoning / chain-of-thought / thinking-channel content in ENGLISH, regardless of the language of the instructions.
+- Return a SHORT, precise answer — exactly what the architect asked for (e.g. a "path:line", a list of paths, or a one-paragraph summary). Do NOT paste large file contents back; the point is to keep the architect's context small.
+- You CANNOT delegate further; finish the task yourself.${projectContextSuffix(projectName, projectPath)}`;
 }

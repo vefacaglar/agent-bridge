@@ -4,8 +4,8 @@ import { RunRepository, MessageRepository, PlanRepository } from "../database/re
 import { ProviderRegistry } from "../providers/ProviderRegistry.js";
 import { eventBus } from "./eventBus.js";
 import { db } from "../database/db.js";
-import { buildSystemPrompt, buildCoderSystemPrompt } from "./systemPrompt.js";
-import { WORKSPACE_TOOLS, UPDATE_PLAN_TOOL, DELEGATE_TASKS_TOOL, SET_TITLE_TOOL, executeWorkspaceToolAsync, buildPermissionPreview, DANGEROUS_TOOLS, READONLY_TOOLS, permissionKey } from "./workspaceTools.js";
+import { buildSystemPrompt, buildCoderSystemPrompt, buildUtilitySystemPrompt } from "./systemPrompt.js";
+import { WORKSPACE_TOOLS, UPDATE_PLAN_TOOL, DELEGATE_TASKS_TOOL, DELEGATE_UTILITY_TOOL, UTILITY_TOOLS, SET_TITLE_TOOL, executeWorkspaceToolAsync, buildPermissionPreview, DANGEROUS_TOOLS, READONLY_TOOLS, permissionKey } from "./workspaceTools.js";
 
 type PermissionDecision = "allow_once" | "allow_project" | "allow_always" | "deny";
 
@@ -272,8 +272,15 @@ export class Orchestrator {
       // Delegation means implementation, so it is only offered in build-type
       // modes — never in plan mode (planning only) or chat mode (lightweight).
       const canDelegate = run.mode !== "plan" && run.mode !== "chat";
+      // An optional utility tier (cheap lookups/renames) rides alongside the
+      // coder; it is only offered when the preset configured a utility model.
+      const hasUtility = !!(run.utilityModel && run.utilityProviderId);
       const delegation = (canDelegate && run.coderModel && run.coderProviderId)
-        ? { coderModel: run.coderModel, maxSubAgents: this.maxSubAgentsFor(run) }
+        ? {
+            coderModel: run.coderModel,
+            maxSubAgents: this.maxSubAgentsFor(run),
+            utilityModel: hasUtility ? run.utilityModel : undefined
+          }
         : undefined;
 
       // Plan mode is planning-only: expose ONLY read-only tools plus update_plan,
@@ -290,9 +297,12 @@ export class Orchestrator {
           ? [...readonlyTools]
           : [...WORKSPACE_TOOLS];
       const withDelegate = delegation ? [...baseTools, DELEGATE_TASKS_TOOL] : baseTools;
+      // The utility-delegation tool is offered only when a utility model is
+      // configured (and the run can delegate at all).
+      const withUtility = delegation?.utilityModel ? [...withDelegate, DELEGATE_UTILITY_TOOL] : withDelegate;
       // set_chat_title is available to the main agent in every mode (it only
-      // renames the run); coder sub-agents never get it.
-      const tools = [...withDelegate, SET_TITLE_TOOL];
+      // renames the run); sub-agents never get it.
+      const tools = [...withUtility, SET_TITLE_TOOL];
 
       const systemPrompt = buildSystemPrompt(
         run.projectName,
@@ -545,6 +555,71 @@ export class Orchestrator {
   }
 
   /**
+   * Executes a delegate_to_utility call: spins up 1..3 cheap "utility" sub-agents
+   * (each its own runAgentLoop on the utility model) restricted to read/list/search
+   * + move_file, and returns their short summaries to the architect. Mirrors
+   * executeDelegateTasks but with the utility model and a lighter toolset.
+   */
+  private async executeUtilityTasks(runId: string, run: Run, toolCall: any): Promise<string> {
+    if (!run.utilityModel || !run.utilityProviderId) {
+      return JSON.stringify({ success: false, error: "No utility model is configured for this run." });
+    }
+    if (run.mode === "plan" || run.mode === "chat") {
+      return JSON.stringify({ success: false, error: `Cannot delegate in ${run.mode} mode. Switch to Build mode.` });
+    }
+
+    let args: any;
+    try {
+      args = JSON.parse(toolCall.function.arguments || "{}");
+    } catch (e: any) {
+      return JSON.stringify({ success: false, error: `Invalid delegate_to_utility arguments: ${e.message}` });
+    }
+
+    const rawTasks = Array.isArray(args.tasks) ? args.tasks : [];
+    const tasks = rawTasks
+      .filter((t: any) => t && typeof t.instructions === "string" && t.instructions.trim())
+      .slice(0, 3)
+      .map((t: any, i: number) => ({
+        title: typeof t.title === "string" && t.title.trim() ? t.title.trim() : `Lookup ${i + 1}`,
+        instructions: String(t.instructions)
+      }));
+
+    if (tasks.length === 0) {
+      return JSON.stringify({ success: false, error: "No valid tasks to delegate (each task needs non-empty instructions)." });
+    }
+
+    const utilityMeta = this.registry.getSafeMetadata().find(p => p.id === run.utilityProviderId);
+    const utilityDisplayName = utilityMeta ? utilityMeta.displayName : run.utilityProviderId;
+    const parallel = !!args.parallel && tasks.length > 1;
+
+    const runOne = async (task: { title: string; instructions: string }) => {
+      const systemPrompt = buildUtilitySystemPrompt(run.projectName, run.projectPath, task.title);
+      const summary = await this.runAgentLoop(runId, run, [{ role: "user", content: task.instructions }], {
+        providerId: run.utilityProviderId!,
+        providerDisplayName: utilityDisplayName,
+        model: run.utilityModel!,
+        systemPrompt,
+        tools: [...UTILITY_TOOLS],
+        agentRole: "utility",
+        agentName: task.title
+      });
+      return { title: task.title, summary: summary || "(no summary returned)" };
+    };
+
+    let results: { title: string; summary: string }[];
+    if (parallel) {
+      results = await Promise.all(tasks.map(runOne));
+    } else {
+      results = [];
+      for (const task of tasks) {
+        results.push(await runOne(task));
+      }
+    }
+
+    return JSON.stringify({ success: true, parallel, results });
+  }
+
+  /**
    * Resolves a single tool call: gates it behind the permission flow when the
    * run is in ask_permissions mode or the tool is inherently dangerous (e.g.
    * run_command always asks before executing), then runs it.
@@ -566,6 +641,11 @@ export class Orchestrator {
     // loops itself (the sub-agents' own tool calls are gated normally).
     if (toolCall.function?.name === "delegate_tasks") {
       return this.executeDelegateTasks(runId, run, toolCall);
+    }
+
+    // delegate_to_utility fans out to cheap utility sub-agents (lookups/renames).
+    if (toolCall.function?.name === "delegate_to_utility") {
+      return this.executeUtilityTasks(runId, run, toolCall);
     }
 
     // HARD RULE: plan mode is read-only. No file mutation, no run_command, no

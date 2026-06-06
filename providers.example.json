@@ -46,7 +46,8 @@
       "displayName": "Opus Plan",
       "architect": { "providerId": "anthropic", "model": "claude-3-opus-20240229" },
       "coder": { "providerId": "anthropic", "model": "claude-3-5-sonnet-20240620" },
-      "maxSubAgents": 3
+      "maxSubAgents": 3,
+      "utility": { "providerId": "anthropic", "model": "claude-3-5-haiku-20241022" }
     }
   }
 }

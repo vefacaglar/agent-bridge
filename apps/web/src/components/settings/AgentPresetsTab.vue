@@ -23,6 +23,8 @@ const formId = ref('');
 const formDisplayName = ref('');
 const formArchitect = ref('');
 const formCoder = ref('');
+// Empty string => no utility tier (the "None" option).
+const formUtility = ref('');
 const formMaxSubAgents = ref(3);
 
 // Flattened provider/model options for the architect + coder dropdowns.
@@ -58,6 +60,7 @@ function handleAdd() {
   formDisplayName.value = '';
   formArchitect.value = modelOptions.value[0]?.value ?? '';
   formCoder.value = modelOptions.value[0]?.value ?? '';
+  formUtility.value = '';
   formMaxSubAgents.value = 3;
   isEditing.value = true;
 }
@@ -68,6 +71,7 @@ function handleEdit(preset: AgentPreset) {
   formDisplayName.value = preset.displayName;
   formArchitect.value = combined(preset.architect.providerId, preset.architect.model);
   formCoder.value = combined(preset.coder.providerId, preset.coder.model);
+  formUtility.value = preset.utility ? combined(preset.utility.providerId, preset.utility.model) : '';
   formMaxSubAgents.value = preset.maxSubAgents;
   isEditing.value = true;
 }
@@ -85,7 +89,8 @@ function toBlocks(list: AgentPreset[]): Record<string, any> {
       displayName: p.displayName,
       architect: { providerId: p.architect.providerId, model: p.architect.model },
       coder: { providerId: p.coder.providerId, model: p.coder.model },
-      maxSubAgents: p.maxSubAgents
+      maxSubAgents: p.maxSubAgents,
+      ...(p.utility ? { utility: { providerId: p.utility.providerId, model: p.utility.model } } : {})
     };
   }
   return blocks;
@@ -115,7 +120,8 @@ async function handleSave() {
     displayName: formDisplayName.value.trim() || id,
     architect,
     coder,
-    maxSubAgents: Math.min(3, Math.max(1, Number(formMaxSubAgents.value) || 1))
+    maxSubAgents: Math.min(3, Math.max(1, Number(formMaxSubAgents.value) || 1)),
+    utility: formUtility.value ? splitCombined(formUtility.value) : undefined
   };
 
   // Replace the edited preset (by original id) or append a new one.
@@ -150,7 +156,8 @@ async function handleDelete(preset: AgentPreset) {
         <p class="settings-section-desc">
           Dual-model pairings (like <code>opusplan</code>): an <strong>architect</strong> model
           plans and delegates code-writing to a <strong>coder</strong> model running as 1–3
-          sub-agents. Selectable next to the model picker in the composer.
+          sub-agents, with an optional cheap <strong>utility</strong> model for tiny lookups
+          and renames. Selectable next to the model picker in the composer.
         </p>
       </div>
       <button v-if="!isEditing" class="add-btn" @click="handleAdd">Add preset</button>
@@ -179,6 +186,13 @@ async function handleDelete(preset: AgentPreset) {
         </select>
       </div>
       <div class="form-row">
+        <label>Utility model <span class="form-hint">(optional — cheap lookups & renames)</span></label>
+        <select v-model="formUtility">
+          <option value="">None</option>
+          <option v-for="o in modelOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
+        </select>
+      </div>
+      <div class="form-row">
         <label>Max sub-agents</label>
         <select v-model.number="formMaxSubAgents">
           <option :value="1">1</option>
@@ -199,7 +213,7 @@ async function handleDelete(preset: AgentPreset) {
         <div class="preset-info">
           <span class="preset-name">{{ preset.displayName }}</span>
           <span class="preset-flow">
-            {{ preset.architect.model }} → {{ preset.coder.model }} · up to {{ preset.maxSubAgents }} sub-agent{{ preset.maxSubAgents === 1 ? '' : 's' }}
+            {{ preset.architect.model }} → {{ preset.coder.model }}<template v-if="preset.utility"> · utility: {{ preset.utility.model }}</template> · up to {{ preset.maxSubAgents }} sub-agent{{ preset.maxSubAgents === 1 ? '' : 's' }}
           </span>
         </div>
         <div class="preset-actions">
@@ -264,6 +278,11 @@ async function handleDelete(preset: AgentPreset) {
 .form-row label {
   font-size: 0.78rem;
   color: var(--muted);
+}
+
+.form-hint {
+  color: var(--faint);
+  font-weight: 400;
 }
 
 .form-row input,

@@ -63,28 +63,34 @@ export function groupMessages(messages: RunMessage[]): MessageGroup[] {
  * relying on adjacency. Two separate delegate_tasks calls are split anyway by
  * the architect's own messages sitting between them.
  */
+function isSubAgent(group: MessageGroup): boolean {
+  return group.message.agentRole === 'coder' || group.message.agentRole === 'utility';
+}
+
 function foldCoderGroups(flat: MessageGroup[]): MessageGroup[] {
   const result: MessageGroup[] = [];
   let i = 0;
   while (i < flat.length) {
-    if (flat[i].message.agentRole === 'coder') {
+    if (isSubAgent(flat[i])) {
       const block: MessageGroup[] = [];
-      while (i < flat.length && flat[i].message.agentRole === 'coder') {
+      while (i < flat.length && isSubAgent(flat[i])) {
         block.push(flat[i]);
         i++;
       }
 
-      // Partition the block into one bucket per sub-agent, keeping each
-      // sub-agent's messages in order and preserving first-appearance order.
+      // Partition the block into one bucket per sub-agent, keyed by role+name so
+      // coder and utility sub-agents never merge, keeping each in order and
+      // preserving first-appearance order.
       const buckets = new Map<string, MessageGroup[]>();
       for (const g of block) {
-        const key = g.message.agentName || 'coder';
+        const key = `${g.message.agentRole}:${g.message.agentName || ''}`;
         const bucket = buckets.get(key);
         if (bucket) bucket.push(g);
         else buckets.set(key, [g]);
       }
 
-      for (const [name, children] of buckets) {
+      for (const children of buckets.values()) {
+        const name = children[0].message.agentName;
         result.push({
           type: 'coder_group',
           id: `coder-${children[0].id}`,
@@ -92,7 +98,7 @@ function foldCoderGroups(flat: MessageGroup[]): MessageGroup[] {
           toolCalls: [],
           toolResponses: [],
           children,
-          title: name === 'coder' ? undefined : name
+          title: name || undefined
         });
       }
     } else {

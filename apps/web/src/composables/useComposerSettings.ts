@@ -78,12 +78,14 @@ export function useComposerSettings(
   });
 
   // Dual-model fields to attach to a run; empty object in single-model mode.
-  const agentRunFields = computed<{ coderProviderId?: string; coderModel?: string; agentPreset?: string }>(() => {
+  const agentRunFields = computed<{ coderProviderId?: string; coderModel?: string; utilityProviderId?: string; utilityModel?: string; agentPreset?: string }>(() => {
     if (!activePreset.value) return {};
     return {
       agentPreset: activePreset.value.id,
       coderProviderId: activePreset.value.coder.providerId,
-      coderModel: activePreset.value.coder.model
+      coderModel: activePreset.value.coder.model,
+      utilityProviderId: activePreset.value.utility?.providerId,
+      utilityModel: activePreset.value.utility?.model
     };
   });
 

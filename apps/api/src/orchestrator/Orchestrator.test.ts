@@ -532,6 +532,92 @@ test("Orchestrator Integration Tests", async (t) => {
     assert.strictEqual(savedMsgs[4].content, "All subtasks complete.");
   });
 
+  await t.test("Orchestrator - delegate_to_utility runs a utility sub-agent", async () => {
+    const registry = new ProviderRegistry(testConfigPath);
+    const runRepo = new RunRepository();
+    const messageRepo = new MessageRepository();
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository());
+
+    const runId = "run-test-utility";
+    const runData: Run = {
+      id: runId,
+      title: "Test Utility",
+      task: "Find a file then build",
+      status: "created",
+      providerId: "test-provider",
+      providerDisplayName: "Test Provider",
+      model: "model-1",
+      // Dual-model + utility tier, all on the same mock provider.
+      coderProviderId: "test-provider",
+      coderModel: "model-1",
+      utilityProviderId: "test-provider",
+      utilityModel: "model-1",
+      projectPath: process.cwd(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    runRepo.create(runData);
+
+    let callCount = 0;
+    globalThis.fetch = async (_url: any, _options: any) => {
+      callCount++;
+      if (callCount === 1) {
+        // Architect delegates one tiny lookup to the utility tier.
+        return {
+          ok: true,
+          json: async () => ({
+            choices: [{
+              message: {
+                role: "assistant",
+                content: "Let me locate it.",
+                tool_calls: [{
+                  id: "call_util_1",
+                  type: "function",
+                  function: {
+                    name: "delegate_to_utility",
+                    arguments: JSON.stringify({
+                      tasks: [{ title: "Locate config", instructions: "Where is config defined?" }]
+                    })
+                  }
+                }]
+              }
+            }]
+          })
+        } as any;
+      }
+      // Utility sub-agent (call 2) returns a short answer; architect final (call 3).
+      const text = callCount === 2 ? "It's at src/config.ts:10" : "Done.";
+      return {
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { role: "assistant", content: text } }]
+        })
+      } as any;
+    };
+
+    await orchestrator.run(runId);
+
+    const finishedRun = runRepo.getById(runId);
+    assert.strictEqual(finishedRun?.status, "done");
+
+    const savedMsgs = messageRepo.listByRunId(runId);
+    // architect tool call, utility sub-agent, utility tool result, architect final
+    assert.strictEqual(savedMsgs.length, 4);
+    assert.ok(savedMsgs[0].rawResponse?.includes("delegate_to_utility"));
+    assert.strictEqual(savedMsgs[1].agentRole, "utility");
+    assert.strictEqual(savedMsgs[1].agentName, "Locate config");
+    assert.strictEqual(savedMsgs[1].content, "It's at src/config.ts:10");
+    assert.strictEqual(savedMsgs[2].role, "tool");
+
+    const utilResult = JSON.parse(savedMsgs[2].content);
+    assert.strictEqual(utilResult.success, true);
+    assert.strictEqual(utilResult.results.length, 1);
+    assert.strictEqual(utilResult.results[0].summary, "It's at src/config.ts:10");
+
+    assert.strictEqual(savedMsgs[3].content, "Done.");
+  });
+
   await t.test("Orchestrator - plan mode blocks mutating/command tools even if the model calls them", async () => {
     const registry = new ProviderRegistry(testConfigPath);
     const runRepo = new RunRepository();
