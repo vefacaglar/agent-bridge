@@ -5,7 +5,7 @@ import { ProviderRegistry } from "../providers/ProviderRegistry.js";
 import { eventBus } from "./eventBus.js";
 import { db } from "../database/db.js";
 import { buildSystemPrompt, buildCoderSystemPrompt } from "./systemPrompt.js";
-import { WORKSPACE_TOOLS, UPDATE_PLAN_TOOL, DELEGATE_TASKS_TOOL, executeWorkspaceToolAsync, buildPermissionPreview, DANGEROUS_TOOLS, READONLY_TOOLS, permissionKey } from "./workspaceTools.js";
+import { WORKSPACE_TOOLS, UPDATE_PLAN_TOOL, DELEGATE_TASKS_TOOL, SET_TITLE_TOOL, executeWorkspaceToolAsync, buildPermissionPreview, DANGEROUS_TOOLS, READONLY_TOOLS, permissionKey } from "./workspaceTools.js";
 
 type PermissionDecision = "allow_once" | "allow_project" | "allow_always" | "deny";
 
@@ -282,7 +282,10 @@ export class Orchestrator {
       const baseTools = run.mode === "plan"
         ? [...WORKSPACE_TOOLS.filter(t => READONLY_TOOLS.has(t.function.name)), UPDATE_PLAN_TOOL]
         : [...WORKSPACE_TOOLS];
-      const tools = delegation ? [...baseTools, DELEGATE_TASKS_TOOL] : baseTools;
+      const withDelegate = delegation ? [...baseTools, DELEGATE_TASKS_TOOL] : baseTools;
+      // set_chat_title is available to the main agent in every mode (it only
+      // renames the run); coder sub-agents never get it.
+      const tools = [...withDelegate, SET_TITLE_TOOL];
 
       const systemPrompt = buildSystemPrompt(
         run.projectName,
@@ -539,6 +542,12 @@ export class Orchestrator {
       return this.executePlanUpdate(runId, toolCall);
     }
 
+    // set_chat_title only renames the run (no filesystem/network I/O), so it is
+    // allowed in every mode and runs silently without a permission prompt.
+    if (toolCall.function?.name === "set_chat_title") {
+      return this.executeSetTitle(runId, toolCall);
+    }
+
     // delegate_tasks fans out to coder sub-agents; the orchestrator runs their
     // loops itself (the sub-agents' own tool calls are gated normally).
     if (toolCall.function?.name === "delegate_tasks") {
@@ -570,6 +579,29 @@ export class Orchestrator {
       this.emitStatus(runId, "generating");
     }
     return executeWorkspaceToolAsync(run, toolCall);
+  }
+
+  /**
+   * Renames the run from the model's set_chat_title call and broadcasts the new
+   * title to the UI. Never throws — failures come back as a JSON error.
+   */
+  private executeSetTitle(runId: string, toolCall: any): string {
+    try {
+      const args = JSON.parse(toolCall.function.arguments || "{}");
+      let title = typeof args.title === "string" ? args.title.trim() : "";
+      // Strip wrapping quotes the model sometimes adds, and cap the length.
+      title = title.replace(/^["'`]+|["'`]+$/g, "").trim().slice(0, 80);
+      if (!title) {
+        return JSON.stringify({ success: false, error: "Title was empty." });
+      }
+
+      this.runRepo.update(runId, { title });
+      eventBus.emit(`run:${runId}`, { type: "run_title_changed", runId, title });
+
+      return JSON.stringify({ success: true, title });
+    } catch (err: any) {
+      return JSON.stringify({ success: false, error: err?.message ?? "Failed to set title." });
+    }
   }
 
   /**

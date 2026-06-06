@@ -292,6 +292,16 @@ executes tools through `executeWorkspaceToolAsync`.
 
 Do not add git integration or further network tools without an explicit request.
 
+### Session Title (`set_chat_title`)
+
+New runs are created titled `"New session…"` (see `routes/runs.ts`). The main
+agent is given a `set_chat_title(title)` tool in every mode (coder sub-agents are
+not); the system prompt asks it to call this once, early, with a short title in
+the user's language. Like `update_plan` it performs no filesystem/network I/O, so
+it runs silently (no permission prompt): `Orchestrator.executeSetTitle` updates
+the run via `RunRepository.update` and emits a `run_title_changed` SSE event,
+which the web client applies to the active run and the sidebar list live.
+
 ### Plan Panel (`update_plan`)
 
 In plan mode the orchestrator additionally advertises an `update_plan` tool:

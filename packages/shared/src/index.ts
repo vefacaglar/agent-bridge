@@ -142,6 +142,11 @@ export type RunEvent =
   | {
       type: "plan_updated";
       plan: Plan;
+    }
+  | {
+      type: "run_title_changed";
+      runId: string;
+      title: string;
     };
 
 // A single step the assistant tracks inside a plan.

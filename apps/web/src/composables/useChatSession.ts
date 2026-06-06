@@ -172,6 +172,12 @@ export function useChatSession(options: ChatSessionOptions) {
         currentPlan.value = data.plan;
       }
 
+      if (data.type === 'run_title_changed') {
+        if (activeRun.value?.id === runId) activeRun.value.title = data.title;
+        const run = runs.value.find(r => r.id === runId);
+        if (run) run.title = data.title;
+      }
+
       if (data.type === 'run_completed') {
         if (activeRun.value?.id === runId) updateRunStatus(runId, 'done');
         finishEventStream();

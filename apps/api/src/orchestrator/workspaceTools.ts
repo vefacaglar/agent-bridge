@@ -253,6 +253,29 @@ export const UPDATE_PLAN_TOOL = {
 };
 
 /**
+ * Lets the model name the chat session. Available in every mode; performs no
+ * filesystem/network I/O (it only renames the run), so it runs silently without
+ * a permission prompt. The orchestrator persists the title and broadcasts it.
+ */
+export const SET_TITLE_TOOL = {
+  type: "function" as const,
+  function: {
+    name: "set_chat_title",
+    description: "Set a short, descriptive title for THIS chat session (3-6 words, no quotes, in the user's language). Call this exactly once, as soon as the user's intent is clear (typically right after their first message). The session starts as \"New session…\"; replace it with a concise title that summarizes the task. Do not call it again unless the topic of the conversation fundamentally changes.",
+    parameters: {
+      type: "object",
+      properties: {
+        title: {
+          type: "string",
+          description: "A short, descriptive title for the session (3-6 words, no surrounding quotes)."
+        }
+      },
+      required: ["title"]
+    }
+  }
+};
+
+/**
  * Architect-only tool (dual-model runs). Lets the architect model delegate one
  * or more self-contained coding tasks to coder sub-agents running the configured
  * coder model. Performs no direct filesystem/network I/O itself — the orchestrator
