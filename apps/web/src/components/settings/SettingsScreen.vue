@@ -129,12 +129,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
                   <span class="breadcrumb-chat-title">{{ TABS.find(t => t.id === activeTab)?.label }}</span>
                 </div>
               </div>
-              <button class="settings-top-close-btn" @click="emit('close')" title="Close Settings">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18"></line>
-                  <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-              </button>
             </div>
           </header>
 
@@ -232,11 +226,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
 }
 
 .settings-sidebar-toggle-btn {
+  display: none;
   background: transparent;
   border: none;
   color: var(--muted);
   cursor: pointer;
-  display: flex;
   align-items: center;
   justify-content: center;
   width: 28px;
@@ -343,6 +337,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
   transform: translateX(-3px);
 }
 
+
+
+
 .settings-main {
   flex: 1;
   display: flex;
@@ -372,11 +369,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
 }
 
 .breadcrumb-project {
+  display: none;
   color: var(--muted);
   font-weight: 400;
 }
 
 .breadcrumb-separator {
+  display: none;
   margin: 0 8px;
   color: var(--faint);
   user-select: none;
@@ -386,24 +385,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
   font-weight: 600;
 }
 
-.settings-top-close-btn {
-  background: transparent;
-  border: none;
-  color: var(--muted);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  transition: all 0.2s ease;
-}
 
-.settings-top-close-btn:hover {
-  color: var(--text);
-  background: rgba(255, 255, 255, 0.06);
-}
 
 .settings-scroll-area {
   flex: 1;
@@ -586,6 +568,15 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
 
   .settings-scroll-area {
     padding: 16px;
+  }
+
+  .settings-sidebar-toggle-btn {
+    display: flex;
+  }
+
+  .breadcrumb-project,
+  .breadcrumb-separator {
+    display: inline;
   }
 }
 

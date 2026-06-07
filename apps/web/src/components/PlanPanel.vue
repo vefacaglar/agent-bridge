@@ -300,7 +300,7 @@ defineExpose({
           >
             <span class="plan-task-box" :class="task.status"></span>
             <span class="plan-task-text">{{ task.text }}</span>
-            <span class="plan-task-status" :class="task.status">{{ statusLabel(task.status) }}</span>
+            <span v-if="task.status !== 'completed'" class="plan-task-status" :class="task.status">{{ statusLabel(task.status) }}</span>
           </li>
         </ul>
 
