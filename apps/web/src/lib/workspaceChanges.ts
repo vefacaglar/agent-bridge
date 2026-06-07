@@ -211,6 +211,18 @@ export function collectWorkspaceChanges(messages: RunMessage[], projectPath?: st
     .sort((a, b) => normalizeChangePath(a.fullPath).localeCompare(normalizeChangePath(b.fullPath)));
 }
 
+export function hasWorkspaceChangeSignals(messages: RunMessage[]): boolean {
+  for (const message of messages) {
+    if (message.role !== 'assistant') continue;
+    const toolCalls = parseJson(message.rawResponse);
+    if (!Array.isArray(toolCalls)) continue;
+    if (toolCalls.some((toolCall: any) => CHANGE_TOOLS.has(toolCall?.function?.name))) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function changeDiffRows(change: WorkspaceChange): DiffRow[] {
   if (change.kind === 'edited' || change.kind === 'created') {
     return lineDiff(change.oldText, change.newText);

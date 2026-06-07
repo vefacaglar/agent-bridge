@@ -877,25 +877,10 @@ defineExpose({
 }
 
 .agent-role-badge {
-  font-size: 0.64rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 1px 6px;
-  border-radius: 5px;
+  font-size: 0.74rem;
+  font-style: italic;
+  color: var(--faint);
   flex-shrink: 0;
-}
-
-.agent-role-badge.coder {
-  background: rgba(160, 100, 240, 0.15);
-  color: #c090ff;
-  border: 1px solid rgba(160, 100, 240, 0.25);
-}
-
-.agent-role-badge.utility {
-  background: rgba(0, 180, 200, 0.15);
-  color: #50e4ff;
-  border: 1px solid rgba(0, 180, 200, 0.25);
 }
 
 .agent-sub-info {

@@ -58,6 +58,8 @@ export function useChatSession(options: ChatSessionOptions) {
   const pendingQuestionRequest = ref<any>(null);
 
   let eventSource: EventSource | null = null;
+  let pendingMessageFrame: number | null = null;
+  const pendingMessages = new Map<string, RunMessage>();
 
   const groupedMessages = computed<MessageGroup[]>(() => groupMessages(messages.value));
 
@@ -111,6 +113,7 @@ export function useChatSession(options: ChatSessionOptions) {
   async function selectRun(run: Run) {
     eventSource?.close();
     eventSource = null;
+    clearPendingMessageUpdates();
     clearMarkdownCache();
 
     activeRunId.value = run.id;
@@ -154,6 +157,7 @@ export function useChatSession(options: ChatSessionOptions) {
     // stream here; selecting it again later reconnects and reloads its history.
     eventSource?.close();
     eventSource = null;
+    clearPendingMessageUpdates();
     clearMarkdownCache();
 
     isRunning.value = false;
@@ -169,8 +173,46 @@ export function useChatSession(options: ChatSessionOptions) {
 
   // --- Live event stream ---------------------------------------------------
 
+  function flushPendingMessages() {
+    pendingMessageFrame = null;
+    if (pendingMessages.size === 0) return;
+
+    const updates = Array.from(pendingMessages.values());
+    pendingMessages.clear();
+
+    const next = messages.value.slice();
+    const indexById = new Map(next.map((message, index) => [message.id, index]));
+
+    for (const message of updates) {
+      const index = indexById.get(message.id);
+      if (index !== undefined) {
+        next[index] = message;
+      } else {
+        indexById.set(message.id, next.length);
+        next.push(message);
+      }
+    }
+
+    messages.value = next;
+  }
+
+  function queueMessageUpdate(message: RunMessage) {
+    pendingMessages.set(message.id, message);
+    if (pendingMessageFrame !== null) return;
+    pendingMessageFrame = requestAnimationFrame(flushPendingMessages);
+  }
+
+  function clearPendingMessageUpdates() {
+    if (pendingMessageFrame !== null) {
+      cancelAnimationFrame(pendingMessageFrame);
+      pendingMessageFrame = null;
+    }
+    pendingMessages.clear();
+  }
+
   function connectEventSource(runId: string) {
     eventSource?.close();
+    clearPendingMessageUpdates();
     eventSource = new EventSource(api.eventsUrl(runId));
 
     eventSource.onmessage = (event) => {
@@ -204,18 +246,11 @@ export function useChatSession(options: ChatSessionOptions) {
       }
 
       if (data.type === 'message_created' && activeRun.value?.id === runId) {
-        if (!messages.value.some(m => m.id === data.message.id)) {
-          messages.value.push(data.message);
-        }
+        queueMessageUpdate(data.message);
       }
 
       if (data.type === 'message_updated' && activeRun.value?.id === runId) {
-        const index = messages.value.findIndex(m => m.id === data.message.id);
-        if (index !== -1) {
-          messages.value[index] = data.message;
-        } else {
-          messages.value.push(data.message);
-        }
+        queueMessageUpdate(data.message);
       }
 
       if (data.type === 'plan_updated' && activeRun.value?.id === runId) {
@@ -252,6 +287,7 @@ export function useChatSession(options: ChatSessionOptions) {
   }
 
   function finishEventStream(options: { sendQueuedMessage?: boolean } = {}) {
+    flushPendingMessages();
     eventSource?.close();
     eventSource = null;
     isRunning.value = false;

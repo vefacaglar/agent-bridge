@@ -65,6 +65,14 @@ export function groupMessages(messages: RunMessage[]): MessageGroup[] {
 }
 
 export function collectAgentSummaries(groups: MessageGroup[], isRunning: boolean): AgentSummary[] {
+  return collectAgentSummariesInternal(groups, isRunning, true);
+}
+
+export function collectAgentSummaryLinks(groups: MessageGroup[], isRunning: boolean): AgentSummary[] {
+  return collectAgentSummariesInternal(groups, isRunning, false);
+}
+
+function collectAgentSummariesInternal(groups: MessageGroup[], isRunning: boolean, includeChildren: boolean): AgentSummary[] {
   const lastNonCoderIdx = lastNonCoderIndex(groups);
   return groups
     .map((group, index) => ({ group, index }))
@@ -87,7 +95,7 @@ export function collectAgentSummaries(groups: MessageGroup[], isRunning: boolean
           if (child.type !== 'tool_group') return sum;
           return sum + Math.max(child.toolCalls.length, 1);
         }, 0),
-        children
+        children: includeChildren ? children : undefined
       };
     });
 }

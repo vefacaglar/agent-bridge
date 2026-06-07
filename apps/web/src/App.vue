@@ -8,8 +8,8 @@ import AddProjectModal from './components/AddProjectModal.vue';
 import SettingsScreen from './components/settings/SettingsScreen.vue';
 import AgentTaskList from './components/AgentTaskList.vue';
 import PlanPanel from './components/PlanPanel.vue';
-import { collectWorkspaceChanges } from './lib/workspaceChanges';
-import { collectAgentSummaries } from './lib/messageGroups';
+import { collectWorkspaceChanges, hasWorkspaceChangeSignals } from './lib/workspaceChanges';
+import { collectAgentSummaries, collectAgentSummaryLinks } from './lib/messageGroups';
 
 const {
   runs,
@@ -126,16 +126,21 @@ const currentTaskList = computed<string | null>(() => {
   return null;
 });
 
-const workspaceChanges = computed(() => collectWorkspaceChanges(messages.value, activeRun.value?.projectPath));
-const agentSummaries = computed(() => collectAgentSummaries(groupedMessages.value, isRunning.value));
-
 // The side panel mirrors Codex / Claude desktop: it opens automatically as soon
 // as the assistant creates a plan, edits workspace files, or starts sub-agents.
 // Closing it collapses every panel tab until the user re-opens a thread link or
 // switches chats.
 const sidePanelCollapsed = ref(localStorage.getItem('sidePanelCollapsed') === 'true');
+const agentSummaryLinks = computed(() => collectAgentSummaryLinks(groupedMessages.value, isRunning.value));
+const hasWorkspaceChanges = computed(() => hasWorkspaceChangeSignals(messages.value));
+const workspaceChanges = computed(() =>
+  sidePanelOpen.value ? collectWorkspaceChanges(messages.value, activeRun.value?.projectPath) : []
+);
+const agentSummaries = computed(() =>
+  sidePanelOpen.value ? collectAgentSummaries(groupedMessages.value, isRunning.value) : []
+);
 const hasSidePanelContent = computed(() =>
-  !!currentPlan.value || workspaceChanges.value.length > 0 || agentSummaries.value.length > 0
+  !!currentPlan.value || hasWorkspaceChanges.value || agentSummaryLinks.value.length > 0
 );
 const sidePanelOpen = computed(() =>
   hasSidePanelContent.value && !sidePanelCollapsed.value
@@ -397,7 +402,7 @@ onUnmounted(() => {
             :is-running="isRunning"
             :plan="currentPlan"
             :plan-panel-open="sidePanelOpen"
-            :agent-summaries="agentSummaries"
+            :agent-summaries="agentSummaryLinks"
             @open-plan="openPlan"
             @open-agents="openAgents"
             @view-agent="openAgentTranscript"
@@ -476,8 +481,7 @@ onUnmounted(() => {
 
     <PlanPanel
       ref="planPanelRef"
-      v-if="hasSidePanelContent"
-      :class="{ collapsed: !sidePanelOpen }"
+      v-if="sidePanelOpen"
       :isOpen="sidePanelOpen"
       :plan="currentPlan"
       :changes="workspaceChanges"

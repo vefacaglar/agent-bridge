@@ -4,6 +4,7 @@ import { RunRepository, MessageRepository, PlanRepository, MemoryRepository } fr
 import { ProviderRegistry } from "../providers/ProviderRegistry.js";
 import { eventBus } from "./eventBus.js";
 import { appendFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { db } from "../database/db.js";
 import { buildSystemPrompt, buildCoderSystemPrompt, buildUtilitySystemPrompt, formatMemoryContext } from "./systemPrompt.js";
 import { WORKSPACE_TOOLS, UPDATE_PLAN_TOOL, DELEGATE_TASKS_TOOL, DELEGATE_UTILITY_TOOL, UTILITY_TOOLS, SET_TITLE_TOOL, ASK_QUESTION_TOOL, REMEMBER_TOOL, executeWorkspaceToolAsync, buildPermissionPreview, DANGEROUS_TOOLS, READONLY_TOOLS, MODIFYING_TOOLS, permissionKey, commandEscapesWorkspace } from "./workspaceTools.js";
@@ -30,6 +31,16 @@ interface SubAgentTier {
 
 function randomId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+}
+
+function usageLogPath(): string | null {
+  if (process.env.LOCAGENS_USAGE_LOG_PATH) {
+    return resolve(process.env.LOCAGENS_USAGE_LOG_PATH);
+  }
+  if (process.env.LOCAGENS_DB_PATH) {
+    return join(dirname(resolve(process.env.LOCAGENS_DB_PATH)), "usage.log");
+  }
+  return null;
 }
 
 export class Orchestrator {
@@ -669,7 +680,8 @@ export class Orchestrator {
         // Also append to a local log file so token/cache usage can be inspected
         // after the fact (the console stream is otherwise lost in the dev terminal).
         try {
-          appendFileSync("usage.log", line + "\n");
+          const logPath = usageLogPath();
+          if (logPath) appendFileSync(logPath, line + "\n");
         } catch {
           // Best-effort only; never let logging break a run.
         }

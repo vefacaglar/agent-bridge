@@ -65,7 +65,9 @@ function isAtBottom(el: HTMLElement, threshold = 60) {
   return el.scrollHeight - el.scrollTop - el.clientHeight <= threshold;
 }
 
-watch(() => props.children.map(c => c.message.content + (c.message.reasoningContent ?? '')).join(''), () => {
+watch(() => props.children.map(c =>
+  `${c.id}:${c.message.content.length}:${c.message.reasoningContent?.length ?? 0}`
+).join('|'), () => {
   if (!props.active || !expanded.value || !bodyEl.value) return;
 
   const wasAtBottom = isAtBottom(bodyEl.value);
