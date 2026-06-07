@@ -953,13 +953,11 @@ export class Orchestrator {
     }
 
     const isDangerous = DANGEROUS_TOOLS.has(toolCall.function?.name);
-    // run_command / fetch_url ALWAYS require approval — even in Full Access mode.
-    // These are the only tools that can reach outside the project folder (a shell
-    // command or a network request), so they stay gated regardless of mode; a
-    // matching standing grant still lets them run silently. Full Access only drops
-    // prompts for ordinary in-workspace file edits, NOT for commands/network.
-    // Other tools gate only in ask_permissions mode.
-    const mustGate = isDangerous || run.mode === "ask_permissions";
+    // run_command / fetch_url require approval in most modes — but NOT in Full
+    // Access mode, where the user has explicitly opted in to autonomous operation
+    // with no interruptions. A matching standing grant also lets them run silently
+    // in any mode. Other tools gate only in ask_permissions mode.
+    const mustGate = run.mode !== "full_access" && (isDangerous || run.mode === "ask_permissions");
     const needsPermission = mustGate && !this.checkPermission(run, toolCall);
 
     if (needsPermission) {
