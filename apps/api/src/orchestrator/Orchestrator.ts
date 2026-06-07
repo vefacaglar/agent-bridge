@@ -50,6 +50,13 @@ export class Orchestrator {
     questions: UserQuestion[];
   }>();
 
+  // Throttles high-frequency SQLite writes during live message token streaming
+  private pendingMessageDbUpdates = new Map<string, {
+    msg: RunMessage;
+    lastWriteTime: number;
+    timer: NodeJS.Timeout | null;
+  }>();
+
   constructor(
     private runRepo: RunRepository,
     private messageRepo: MessageRepository,
@@ -209,17 +216,63 @@ export class Orchestrator {
   }
 
   private updateMessage(runId: string, msg: RunMessage) {
-    this.messageRepo.update(msg.id, {
-      content: msg.content,
-      reasoningContent: msg.reasoningContent,
-      rawResponse: msg.rawResponse
-    });
+    this.scheduleMessageDbUpdate(msg);
     eventBus.emit(`run:${runId}`, { type: "message_updated", message: msg });
+  }
+
+  private scheduleMessageDbUpdate(msg: RunMessage) {
+    const now = Date.now();
+    const existing = this.pendingMessageDbUpdates.get(msg.id);
+
+    if (existing) {
+      existing.msg = msg;
+      if (!existing.timer) {
+        const elapsed = now - existing.lastWriteTime;
+        const delay = Math.max(0, 1000 - elapsed);
+        existing.timer = setTimeout(() => this.flushMessageDbUpdate(msg.id), delay);
+      }
+    } else {
+      // First update for this message: write immediately
+      this.messageRepo.update(msg.id, {
+        content: msg.content,
+        reasoningContent: msg.reasoningContent,
+        rawResponse: msg.rawResponse
+      });
+      this.pendingMessageDbUpdates.set(msg.id, {
+        msg,
+        lastWriteTime: now,
+        timer: null
+      });
+    }
+  }
+
+  private flushMessageDbUpdate(msgId: string) {
+    const entry = this.pendingMessageDbUpdates.get(msgId);
+    if (!entry) return;
+
+    if (entry.timer) {
+      clearTimeout(entry.timer);
+      entry.timer = null;
+    }
+
+    this.messageRepo.update(msgId, {
+      content: entry.msg.content,
+      reasoningContent: entry.msg.reasoningContent,
+      rawResponse: entry.msg.rawResponse
+    });
+    this.pendingMessageDbUpdates.delete(msgId);
+  }
+
+  private flushAllPendingDbUpdates() {
+    for (const msgId of this.pendingMessageDbUpdates.keys()) {
+      this.flushMessageDbUpdate(msgId);
+    }
   }
 
   // --- Run lifecycle -------------------------------------------------------
 
   cancel(runId: string): boolean {
+    this.flushAllPendingDbUpdates();
     // Unblock any pending permission promise so the run loop can unwind.
     const pending = this.pendingPermissions.get(runId);
     if (pending) {
@@ -492,6 +545,7 @@ export class Orchestrator {
         eventBus.emit(`run:${runId}`, { type: "run_failed", errorMessage: error.message });
       }
     } finally {
+      this.flushAllPendingDbUpdates();
       this.activeRuns.delete(runId);
       this.permissionChain.delete(runId);
       this.pendingQuestions.delete(runId);
@@ -575,6 +629,7 @@ export class Orchestrator {
       });
 
       checkCancelled();
+      this.flushMessageDbUpdate(msgId);
 
       // Prompt-cache measurement: one line per model call so cache hit-rate is
       // observable live in the server console during a run. inputTokens is the
