@@ -99,88 +99,88 @@ function handleClick(event: MouseEvent) {
 
 /* Primary: Solid White High Contrast */
 .btn-primary {
-  background: #ffffff;
-  color: #000000;
-  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.08);
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-color);
+  box-shadow: 0 4px 12px var(--btn-primary-shadow);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: #f0f0f0;
+  background: var(--btn-primary-hover-bg);
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(255, 255, 255, 0.12);
+  box-shadow: 0 6px 16px var(--btn-primary-hover-shadow);
 }
 
 .btn-primary:active:not(:disabled) {
-  background: #d8d8d8;
+  background: var(--btn-primary-active-bg);
   transform: translateY(0);
 }
 
 /* Secondary: Premium Sleek Dark Gray */
 .btn-secondary {
-  background: #2a2a2e;
-  color: #e0e0e0;
-  border: 1px solid rgba(255, 255, 255, 0.04) !important;
+  background: var(--btn-secondary-bg);
+  color: var(--btn-secondary-color);
+  border: 1px solid var(--btn-secondary-border) !important;
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: #35353a;
-  color: #ffffff;
+  background: var(--btn-secondary-hover-bg);
+  color: var(--btn-secondary-hover-color);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
-  border-color: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 4px 12px var(--btn-secondary-shadow);
+  border-color: var(--btn-secondary-hover-border) !important;
 }
 
 .btn-secondary:active:not(:disabled) {
-  background: #202024;
+  background: var(--btn-secondary-active-bg);
   transform: translateY(0);
 }
 
 /* Danger: Soft Red Glow */
 .btn-danger {
-  background: rgba(255, 107, 107, 0.16);
-  color: #ff8a80;
-  border: 1px solid rgba(255, 107, 107, 0.1) !important;
+  background: var(--btn-danger-bg);
+  color: var(--btn-danger-color);
+  border: 1px solid var(--btn-danger-border) !important;
 }
 
 .btn-danger:hover:not(:disabled) {
-  background: rgba(255, 107, 107, 0.24);
-  color: #ff6b6b;
+  background: var(--btn-danger-hover-bg);
+  color: var(--btn-danger-hover-color);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(255, 107, 107, 0.1);
-  border-color: rgba(255, 107, 107, 0.2) !important;
+  box-shadow: 0 4px 12px var(--btn-danger-shadow);
+  border-color: var(--btn-danger-hover-border) !important;
 }
 
 .btn-danger:active:not(:disabled) {
-  background: rgba(255, 107, 107, 0.12);
+  background: var(--btn-danger-active-bg);
   transform: translateY(0);
 }
 
 /* Chip: Small Rounded Option Pill */
 .btn-chip {
-  background: #202024;
-  color: #a0a0a5;
+  background: var(--btn-chip-bg);
+  color: var(--btn-chip-color);
   border-radius: 999px !important;
-  border: 1px solid rgba(255, 255, 255, 0.02) !important;
+  border: 1px solid var(--btn-chip-border) !important;
 }
 
 .btn-chip:hover:not(:disabled) {
-  background: #2a2a2e;
-  color: #d0d0d5;
-  border-color: rgba(255, 255, 255, 0.08) !important;
+  background: var(--btn-chip-hover-bg);
+  color: var(--btn-chip-hover-color);
+  border-color: var(--btn-chip-hover-border) !important;
 }
 
 .btn-chip.btn-active {
-  background: #ffffff;
-  color: #000000;
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-color);
   font-weight: 600;
-  border-color: #ffffff !important;
-  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.08);
+  border-color: var(--btn-primary-bg) !important;
+  box-shadow: 0 4px 12px var(--btn-primary-shadow);
 }
 
 .btn-chip.btn-active:hover:not(:disabled) {
-  background: #f0f0f0;
-  color: #000000;
-  border-color: #f0f0f0 !important;
+  background: var(--btn-primary-hover-bg);
+  color: var(--btn-primary-color);
+  border-color: var(--btn-primary-hover-bg) !important;
 }
 
 /* DISABLED STATE */

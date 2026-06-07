@@ -742,7 +742,7 @@ function formatToolResult(name: string, contentJson: string): string {
 
 .plan-tool-card:hover {
   border-color: transparent;
-  background: #2c2c31;
+  background: var(--plan-card-hover-bg);
 }
 
 .plan-tool-head {
@@ -832,7 +832,7 @@ function formatToolResult(name: string, contentJson: string): string {
 
 .tool-thought-body {
   margin-bottom: 12px;
-  color: #deded8;
+  color: var(--msg-thought-text);
   line-height: 1.6;
 }
 
@@ -1053,7 +1053,7 @@ function formatToolResult(name: string, contentJson: string): string {
 
 .tool-running-shimmer {
   height: 24px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--plan-task-hover-bg);
   border-radius: 4px;
   overflow: hidden;
   position: relative;
@@ -1065,7 +1065,7 @@ function formatToolResult(name: string, contentJson: string): string {
   width: 100%;
   height: 100%;
   transform: translateX(-100%);
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+  background: linear-gradient(90deg, transparent, var(--shimmer-glow), transparent);
   animation: toolShimmer 1.5s infinite;
 }
 

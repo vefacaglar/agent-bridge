@@ -240,7 +240,7 @@ function onDeleteProject(path: string, event: Event) {
   width: 28px;
   height: 28px;
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--panel-close-bg);
   color: var(--muted);
   cursor: pointer;
   transition: all 0.2s ease;
@@ -249,7 +249,7 @@ function onDeleteProject(path: string, event: Event) {
 
 .search-btn:hover,
 .collapse-btn:hover {
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--panel-close-hover-bg);
   color: var(--text);
 }
 
@@ -326,7 +326,7 @@ function onDeleteProject(path: string, event: Event) {
 }
 
 .project-header:hover {
-  background: rgba(255, 255, 255, 0.045);
+  background: var(--nav-action-hover-bg);
   color: var(--text);
 }
 
@@ -423,6 +423,6 @@ function onDeleteProject(path: string, event: Event) {
 
 .load-more-btn:hover {
   color: var(--muted);
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--sidebar-load-more-hover);
 }
 </style>

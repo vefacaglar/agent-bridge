@@ -199,7 +199,7 @@ const projectPermissionsGroups = computed(() => {
 }
 
 .perm-accordion-item {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid var(--perm-group-border);
   padding: 8px 0;
 }
 
@@ -219,7 +219,7 @@ const projectPermissionsGroups = computed(() => {
 }
 
 .perm-accordion-header:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--perm-header-hover-bg);
 }
 
 .perm-accordion-arrow {
@@ -271,7 +271,7 @@ const projectPermissionsGroups = computed(() => {
 
 .perm-accordion-content {
   padding: 10px 12px 10px 20px;
-  background: rgba(255, 255, 255, 0.01);
+  background: var(--perm-content-bg);
   border-radius: 6px;
   margin-top: 4px;
 }
@@ -303,10 +303,10 @@ const projectPermissionsGroups = computed(() => {
 
 .perm-detail-code {
   font-family: monospace;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--perm-code-bg);
   padding: 2px 6px;
   border-radius: 4px;
-  color: #ff8a80;
+  color: var(--perm-code-color);
   word-break: break-all;
 }
 

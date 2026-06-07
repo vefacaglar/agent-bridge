@@ -288,7 +288,7 @@ const formattedElapsedTime = computed(() => {
           title="Copy message"
           @click.stop="copyTextWithStatus(activeRun?.task || '', activeRun?.id || '')"
         >
-          <svg v-if="copiedMessageId === activeRun?.id" class="check-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7bd88f" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <svg v-if="copiedMessageId === activeRun?.id" class="check-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M20 6 9 17l-5-5"/>
           </svg>
           <svg v-else class="copy-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -354,7 +354,7 @@ const formattedElapsedTime = computed(() => {
             title="Copy message"
             @click.stop="copyTextWithStatus(group.message.content, group.message.id)"
           >
-            <svg v-if="copiedMessageId === group.message.id" class="check-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7bd88f" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <svg v-if="copiedMessageId === group.message.id" class="check-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <path d="M20 6 9 17l-5-5"/>
             </svg>
             <svg v-else class="copy-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -469,7 +469,7 @@ const formattedElapsedTime = computed(() => {
             title="Copy entire response"
             @click="copyTextWithStatus(group.message.content, group.message.id)"
           >
-            <svg v-if="copiedMessageId === group.message.id" class="check-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7bd88f" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <svg v-if="copiedMessageId === group.message.id" class="check-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <path d="M20 6 9 17l-5-5"/>
             </svg>
             <svg v-else class="copy-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -667,13 +667,13 @@ const formattedElapsedTime = computed(() => {
   border-radius: 8px;
   overflow: hidden;
   font-family: 'Fira Code', 'Courier New', monospace;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 4px 15px var(--btn-secondary-shadow);
   transition: border-color 0.2s ease;
 }
 
 .plan-terminal-container:hover,
 .thinking-terminal-container:hover {
-  border-color: #3f3f4a;
+  border-color: var(--msg-container-border);
 }
 
 .terminal-header {
@@ -699,7 +699,7 @@ const formattedElapsedTime = computed(() => {
 }
 
 .terminal-title {
-  color: #a6a6a0;
+  color: var(--msg-metadata-color);
   font-size: 0.8rem;
   font-weight: 500;
 }
@@ -753,13 +753,13 @@ const formattedElapsedTime = computed(() => {
 }
 
 .log-timestamp {
-  color: #55555d;
+  color: var(--msg-copy-btn);
   flex-shrink: 0;
   user-select: none;
 }
 
 .log-prompt {
-  color: #7bd88f;
+  color: var(--msg-success-stroke);
   flex-shrink: 0;
   user-select: none;
 }
@@ -769,19 +769,19 @@ const formattedElapsedTime = computed(() => {
 }
 
 .log-text.info {
-  color: #deded8;
+  color: var(--msg-thought-text);
 }
 
 .log-text.success {
-  color: #7bd88f;
+  color: var(--msg-success-stroke);
 }
 
 .log-text.warning {
-  color: #ffd18a;
+  color: var(--msg-warning-text);
 }
 
 .log-text.danger {
-  color: #ff8a80;
+  color: var(--msg-danger-text);
 }
 
 .terminal-cursor-line {
@@ -791,7 +791,7 @@ const formattedElapsedTime = computed(() => {
 }
 
 .terminal-cursor {
-  color: #7bd88f;
+  color: var(--msg-success-stroke);
   animation: blink 1s infinite step-end;
 }
 
@@ -824,10 +824,10 @@ const formattedElapsedTime = computed(() => {
   padding: 14px 16px;
   border: none;
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--user-bubble-bg);
   box-shadow:
-    0 12px 32px rgba(0, 0, 0, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    0 12px 32px var(--user-bubble-shadow-color),
+    inset 0 1px 0 var(--user-bubble-border);
   transition: background 0.2s ease, max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease;
   overflow: hidden;
   position: relative;
@@ -838,22 +838,22 @@ const formattedElapsedTime = computed(() => {
 }
 
 .user-bubble.is-expandable.is-collapsed:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--user-bubble-hover-bg);
 }
 
 .user-bubble.is-collapsed.is-expandable {
   max-height: 6.5rem;
   box-shadow:
-    0 12px 32px rgba(0, 0, 0, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    inset 0 -36px 36px -18px rgba(20, 20, 22, 0.98);
+    0 12px 32px var(--user-bubble-shadow-color),
+    inset 0 1px 0 var(--user-bubble-border),
+    inset 0 -36px 36px -18px var(--user-bubble-fade-color);
 }
 
 .user-bubble.is-expanded.is-expandable {
   max-height: 2000px;
   box-shadow:
-    0 12px 32px rgba(0, 0, 0, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    0 12px 32px var(--user-bubble-shadow-color),
+    inset 0 1px 0 var(--user-bubble-border);
 }
 
 .user-message-container {
@@ -901,7 +901,7 @@ const formattedElapsedTime = computed(() => {
 .user-markdown-body :deep(img):hover {
   transform: scale(1.05);
   border-color: var(--planner);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 12px var(--user-bubble-shadow-color);
 }
 
 /* Lightbox Modal */
@@ -911,7 +911,7 @@ const formattedElapsedTime = computed(() => {
   left: 0;
   width: 100vw;
   height: 100vh;
-  background: rgba(10, 10, 12, 0.85);
+  background: var(--lightbox-overlay-bg);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   display: flex;
@@ -935,8 +935,8 @@ const formattedElapsedTime = computed(() => {
   max-height: 90vh;
   object-fit: contain;
   border-radius: 12px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 20px 50px var(--lightbox-image-shadow);
+  border: 1px solid var(--lightbox-image-border);
   cursor: default;
   user-select: none;
 }
@@ -945,8 +945,8 @@ const formattedElapsedTime = computed(() => {
   position: absolute;
   top: -40px;
   right: -40px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: var(--lightbox-close-btn-bg);
+  border: 1px solid var(--lightbox-close-btn-border);
   color: var(--text);
   border-radius: 50%;
   width: 36px;
@@ -959,7 +959,7 @@ const formattedElapsedTime = computed(() => {
 }
 
 .lightbox-close-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--lightbox-close-btn-hover-bg);
   transform: scale(1.1);
 }
 
@@ -968,8 +968,8 @@ const formattedElapsedTime = computed(() => {
   .lightbox-close-btn {
     top: 10px;
     right: 10px;
-    background: rgba(0, 0, 0, 0.5);
-    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: var(--lightbox-close-btn-mobile-bg);
+    border: 1px solid var(--lightbox-close-btn-mobile-border);
   }
 }
 
@@ -1062,12 +1062,12 @@ const formattedElapsedTime = computed(() => {
 }
 
 .assistant-message {
-  color: rgba(227, 227, 226, 0.9);
+  color: var(--assistant-msg-color);
   line-height: 1.65;
 }
 
 .assistant-meta {
-  color: rgba(117, 117, 116, 0.84);
+  color: var(--assistant-meta-color);
 }
 
 .coder-shortcut-row {
@@ -1108,4 +1108,7 @@ const formattedElapsedTime = computed(() => {
   margin: 6px 0;
 }
 
+.check-icon {
+  stroke: var(--msg-success-stroke);
+}
 </style>

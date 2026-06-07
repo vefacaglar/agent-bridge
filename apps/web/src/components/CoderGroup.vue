@@ -224,7 +224,7 @@ watch(expanded, (isExpanded) => {
 
 .coder-group-toggle:hover {
   color: var(--text);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--perm-code-bg);
 }
 
 .coder-group-body {
@@ -236,7 +236,7 @@ watch(expanded, (isExpanded) => {
 }
 
 .coder-text {
-  color: #deded8;
+  color: var(--msg-thought-text);
   line-height: 1.6;
   font-size: 0.9rem;
   margin: 8px 0;

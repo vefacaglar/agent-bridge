@@ -172,7 +172,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeyDown, true));
   padding: 14px;
   z-index: 1;
   pointer-events: auto;
-  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 14px 36px var(--permission-card-shadow);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -227,11 +227,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeyDown, true));
 }
 
 .cc-diff-row.add {
-  background: rgba(123, 216, 143, 0.16);
+  background: var(--permission-card-allow-bg);
 }
 
 .cc-diff-row.del {
-  background: rgba(255, 138, 128, 0.16);
+  background: var(--permission-card-deny-bg);
 }
 
 .cc-diff-gutter {

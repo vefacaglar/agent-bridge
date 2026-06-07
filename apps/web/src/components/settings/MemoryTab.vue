@@ -332,7 +332,7 @@ function submitAdd() {
   gap: 12px;
   padding: 10px 0;
   background: transparent;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid var(--memory-item-border);
 }
 
 .mem-item.editing {
@@ -414,10 +414,10 @@ function submitAdd() {
 }
 
 .mem-action-text-btn.delete {
-  color: rgba(255, 107, 107, 0.7);
+  color: var(--memory-delete-hover);
 }
 
 .mem-action-text-btn.delete:hover {
-  color: #ff6b6b;
+  color: var(--memory-delete-hover-solid);
 }
 </style>

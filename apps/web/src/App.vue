@@ -638,7 +638,7 @@ onUnmounted(() => {
 }
 
 .breadcrumb-project {
-  color: rgba(164, 164, 162, 0.82);
+  color: var(--breadcrumb-project-color);
   font-weight: 400;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -687,13 +687,13 @@ onUnmounted(() => {
 }
 
 .dialog-icon-wrap.confirm {
-  background: rgba(94, 162, 235, 0.12);
-  color: #5ea2eb;
+  background: var(--dialog-confirm-icon-bg);
+  color: var(--dialog-confirm-icon-color);
 }
 
 .dialog-icon-wrap.alert {
-  background: rgba(255, 170, 0, 0.12);
-  color: #ffaa00;
+  background: var(--dialog-alert-icon-bg);
+  color: var(--dialog-alert-icon-color);
 }
 
 .dialog-message {

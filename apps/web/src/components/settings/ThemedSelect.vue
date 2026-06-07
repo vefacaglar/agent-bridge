@@ -127,7 +127,7 @@ onBeforeUnmount(() => {
   background: var(--control-bg);
   border: 1px solid var(--control-border);
   border-radius: 10px;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 12px 30px var(--composer-dropdown-shadow);
 }
 
 .themed-select-option {

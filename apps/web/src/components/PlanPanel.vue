@@ -515,7 +515,7 @@ defineExpose({
 
 .panel-resize-handle:hover,
 .panel-resize-handle:active {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--panel-resize-hover);
   border-left: 1px solid var(--border-soft);
 }
 
@@ -588,7 +588,7 @@ defineExpose({
   padding: 5px 10px;
   border: 1px solid transparent;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.015);
+  background: var(--panel-tab-bg);
   color: var(--muted);
   font-size: 0.82rem;
   cursor: pointer;
@@ -602,8 +602,8 @@ defineExpose({
 
 .panel-tab:hover,
 .panel-tab.active {
-  background: rgba(255, 255, 255, 0.055);
-  border-color: rgba(255, 255, 255, 0.11);
+  background: var(--panel-tab-hover-bg);
+  border-color: var(--panel-tab-hover-border);
   color: var(--text);
 }
 
@@ -631,7 +631,7 @@ defineExpose({
   justify-content: center;
   width: 28px;
   height: 28px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--panel-close-bg);
   border: none;
   border-radius: 6px;
   color: var(--muted);
@@ -642,7 +642,7 @@ defineExpose({
 
 .workspace-panel-close:hover {
   color: var(--text);
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--panel-close-hover-bg);
 }
 
 .workspace-panel-body {
@@ -685,11 +685,11 @@ defineExpose({
 }
 
 .add {
-  color: #7bd88f;
+  color: var(--msg-success-stroke);
 }
 
 .del {
-  color: #e06c75;
+  color: var(--plan-del-color);
 }
 
 .change-list {
@@ -706,7 +706,7 @@ defineExpose({
 
 .agent-row {
   padding: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--agent-row-border);
   border-radius: 10px;
   background: transparent;
   box-shadow: none;
@@ -714,7 +714,7 @@ defineExpose({
 }
 
 .agent-row:hover {
-  border-color: rgba(255, 255, 255, 0.08);
+  border-color: var(--settings-card-border);
   background: transparent;
 }
 
@@ -722,11 +722,11 @@ defineExpose({
    clearly "inside" it rather than spilling onto the flat panel. */
 .agent-row.expanded {
   background: transparent;
-  border-color: rgba(255, 255, 255, 0.06);
+  border-color: var(--settings-sidebar-border);
 }
 
 .agent-row.running {
-  border-color: rgba(150, 167, 143, 0.15);
+  border-color: var(--agent-row-running-border);
 }
 
 .agent-row-main {
@@ -746,13 +746,13 @@ defineExpose({
 }
 
 .agent-status-dot.running {
-  background: #5ea2eb;
-  box-shadow: 0 0 0 4px rgba(94, 162, 235, 0.12);
+  background: var(--dialog-confirm-icon-color);
+  box-shadow: 0 0 0 4px var(--dialog-confirm-icon-bg);
 }
 
 .agent-status-dot.done {
-  background: #9fb99f;
-  box-shadow: 0 0 0 4px rgba(159, 185, 159, 0.1);
+  background: var(--agent-status-done-bg);
+  box-shadow: 0 0 0 4px var(--agent-status-done-shadow);
 }
 
 .agent-row-text {
@@ -876,11 +876,11 @@ defineExpose({
 }
 
 .diff-row.add {
-  background: rgba(123, 216, 143, 0.12);
+  background: var(--diff-add-bg);
 }
 
 .diff-row.del {
-  background: rgba(224, 108, 117, 0.13);
+  background: var(--diff-del-bg);
 }
 
 .diff-line,
@@ -889,7 +889,7 @@ defineExpose({
   user-select: none;
   text-align: right;
   padding: 3px 6px;
-  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  border-right: 1px solid var(--composer-menu-border);
 }
 
 .diff-mark {
@@ -1038,15 +1038,15 @@ defineExpose({
 }
 
 .plan-task:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--plan-task-hover-bg);
 }
 
 .plan-task.in_progress {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--plan-task-hover-bg);
 }
 
 .plan-task.in_progress:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--plan-task-progress-hover-bg);
 }
 
 .plan-task-box {
@@ -1145,7 +1145,7 @@ defineExpose({
 }
 
 .coder-text {
-  color: #deded8;
+  color: var(--msg-thought-text);
   line-height: 1.6;
   font-size: 0.88rem;
   margin: 8px 0;

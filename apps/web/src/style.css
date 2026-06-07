@@ -57,6 +57,221 @@
      their content edges share a vertical line. The middle reading column keeps
      its own wider gutter on purpose. */
   --card-pad-x: 16px;
+
+  /* Dialogs & Alerts (App.vue) */
+  --dialog-confirm-icon-bg: rgba(94, 162, 235, 0.12);
+  --dialog-confirm-icon-color: #5ea2eb;
+  --dialog-alert-icon-bg: rgba(255, 170, 0, 0.12);
+  --dialog-alert-icon-color: #ffaa00;
+
+  /* Accordions & Permissions (PermissionsTab.vue) */
+  --perm-group-border: rgba(255, 255, 255, 0.04);
+  --perm-header-hover-bg: rgba(255, 255, 255, 0.04);
+  --perm-content-bg: rgba(255, 255, 255, 0.01);
+  --perm-code-bg: rgba(255, 255, 255, 0.04);
+  --perm-code-color: #ff8a80;
+
+  /* Messages & Thread (MessageThread.vue) */
+  --msg-container-border: #3f3f4a;
+  --msg-metadata-color: #a6a6a0;
+  --msg-copy-btn: #55555d;
+  --msg-thought-text: #deded8;
+  --msg-success-stroke: #7bd88f;
+  --msg-warning-text: #ffd18a;
+  --msg-danger-text: #ff8a80;
+
+  /* Composer & Dropdowns (ChatComposer.vue, ThemedSelect.vue) */
+  --composer-queued-msg-bg: #101012;
+  --composer-queued-msg-border: #242428;
+  --composer-token-inactive: #3a3a3c;
+  --composer-menu-border: rgba(255, 255, 255, 0.055);
+  --composer-menu-bg: rgba(255, 255, 255, 0.018);
+  --composer-menu-shadow: rgba(255, 255, 255, 0.018);
+  --composer-menu-active-bg: #1e1e21;
+  --composer-menu-shortcut-bg: #202022;
+  --composer-token-accent: rgba(164, 164, 162, 0.78);
+  --composer-dropdown-bg: #161618;
+  --composer-dropdown-border: #2d2d30;
+  --composer-dropdown-item-hover: #252528;
+  --composer-dropdown-shadow: rgba(0, 0, 0, 0.55);
+  --composer-parameter-bg: rgba(255, 255, 255, 0.025);
+  --composer-indicator-border: rgba(255, 255, 255, 0.12);
+  --composer-indicator-dot: #444444;
+  --composer-shadow: rgba(0, 0, 0, 0.22);
+
+  /* Modals (style.css, App.vue) */
+  --modal-overlay-bg: rgba(0, 0, 0, 0.65);
+  --modal-card-shadow: rgba(0, 0, 0, 0.45);
+  --modal-card-bg: #141414;
+  --modal-close-border: var(--border);
+  --modal-close-bg-hover: rgba(255, 255, 255, 0.05);
+
+  /* Settings Layout (SettingsScreen.vue) */
+  --settings-overlay-bg: rgba(8, 8, 8, 0.7);
+  --settings-card-bg: #141414;
+  --settings-sidebar-bg: #0e0e0e;
+  --settings-main-bg: #121212;
+  --settings-card-border: rgba(255, 255, 255, 0.08);
+  --settings-card-shadow: rgba(0, 0, 0, 0.6);
+  --settings-card-inset-shadow: rgba(255, 255, 255, 0.1);
+  --settings-sidebar-border: rgba(255, 255, 255, 0.06);
+  --settings-sidebar-toggle-hover: rgba(255, 255, 255, 0.06);
+  --settings-tab-btn-hover: rgba(255, 255, 255, 0.04);
+  --settings-tab-btn-active-border: rgba(255, 255, 255, 0.06);
+  --settings-tab-btn-shadow: rgba(0, 0, 0, 0.2);
+  --settings-close-btn-hover: rgba(255, 255, 255, 0.04);
+
+  /* Tab Panel & Plan Panel (PlanPanel.vue) */
+  --panel-tab-bg: rgba(255, 255, 255, 0.015);
+  --panel-tab-hover-bg: rgba(255, 255, 255, 0.055);
+  --panel-tab-hover-border: rgba(255, 255, 255, 0.11);
+  --panel-close-bg: rgba(255, 255, 255, 0.02);
+  --panel-close-hover-bg: rgba(255, 255, 255, 0.07);
+  --panel-resize-hover: rgba(255, 255, 255, 0.04);
+  --plan-card-hover-bg: #2c2c31;
+  --plan-card-hover-border: transparent;
+  --plan-task-hover-bg: rgba(255, 255, 255, 0.03);
+  --plan-task-progress-hover-bg: rgba(255, 255, 255, 0.06);
+
+  /* Themed Buttons (ThemedButton.vue, style.css) */
+  --btn-primary-bg: #ffffff;
+  --btn-primary-color: #000000;
+  --btn-primary-hover-bg: #f0f0f0;
+  --btn-primary-active-bg: #d8d8d8;
+  --btn-primary-shadow: rgba(255, 255, 255, 0.08);
+  --btn-primary-hover-shadow: rgba(255, 255, 255, 0.12);
+
+  --btn-secondary-bg: #2a2a2e;
+  --btn-secondary-color: #e0e0e0;
+  --btn-secondary-hover-bg: #35353a;
+  --btn-secondary-hover-color: #ffffff;
+  --btn-secondary-active-bg: #202024;
+  --btn-secondary-border: rgba(255, 255, 255, 0.04);
+  --btn-secondary-hover-border: rgba(255, 255, 255, 0.08);
+  --btn-secondary-shadow: rgba(0, 0, 0, 0.25);
+
+  --btn-danger-bg: rgba(255, 107, 107, 0.16);
+  --btn-danger-color: #ff8a80;
+  --btn-danger-hover-bg: rgba(255, 107, 107, 0.24);
+  --btn-danger-hover-color: #ff6b6b;
+  --btn-danger-active-bg: rgba(255, 107, 107, 0.12);
+  --btn-danger-border: rgba(255, 107, 107, 0.1);
+  --btn-danger-hover-border: rgba(255, 107, 107, 0.2);
+  --btn-danger-shadow: rgba(255, 107, 107, 0.1);
+
+  --btn-chip-bg: #202024;
+  --btn-chip-color: #a0a0a5;
+  --btn-chip-border: rgba(255, 255, 255, 0.02);
+  --btn-chip-hover-bg: #2a2a2e;
+  --btn-chip-hover-color: #d0d0d5;
+  --btn-chip-hover-border: rgba(255, 255, 255, 0.08);
+
+  /* Markdown & Code Blocks (style.css, ToolGroup.vue) */
+  --markdown-code-bg: rgba(255, 255, 255, 0.08);
+  --markdown-blockquote-border: #3e3e3e;
+  --markdown-copy-hover-border: #55555d;
+  --markdown-copy-copied-bg: rgba(123, 216, 143, 0.1);
+  --markdown-copy-copied-border: rgba(123, 216, 143, 0.3);
+
+  /* Miscellaneous/Common details */
+  --attachment-pill-bg: #252528;
+  --attachment-pill-border: #333333;
+  --attachment-shadow: rgba(0, 0, 0, 0.15);
+  --error-bubble-bg: rgba(255, 138, 128, 0.08);
+  --error-bubble-border: rgba(255, 138, 128, 0.25);
+  --permission-card-shadow: rgba(0, 0, 0, 0.5);
+  --permission-card-allow-bg: rgba(123, 216, 143, 0.16);
+  --permission-card-deny-bg: rgba(255, 138, 128, 0.16);
+  --memory-item-border: rgba(255, 255, 255, 0.04);
+  --memory-delete-hover: rgba(255, 107, 107, 0.7);
+  --memory-delete-hover-solid: #ff6b6b;
+  --sidebar-load-more-hover: rgba(255, 255, 255, 0.02);
+
+  /* Scrollbars */
+  --scrollbar-thumb-normal: rgba(255, 255, 255, 0);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.3);
+
+  /* Side backdrops & Nav actions */
+  --nav-action-hover-bg: rgba(255, 255, 255, 0.045);
+  --add-project-btn-hover-bg: rgba(255, 255, 255, 0.08);
+  --backdrop-bg: rgba(0, 0, 0, 0.4);
+
+  /* Input fields */
+  --input-focus-border: #555555;
+
+  /* Tool detail blocks */
+  --tool-details-bg: #151515;
+  --tool-details-border: #2d2d2d;
+  --perm-code-border: #222222;
+  --perm-code-success-color: #a8ffb2;
+
+  /* Permission decision buttons */
+  --perm-btn-green-bg: rgba(136, 168, 144, 0.12);
+  --perm-btn-green-border: rgba(136, 168, 144, 0.25);
+  --perm-btn-green-hover-bg: rgba(136, 168, 144, 0.22);
+  --perm-btn-blue-bg: rgba(176, 160, 184, 0.12);
+  --perm-btn-blue-border: rgba(176, 160, 184, 0.25);
+  --perm-btn-blue-hover-bg: rgba(176, 160, 184, 0.22);
+  --perm-btn-purple-bg: rgba(141, 160, 139, 0.12);
+  --perm-btn-purple-border: rgba(141, 160, 139, 0.25);
+  --perm-btn-purple-hover-bg: rgba(141, 160, 139, 0.22);
+  --perm-btn-red-bg: rgba(184, 130, 130, 0.12);
+  --perm-btn-red-border: rgba(184, 130, 130, 0.25);
+  --perm-btn-red-hover-bg: rgba(184, 130, 130, 0.22);
+
+  /* Status Warnings */
+  --status-warning-border: rgba(188, 162, 130, 0.3);
+  --status-warning-bg: rgba(188, 162, 130, 0.08);
+
+  /* Markdown details */
+  --markdown-table-row-even-bg: rgba(255, 255, 255, 0.02);
+  --review-pill-bg: rgba(217, 193, 139, 0.1);
+  --code-wrapper-shadow: rgba(0, 0, 0, 0.15);
+  --composer-status-border: rgba(255, 255, 255, 0.04);
+  --delete-project-btn-hover-bg: rgba(255, 138, 128, 0.15);
+  --danger-badge-border: rgba(255, 138, 128, 0.45);
+  --breadcrumb-project-color: rgba(164, 164, 162, 0.82);
+
+  /* User Message Bubbles */
+  --user-bubble-bg: rgba(255, 255, 255, 0.12);
+  --user-bubble-hover-bg: rgba(255, 255, 255, 0.15);
+  --user-bubble-shadow-color: rgba(0, 0, 0, 0.2);
+  --user-bubble-border: rgba(255, 255, 255, 0.05);
+  --user-bubble-fade-color: rgba(20, 20, 22, 0.98);
+
+  /* Lightbox */
+  --lightbox-overlay-bg: rgba(10, 10, 12, 0.85);
+  --lightbox-image-shadow: rgba(0, 0, 0, 0.5);
+  --lightbox-image-border: rgba(255, 255, 255, 0.1);
+  --lightbox-close-btn-bg: rgba(255, 255, 255, 0.1);
+  --lightbox-close-btn-border: rgba(255, 255, 255, 0.15);
+  --lightbox-close-btn-hover-bg: rgba(255, 255, 255, 0.2);
+  --lightbox-close-btn-mobile-bg: rgba(0, 0, 0, 0.5);
+  --lightbox-close-btn-mobile-border: rgba(255, 255, 255, 0.3);
+
+  /* Assistant Message Texts */
+  --assistant-msg-color: rgba(227, 227, 226, 0.9);
+  --assistant-meta-color: rgba(117, 117, 116, 0.84);
+  --card-overlay-shadow: rgba(0, 0, 0, 0.4);
+
+  /* Composer additions */
+  --composer-input-shadow: rgba(0, 0, 0, 0.32);
+  --composer-input-inset-shadow: rgba(255, 255, 255, 0.045);
+  --composer-input-focus-shadow: rgba(0, 0, 0, 0.38);
+  --composer-input-focus-border-shadow: rgba(164, 164, 162, 0.05);
+  --composer-input-focus-inset-shadow: rgba(255, 255, 255, 0.055);
+  --composer-preset-active-bg: rgba(164, 164, 162, 0.06);
+  --composer-preset-active-border: rgba(164, 164, 162, 0.085);
+  --shimmer-glow: rgba(255, 255, 255, 0.05);
+
+  /* Plan Panel & Agents additions */
+  --plan-del-color: #e06c75;
+  --agent-row-border: rgba(255, 255, 255, 0.03);
+  --agent-row-running-border: rgba(150, 167, 143, 0.15);
+  --agent-status-done-bg: #9fb99f;
+  --agent-status-done-shadow: rgba(159, 185, 159, 0.1);
+  --diff-add-bg: rgba(123, 216, 143, 0.12);
+  --diff-del-bg: rgba(224, 108, 117, 0.13);
 }
 
 *, *::before, *::after {
@@ -74,7 +289,7 @@
 .plan-diff-scroller,
 textarea,
 pre {
-  --scrollbar-color: rgba(255, 255, 255, 0);
+  --scrollbar-color: var(--scrollbar-thumb-normal);
   transition: --scrollbar-color 0.3s ease;
 }
 
@@ -96,7 +311,7 @@ pre:hover,
 .plan-diff-scroller.is-scrolling,
 textarea.is-scrolling,
 pre.is-scrolling {
-  --scrollbar-color: rgba(255, 255, 255, 0.3);
+  --scrollbar-color: var(--scrollbar-thumb-hover);
   transition: --scrollbar-color 0.05s ease;
 }
 
@@ -222,7 +437,7 @@ pre {
   width: 28px;
   height: 28px;
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--panel-close-bg);
   color: var(--muted);
   border: none;
   cursor: pointer;
@@ -235,7 +450,7 @@ pre {
 
 .panel-toggle-btn:hover,
 .expand-sidebar-btn:hover {
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--panel-close-hover-bg);
   color: var(--text);
 }
 
@@ -262,7 +477,7 @@ pre {
 .nav-action:hover,
 .project-item:hover,
 .chat-history-item:hover {
-  background: rgba(255, 255, 255, 0.045);
+  background: var(--nav-action-hover-bg);
 }
 
 /* Active (selected): a solid raised surface + hairline border so the current
@@ -400,40 +615,40 @@ pre {
 }
 
 .ghost-button {
-  background: #2a2a2e;
-  color: #e0e0e0;
-  border-color: rgba(255, 255, 255, 0.04) !important;
+  background: var(--btn-secondary-bg);
+  color: var(--btn-secondary-color);
+  border-color: var(--btn-secondary-border) !important;
 }
 
 .ghost-button:hover {
-  background: #35353a;
-  color: #ffffff;
+  background: var(--btn-secondary-hover-bg);
+  color: var(--btn-secondary-hover-color);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
-  border-color: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 4px 12px var(--btn-secondary-shadow);
+  border-color: var(--btn-secondary-hover-border) !important;
 }
 
 .ghost-button:active {
-  background: #202024;
+  background: var(--btn-secondary-active-bg);
   transform: translateY(0);
 }
 
 .danger-button {
-  background: rgba(255, 107, 107, 0.16);
-  color: #ff8a80;
-  border-color: rgba(255, 107, 107, 0.1) !important;
+  background: var(--btn-danger-bg);
+  color: var(--btn-danger-color);
+  border-color: var(--btn-danger-border) !important;
 }
 
 .danger-button:hover {
-  background: rgba(255, 107, 107, 0.24);
-  color: #ff6b6b;
+  background: var(--btn-danger-hover-bg);
+  color: var(--btn-danger-hover-color);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(255, 107, 107, 0.1);
-  border-color: rgba(255, 107, 107, 0.2) !important;
+  box-shadow: 0 4px 12px var(--btn-danger-shadow);
+  border-color: var(--btn-danger-hover-border) !important;
 }
 
 .danger-button:active {
-  background: rgba(255, 107, 107, 0.12);
+  background: var(--btn-danger-active-bg);
   transform: translateY(0);
 }
 
@@ -541,7 +756,7 @@ pre {
 .assistant-message {
   position: relative;
   padding-bottom: 4px;
-  color: #deded8;
+  color: var(--msg-thought-text);
   line-height: 1.6;
 }
 
@@ -570,7 +785,7 @@ pre {
 }
 
 .markdown-body tr:nth-child(even) {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--markdown-table-row-even-bg);
 }
 
 .assistant-meta {
@@ -610,8 +825,8 @@ pre {
 }
 
 .review-pill {
-  color: #d9c18b;
-  background: rgba(217, 193, 139, 0.1);
+  color: var(--planner);
+  background: var(--review-pill-bg);
 }
 
 .status-pill {
@@ -625,7 +840,7 @@ pre {
 }
 
 .status-pill.active {
-  color: #d9c18b;
+  color: var(--planner);
 }
 
 .status-pill.danger,
@@ -666,7 +881,7 @@ pre {
   border: 1px solid var(--border);
   border-radius: 18px;
   background: var(--surface-strong);
-  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.22);
+  box-shadow: 0 10px 34px var(--composer-shadow);
   padding: 12px;
 }
 
@@ -868,7 +1083,7 @@ pre {
     justify-content: space-between;
     margin-top: 4px;
     padding-top: 6px;
-    border-top: 1px solid rgba(255, 255, 255, 0.04);
+    border-top: 1px solid var(--composer-status-border);
   }
 
   .composer-input-box {
@@ -888,7 +1103,7 @@ pre {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.4);
+    background: var(--backdrop-bg);
     z-index: 1000;
   }
 
@@ -899,7 +1114,7 @@ pre {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.4);
+    background: var(--backdrop-bg);
     z-index: 1000;
   }
 }
@@ -926,7 +1141,7 @@ pre {
 
 .add-project-btn:hover {
   color: var(--text);
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--add-project-btn-hover-bg);
 }
 
 .project-list {
@@ -969,7 +1184,7 @@ pre {
 
 .delete-project-btn:hover {
   color: var(--danger);
-  background: rgba(255, 138, 128, 0.15);
+  background: var(--delete-project-btn-hover-bg);
 }
 
 /* Modal Styling */
@@ -979,7 +1194,7 @@ pre {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.65);
+  background: var(--modal-overlay-bg);
   backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
@@ -993,7 +1208,7 @@ pre {
   background: var(--surface-strong);
   border: 1px solid var(--border);
   border-radius: 14px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 20px 50px var(--modal-card-shadow);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1028,7 +1243,7 @@ pre {
 
 .close-modal-btn:hover {
   color: var(--text);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--modal-close-bg-hover);
 }
 
 .modal-body {
@@ -1062,7 +1277,7 @@ pre {
 }
 
 .form-group input:focus {
-  border-color: #555555;
+  border-color: var(--input-focus-border);
 }
 
 .browse-btn {
@@ -1098,24 +1313,24 @@ pre {
   min-height: 36px;
   border-radius: 8px !important;
   padding: 6px 16px;
-  color: #000000;
-  background: #ffffff;
+  color: var(--btn-primary-color);
+  background: var(--btn-primary-bg);
   font-size: 0.86rem;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 12px var(--btn-primary-shadow);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   border: none !important;
 }
 
 .primary-button:hover:not(:disabled) {
-  background: #f0f0f0;
+  background: var(--btn-primary-hover-bg);
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(255, 255, 255, 0.12);
+  box-shadow: 0 6px 16px var(--btn-primary-hover-shadow);
 }
 
 .primary-button:active:not(:disabled) {
-  background: #d8d8d8;
+  background: var(--btn-primary-active-bg);
   transform: translateY(0);
 }
 
@@ -1141,8 +1356,8 @@ pre {
 }
 
 .tool-call-details-box {
-  background: #151515;
-  border: 1px solid #2d2d2d;
+  background: var(--tool-details-bg);
+  border: 1px solid var(--tool-details-border);
   border-radius: 8px;
   padding: 12px;
   display: flex;
@@ -1165,11 +1380,11 @@ pre {
 }
 
 .permission-args-pre {
-  background: #0d0d0d;
-  border: 1px solid #222;
+  background: var(--perm-code-bg);
+  border: 1px solid var(--perm-code-border);
   border-radius: 6px;
   padding: 10px;
-  color: #a8ffb2;
+  color: var(--perm-code-success-color);
   font-family: monospace;
   font-size: 0.82rem;
   max-height: 220px;
@@ -1208,50 +1423,50 @@ pre {
 }
 
 .perm-btn.green {
-  background: rgba(136, 168, 144, 0.12) !important;
+  background: var(--perm-btn-green-bg) !important;
   color: var(--success) !important;
-  border-color: rgba(136, 168, 144, 0.25) !important;
+  border-color: var(--perm-btn-green-border) !important;
 }
 
 .perm-btn.green:hover {
-  background: rgba(136, 168, 144, 0.22) !important;
+  background: var(--perm-btn-green-hover-bg) !important;
 }
 
 .perm-btn.blue {
-  background: rgba(176, 160, 184, 0.12) !important;
+  background: var(--perm-btn-blue-bg) !important;
   color: var(--info) !important;
-  border-color: rgba(176, 160, 184, 0.25) !important;
+  border-color: var(--perm-btn-blue-border) !important;
 }
 
 .perm-btn.blue:hover {
-  background: rgba(176, 160, 184, 0.22) !important;
+  background: var(--perm-btn-blue-hover-bg) !important;
 }
 
 .perm-btn.purple {
-  background: rgba(141, 160, 139, 0.12) !important;
+  background: var(--perm-btn-purple-bg) !important;
   color: var(--executor) !important;
-  border-color: rgba(141, 160, 139, 0.25) !important;
+  border-color: var(--perm-btn-purple-border) !important;
 }
 
 .perm-btn.purple:hover {
-  background: rgba(141, 160, 139, 0.22) !important;
+  background: var(--perm-btn-purple-hover-bg) !important;
 }
 
 .perm-btn.red {
-  background: rgba(184, 130, 130, 0.12) !important;
+  background: var(--perm-btn-red-bg) !important;
   color: var(--danger) !important;
-  border-color: rgba(184, 130, 130, 0.25) !important;
+  border-color: var(--perm-btn-red-border) !important;
 }
 
 .perm-btn.red:hover {
-  background: rgba(184, 130, 130, 0.22) !important;
+  background: var(--perm-btn-red-hover-bg) !important;
 }
 
 /* Status Warning Colors */
 .status-pill.warning {
   color: var(--warning) !important;
-  border-color: rgba(188, 162, 130, 0.3) !important;
-  background: rgba(188, 162, 130, 0.08) !important;
+  border-color: var(--status-warning-border) !important;
+  background: var(--status-warning-bg) !important;
 }
 
 /* Markdown Formatting */
@@ -1301,7 +1516,7 @@ pre {
 .markdown-body code {
   font-family: 'Roboto Mono', monospace;
   font-size: 0.85rem;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--markdown-code-bg);
   padding: 3px 6px;
   border-radius: 4px;
   color: var(--planner);
@@ -1355,7 +1570,7 @@ pre {
   margin: 0 0 16px;
   padding: 0 16px;
   color: var(--muted);
-  border-left: 4px solid #3e3e3e;
+  border-left: 4px solid var(--markdown-blockquote-border);
 }
 
 /* Premium Code Block Wrapper */
@@ -1365,7 +1580,7 @@ pre {
   border-radius: 10px;
   overflow: hidden;
   background: var(--control-bg);
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 15px var(--code-wrapper-shadow);
   width: 100%;
   max-width: 100%;
 }
@@ -1402,14 +1617,14 @@ pre {
 
 .code-block-copy-btn:hover {
   color: var(--text);
-  background: rgba(255, 255, 255, 0.05);
-  border-color: #55555d;
+  background: var(--modal-close-bg-hover);
+  border-color: var(--markdown-copy-hover-border);
 }
 
 .code-block-copy-btn.copied {
-  color: #7bd88f;
-  background: rgba(123, 216, 143, 0.1);
-  border-color: rgba(123, 216, 143, 0.3);
+  color: var(--msg-success-stroke);
+  background: var(--markdown-copy-copied-bg);
+  border-color: var(--markdown-copy-copied-border);
 }
 
 
@@ -1430,7 +1645,7 @@ pre {
 }
 
 .yellow-dot {
-  color: #ffcc00;
+  color: var(--warning);
   font-size: 0.8rem;
   margin-right: 2px;
 }
@@ -1441,17 +1656,17 @@ pre {
 }
 
 .system-error-message .danger-badge {
-  border-color: rgba(255, 138, 128, 0.45);
+  border-color: var(--danger-badge-border);
   color: var(--danger);
-  background: rgba(255, 138, 128, 0.1);
+  background: var(--error-bubble-bg);
 }
 
 .error-bubble {
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  background: rgba(255, 138, 128, 0.08);
-  border: 1px solid rgba(255, 138, 128, 0.25);
+  background: var(--error-bubble-bg);
+  border: 1px solid var(--error-bubble-border);
   border-radius: 12px;
   padding: 14px 16px;
   color: var(--text);

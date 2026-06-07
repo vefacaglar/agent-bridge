@@ -592,17 +592,17 @@ onBeforeUnmount(() => {
   border-radius: 14px;
   padding: 13px 88px 13px 16px;
   box-shadow:
-    0 18px 45px rgba(0, 0, 0, 0.32),
-    inset 0 1px 0 rgba(255, 255, 255, 0.045);
+    0 18px 45px var(--composer-input-shadow),
+    inset 0 1px 0 var(--composer-input-inset-shadow);
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
 .composer-input-box:focus-within {
   border-color: var(--control-border-focus);
   box-shadow:
-    0 20px 55px rgba(0, 0, 0, 0.38),
-    0 0 0 1px rgba(164, 164, 162, 0.05),
-    inset 0 1px 0 rgba(255, 255, 255, 0.055);
+    0 20px 55px var(--composer-input-focus-shadow),
+    0 0 0 1px var(--composer-input-focus-border-shadow),
+    inset 0 1px 0 var(--composer-input-focus-inset-shadow);
 }
 
 .composer-token-info {
@@ -626,13 +626,13 @@ onBeforeUnmount(() => {
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: #3a3a3c;
+  background: var(--composer-token-inactive);
   transition: all 0.2s ease;
 }
 
 .token-dot.active.thinking {
-  background: #ffb74d;
-  box-shadow: 0 0 6px #ffb74d;
+  background: var(--warning);
+  box-shadow: 0 0 6px var(--warning);
   animation: pulseDot 1.2s infinite alternate;
 }
 
@@ -647,7 +647,7 @@ onBeforeUnmount(() => {
 }
 
 .context-tokens {
-  color: rgba(164, 164, 162, 0.78);
+  color: var(--composer-token-accent);
   font-weight: 500;
 }
 
@@ -660,13 +660,13 @@ onBeforeUnmount(() => {
   width: 100%;
   margin-bottom: 8px;
   padding: 9px 12px;
-  background: #101012;
-  border: 1px solid #242428;
+  background: var(--composer-queued-msg-bg);
+  border: 1px solid var(--composer-queued-msg-border);
   border-radius: 8px;
   color: var(--muted);
   font-size: 0.86rem;
   font-style: italic;
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 8px 22px var(--composer-dropdown-shadow);
 }
 
 .queued-label {
@@ -720,18 +720,18 @@ onBeforeUnmount(() => {
   border: none;
   border-radius: 9px;
   cursor: pointer;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
+  box-shadow: 0 8px 18px var(--composer-shadow);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .composer-send-btn:hover:not(:disabled) {
-  background: #f0f0f0;
+  background: var(--btn-primary-hover-bg);
   transform: translateY(-1px);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 10px 24px var(--composer-dropdown-shadow);
 }
 
 .composer-send-btn:active:not(:disabled) {
-  background: #d8d8d8;
+  background: var(--btn-primary-active-bg);
   transform: translateY(0);
 }
 
@@ -754,7 +754,7 @@ onBeforeUnmount(() => {
 }
 
 .composer-send-btn.stop-mode:active {
-  background: rgba(255, 107, 107, 0.12);
+  background: var(--btn-danger-active-bg);
 }
 
 .composer-menu-row {
@@ -764,10 +764,10 @@ onBeforeUnmount(() => {
   margin-top: 11px;
   padding: 6px;
   gap: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.055);
+  border: 1px solid var(--composer-menu-border);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.018);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.018);
+  background: var(--composer-menu-bg);
+  box-shadow: inset 0 1px 0 var(--composer-menu-shadow);
 }
 
 .composer-menu-left {
@@ -804,9 +804,9 @@ onBeforeUnmount(() => {
 }
 
 .mode-pill-btn:hover {
-  border-color: rgba(255, 255, 255, 0.11);
+  border-color: var(--control-border);
   color: var(--text);
-  background: rgba(255, 255, 255, 0.045);
+  background: var(--nav-action-hover-bg);
 }
 
 /* Full Access is a no-confirmation mode — flag it red wherever it surfaces. */
@@ -830,10 +830,10 @@ onBeforeUnmount(() => {
   bottom: calc(100% + 8px);
   left: 0;
   width: 230px;
-  background: #161618;
-  border: 1px solid #2d2d30;
+  background: var(--composer-dropdown-bg);
+  border: 1px solid var(--composer-dropdown-border);
   border-radius: 10px;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 12px 30px var(--composer-dropdown-shadow);
   z-index: 1000;
   overflow: hidden;
   padding: 6px;
@@ -850,7 +850,7 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   align-items: center;
   padding: 6px 10px 4px;
-  border-bottom: 1px solid #222;
+  border-bottom: 1px solid var(--perm-code-border);
 }
 
 .mode-popup-title {
@@ -883,13 +883,13 @@ onBeforeUnmount(() => {
 }
 
 .mode-popup-list li:hover {
-  background: #252528;
+  background: var(--attachment-pill-bg);
   color: var(--text);
 }
 
 .mode-popup-list li.active {
   color: var(--text);
-  background: #1e1e21;
+  background: var(--composer-menu-active-bg);
 }
 
 .mode-popup-list li.mode-item-danger .mode-item-name {
@@ -910,15 +910,15 @@ onBeforeUnmount(() => {
   font-family: monospace;
   font-size: 0.75rem;
   color: var(--faint);
-  background: #202022;
+  background: var(--composer-menu-shortcut-bg);
   padding: 1px 5px;
   border-radius: 3px;
-  border: 1px solid #2d2d30;
+  border: 1px solid var(--composer-dropdown-border);
 }
 
 .mode-popup-divider {
   height: 1px;
-  background: #222;
+  background: var(--perm-code-border);
   margin: 4px 0;
   padding: 0 !important;
   pointer-events: none;
@@ -928,7 +928,7 @@ onBeforeUnmount(() => {
   font-size: 0.72rem;
   padding: 2px 6px;
   border-radius: 4px;
-  background: #252528;
+  background: var(--attachment-pill-bg);
   color: var(--muted);
   transition: all 0.2s ease;
   font-weight: 500;
@@ -971,8 +971,8 @@ onBeforeUnmount(() => {
 
 .model-select-display-btn:hover {
   color: var(--text);
-  background: rgba(255, 255, 255, 0.045);
-  border-color: rgba(255, 255, 255, 0.11);
+  background: var(--nav-action-hover-bg);
+  border-color: var(--control-border);
 }
 
 .model-select-display-btn:disabled {
@@ -988,8 +988,8 @@ onBeforeUnmount(() => {
 /* Dual-model preset selector: emphasize when a preset (not single model) is on. */
 .preset-select-btn.preset-active {
   color: var(--text);
-  background: rgba(164, 164, 162, 0.06);
-  border-color: rgba(164, 164, 162, 0.085);
+  background: var(--composer-preset-active-bg);
+  border-color: var(--composer-preset-active-border);
   font-weight: 600;
 }
 
@@ -1010,10 +1010,10 @@ onBeforeUnmount(() => {
   max-width: 460px;
   max-height: 280px;
   overflow-y: auto;
-  background: #161618;
-  border: 1px solid #2d2d30;
+  background: var(--composer-dropdown-bg);
+  border: 1px solid var(--composer-dropdown-border);
   border-radius: 10px;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 12px 30px var(--composer-dropdown-shadow);
   z-index: 1000;
   padding: 6px;
   display: flex;
@@ -1045,18 +1045,18 @@ onBeforeUnmount(() => {
 }
 
 .model-dropdown-item:hover {
-  background: #252528;
+  background: var(--attachment-pill-bg);
   color: var(--text);
 }
 
 .model-dropdown-item.active {
   color: var(--text);
-  background: #1e1e21;
+  background: var(--composer-menu-active-bg);
   font-weight: 600;
 }
 
 .status-divider {
-  color: rgba(255, 255, 255, 0.12);
+  color: var(--composer-indicator-border);
   user-select: none;
 }
 
@@ -1064,7 +1064,7 @@ onBeforeUnmount(() => {
   color: var(--muted);
   padding: 5px 7px;
   border-radius: 7px;
-  background: rgba(255, 255, 255, 0.025);
+  background: var(--composer-parameter-bg);
   border: 1px solid transparent;
 }
 
@@ -1076,7 +1076,7 @@ onBeforeUnmount(() => {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  border: 1.5px solid var(--composer-indicator-border);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1091,7 +1091,7 @@ onBeforeUnmount(() => {
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: #444;
+  background: var(--composer-indicator-dot);
   transition: background 0.3s ease;
 }
 
@@ -1107,20 +1107,20 @@ onBeforeUnmount(() => {
   gap: 8px;
   margin-bottom: 10px;
   padding-bottom: 10px;
-  border-bottom: 1px solid #2d2d30;
+  border-bottom: 1px solid var(--composer-dropdown-border);
 }
 
 .attachment-pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: #252528;
-  border: 1px solid #333;
+  background: var(--attachment-pill-bg);
+  border: 1px solid var(--attachment-pill-border);
   border-radius: 6px;
   padding: 4px 8px;
   font-size: 0.78rem;
   color: var(--text);
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 2px 5px var(--attachment-shadow);
 }
 
 .attachment-pill .file-icon {

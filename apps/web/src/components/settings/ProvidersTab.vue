@@ -533,7 +533,7 @@ async function handleFetchModels() {
   font-size: 0.75rem;
   font-family: monospace;
   color: var(--muted);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--surface);
   border: 1px solid var(--border);
   padding: 3px 8px;
   border-radius: 6px;
@@ -617,7 +617,7 @@ async function handleFetchModels() {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  background: rgba(255, 255, 255, 0.01);
+  background: var(--perm-content-bg);
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 12px;

@@ -152,7 +152,7 @@ function submit() {
   padding: 16px;
   z-index: 1;
   pointer-events: auto;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 10px 30px var(--card-overlay-shadow);
   display: flex;
   flex-direction: column;
   gap: 14px;

@@ -81,7 +81,7 @@ const allDone = computed(() => tasks.value.length > 0 && doneCount.value === tas
 }
 
 .task-list-header:hover {
-  background: #2c2c31;
+  background: var(--plan-card-hover-bg);
 }
 
 .task-title {

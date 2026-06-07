@@ -189,7 +189,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
   right: 0;
   bottom: 0;
   z-index: 2500;
-  background: rgba(8, 8, 8, 0.7);
+  background: var(--settings-overlay-bg);
   backdrop-filter: blur(12px);
   display: flex;
   align-items: center;
@@ -200,20 +200,20 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
 .settings-card {
   width: min(980px, 100%);
   height: min(680px, 90vh);
-  background: #141414;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--settings-card-bg);
+  border: 1px solid var(--settings-card-border);
   border-radius: 16px;
   box-shadow: 
-    0 30px 70px rgba(0, 0, 0, 0.6),
-    0 0 1px rgba(255, 255, 255, 0.1) inset;
+    0 30px 70px var(--settings-card-shadow),
+    0 0 1px var(--settings-card-inset-shadow) inset;
   display: flex;
   overflow: hidden;
 }
 
 .settings-sidebar {
   width: 220px;
-  background: #0e0e0e;
-  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--settings-sidebar-bg);
+  border-right: 1px solid var(--settings-sidebar-border);
   padding: 20px;
   display: flex;
   flex-direction: column;
@@ -257,7 +257,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
 
 .settings-sidebar-toggle-btn:hover {
   color: var(--text);
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--settings-sidebar-toggle-hover);
 }
 
 .settings-sidebar-toggle-btn.active {
@@ -320,16 +320,16 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
 }
 
 .settings-tab-btn:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--settings-tab-btn-hover);
   color: var(--text);
 }
 
 .settings-tab-btn.active {
   background: var(--sidebar-active);
-  border-color: rgba(255, 255, 255, 0.06);
+  border-color: var(--settings-tab-btn-active-border);
   color: var(--text);
   font-weight: 400;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 8px var(--settings-tab-btn-shadow);
   transform: translateX(2px);
 }
 
@@ -353,7 +353,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
 
 .settings-close-btn:hover {
   color: var(--text);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--settings-close-btn-hover);
 }
 
 .settings-close-btn svg {
@@ -372,11 +372,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
   display: flex;
   flex-direction: column;
   min-width: 0;
-  background: #121212;
+  background: var(--settings-main-bg);
 }
 
 .settings-main-header {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--settings-sidebar-border);
   padding: 0 24px;
 }
 
@@ -520,7 +520,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
   .settings-overlay {
     padding: 0;
     backdrop-filter: none;
-    background: #121212;
+    background: var(--settings-main-bg);
   }
 
   .settings-card {
@@ -540,7 +540,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
     height: 100vh !important;
     height: 100dvh !important;
     z-index: 100;
-    background: #0e0e0e;
+    background: var(--settings-sidebar-bg);
     padding: 24px 20px;
     border-right: none;
   }
@@ -566,7 +566,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
 
   .settings-sidebar-close-btn:hover {
     color: var(--text);
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--settings-sidebar-toggle-hover);
   }
 
   .settings-tabs-list {
