@@ -415,16 +415,17 @@ export const DELEGATE_TASKS_TOOL = {
  * Lightweight tier tool. Lets the architect delegate tiny, mechanical tasks
  * (locating files/symbols, summarizing a file, simple renames/moves) to a cheap
  * "utility" sub-agent running the configured utility model in this same workspace.
- * The sub-agent only gets read/list/search + move_file, does the noisy churn in
- * its own context, and returns a SHORT distilled answer — keeping the architect's
- * context lean. Like delegate_tasks it performs no direct I/O itself (the
- * orchestrator runs the sub-agent loop), so it is not in DANGEROUS_TOOLS.
+ * The sub-agent only gets read/list/search + move_file. It cannot run commands,
+ * delete, edit, write, create, or delegate. It returns a SHORT distilled answer,
+ * keeping the architect's context lean. Like delegate_tasks it performs no direct
+ * I/O itself (the orchestrator runs the sub-agent loop), so it is not in
+ * DANGEROUS_TOOLS.
  */
 export const DELEGATE_UTILITY_TOOL = {
   type: "function" as const,
   function: {
     name: "delegate_to_utility",
-    description: "Delegate 1-3 tiny lookup/summary/rename tasks to utility sub-agents. Not for substantial implementation.",
+    description: "Delegate 1-3 tiny lookup/summary/move tasks to utility sub-agents. No shell/delete/write/edit.",
     parameters: {
       type: "object",
       properties: {

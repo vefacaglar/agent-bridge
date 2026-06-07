@@ -5,6 +5,7 @@ import { isToolSuccess } from '../lib/messageGroups';
 import { cleanMessageContent, renderMarkdown } from '../lib/markdown';
 
 const props = defineProps<{
+  id?: string;
   thought?: string;
   toolCalls: any[];
   toolResponses: RunMessage[];
@@ -22,6 +23,148 @@ const detailsExpanded = ref<Record<number, boolean>>({});
 
 const copiedParameters = ref<Record<number, boolean>>({});
 const copiedResults = ref<Record<number, boolean>>({});
+
+// Local instance cache to prevent redundant JSON.parse & string manipulation on updates
+const parsedArgsCache = new Map<string, Record<string, any>>();
+const toolPathCache = new Map<string, string>();
+const stepLabelCache = new Map<string, string>();
+const planTitleCache = new Map<string, string>();
+const planTaskCountCache = new Map<string, number>();
+const planSummaryCache = new Map<string, string>();
+const toolParamsCache = new Map<string, string>();
+const isToolSuccessCache = new Map<string, boolean>();
+const askAnswersCache = new Map<string, any>();
+const delegatedResultCache = new Map<string, any>();
+const singleBoxHeaderLabelCache = new Map<string, string>();
+const singleBoxContentCache = new Map<string, string>();
+
+function parseArgsCached(argumentsJson: string): Record<string, any> {
+  let cached = parsedArgsCache.get(argumentsJson);
+  if (cached === undefined) {
+    cached = parseArgs(argumentsJson);
+    parsedArgsCache.set(argumentsJson, cached);
+  }
+  return cached;
+}
+
+function getToolPathCached(argumentsJson: string): string {
+  let cached = toolPathCache.get(argumentsJson);
+  if (cached === undefined) {
+    cached = getToolPath(argumentsJson);
+    toolPathCache.set(argumentsJson, cached);
+  }
+  return cached;
+}
+
+function getStepLabelCached(name: string, args: string, idx: number): string {
+  const resContent = props.toolResponses[idx]?.content ?? '';
+  const key = `${idx}|${name}|${args}|${resContent}`;
+  let cached = stepLabelCache.get(key);
+  if (cached === undefined) {
+    cached = getStepLabel(name, args, idx);
+    stepLabelCache.set(key, cached);
+  }
+  return cached;
+}
+
+function getPlanTitleCached(argumentsJson: string): string {
+  let cached = planTitleCache.get(argumentsJson);
+  if (cached === undefined) {
+    cached = getPlanTitle(argumentsJson);
+    planTitleCache.set(argumentsJson, cached);
+  }
+  return cached;
+}
+
+function getPlanTaskCountCached(argumentsJson: string): number {
+  let cached = planTaskCountCache.get(argumentsJson);
+  if (cached === undefined) {
+    cached = getPlanTaskCount(argumentsJson);
+    planTaskCountCache.set(argumentsJson, cached);
+  }
+  return cached;
+}
+
+function getPlanSummaryCached(argumentsJson: string): string {
+  let cached = planSummaryCache.get(argumentsJson);
+  if (cached === undefined) {
+    cached = getPlanSummary(argumentsJson);
+    planSummaryCache.set(argumentsJson, cached);
+  }
+  return cached;
+}
+
+function formatToolParamsCached(name: string, argumentsJson: string): string {
+  const key = `${name}|${argumentsJson}`;
+  let cached = toolParamsCache.get(key);
+  if (cached === undefined) {
+    cached = formatToolParams(name, argumentsJson);
+    toolParamsCache.set(key, cached);
+  }
+  return cached;
+}
+
+function hasToolParamsCached(name: string, argumentsJson: string): boolean {
+  return !!formatToolParamsCached(name, argumentsJson).trim();
+}
+
+function isToolSuccessCached(content: string): boolean {
+  let cached = isToolSuccessCache.get(content);
+  if (cached === undefined) {
+    cached = isToolSuccess(content);
+    isToolSuccessCache.set(content, cached);
+  }
+  return cached;
+}
+
+function parseAskAnswersCached(contentJson: string): any {
+  let cached = askAnswersCache.get(contentJson);
+  if (cached === undefined) {
+    cached = parseAskAnswers(contentJson);
+    askAnswersCache.set(contentJson, cached);
+  }
+  return cached;
+}
+
+function parseDelegatedResultCached(contentJson: string): any {
+  let cached = delegatedResultCache.get(contentJson);
+  if (cached === undefined) {
+    cached = parseDelegatedResult(contentJson);
+    delegatedResultCache.set(contentJson, cached);
+  }
+  return cached;
+}
+
+function shouldRenderAskAnswersCached(name: string, contentJson: string): boolean {
+  if (name !== 'ask_user_question') return false;
+  return !!parseAskAnswersCached(contentJson)?.length;
+}
+
+function shouldRenderDelegatedResultCached(name: string, contentJson: string): boolean {
+  if (name !== 'delegate_tasks' && name !== 'delegate_to_utility' && name !== 'Workspace Tool Output') return false;
+  return !!parseDelegatedResultCached(contentJson)?.length;
+}
+
+function getSingleBoxHeaderLabelCached(name: string, argumentsJson: string): string {
+  const key = `${name}|${argumentsJson}`;
+  let cached = singleBoxHeaderLabelCache.get(key);
+  if (cached === undefined) {
+    cached = getSingleBoxHeaderLabel(name, argumentsJson);
+    singleBoxHeaderLabelCache.set(key, cached);
+  }
+  return cached;
+}
+
+function formatSingleBoxContentCached(name: string, argumentsJson: string, response: any): string {
+  const resContent = response?.content ?? '';
+  const key = `${name}|${argumentsJson}|${resContent}`;
+  let cached = singleBoxContentCache.get(key);
+  if (cached === undefined) {
+    cached = formatSingleBoxContent(name, argumentsJson, response);
+    singleBoxContentCache.set(key, cached);
+  }
+  return cached;
+}
 
 // Consecutive read-only inspection calls in the same turn are visually noisy
 // (a long stack of "File read: …" / "Directory listed: …" rows). We fold any
@@ -97,7 +240,7 @@ function clusterStatus(c: ToolCluster): 'success' | 'failed' | 'pending' {
   for (const i of c.indices) {
     const res = props.toolResponses[i];
     if (!res) anyPending = true;
-    else if (!isToolSuccess(res.content)) return 'failed';
+    else if (!isToolSuccessCached(res.content)) return 'failed';
   }
   return anyPending ? 'pending' : 'success';
 }
@@ -121,14 +264,14 @@ function copyResult(idx: number, text: string) {
 function getSingleBoxHeaderLabel(name: string, argumentsJson: string): string {
   if (name === 'run_command') return 'bash';
   if (name === 'read_file' || name === 'write_file' || name === 'edit_file') {
-    const path = getToolPath(argumentsJson);
+    const path = getToolPathCached(argumentsJson);
     return path.split('/').pop() || name;
   }
   return name;
 }
 
 function formatSingleBoxContent(name: string, argumentsJson: string, response: any): string {
-  const params = hasToolParams(name, argumentsJson) ? formatToolParams(name, argumentsJson) : '';
+  const params = hasToolParamsCached(name, argumentsJson) ? formatToolParamsCached(name, argumentsJson) : '';
   const result = response ? formatToolResult(name, response.content) : 'Running...';
   
   if (params && result) {
@@ -145,20 +288,20 @@ function formatSingleBoxContent(name: string, argumentsJson: string, response: a
 
 /** Title of an update_plan call, for the clickable plan card. */
 function getPlanTitle(argumentsJson: string): string {
-  const parsed = parseArgs(argumentsJson);
+  const parsed = parseArgsCached(argumentsJson);
   return typeof parsed.title === 'string' && parsed.title.trim() ? parsed.title.trim() : 'Plan';
 }
 
 /** Number of steps in an update_plan call's tasks array. */
 function getPlanTaskCount(argumentsJson: string): number {
-  const parsed = parseArgs(argumentsJson);
+  const parsed = parseArgsCached(argumentsJson);
   return Array.isArray(parsed.tasks) ? parsed.tasks.length : 0;
 }
 
 /** A short plain-text summary for the plan card: first real line of the body,
  *  falling back to the first few step titles. */
 function getPlanSummary(argumentsJson: string): string {
-  const parsed = parseArgs(argumentsJson);
+  const parsed = parseArgsCached(argumentsJson);
   const clip = (s: string) => (s.length > 150 ? s.slice(0, 150).trim() + '…' : s);
 
   const body = typeof parsed.body === 'string' ? parsed.body : '';
@@ -217,12 +360,12 @@ function getStepLabel(name: string, args: string, idx: number): string {
   if (name === 'Workspace Tool Output') {
     const res = props.toolResponses[idx];
     if (res) {
-      const delegated = parseDelegatedResult(res.content);
+      const delegated = parseDelegatedResultCached(res.content);
       if (delegated?.length) {
         return delegated.length === 1 ? `Utility result: ${delegated[0].title}` : `${delegated.length} utility results`;
       }
       try {
-        const parsed = JSON.parse(res.content);
+        const parsed = parseArgsCached(res.content);
         if (parsed.error) return `Error: ${parsed.error}`;
         if (typeof parsed.message === 'string' && parsed.message) return parsed.message;
       } catch (e) { /* fall through */ }
@@ -233,8 +376,8 @@ function getStepLabel(name: string, args: string, idx: number): string {
 }
 
 function getToolLabel(name: string, args: string): string {
-  const path = getToolPath(args);
-  const parsed = parseArgs(args);
+  const path = getToolPathCached(args);
+  const parsed = parseArgsCached(args);
   switch (name) {
     case 'read_file':
       return `File read: ${path}`;
@@ -375,9 +518,6 @@ function formatToolParams(name: string, argumentsJson: string): string {
   }
 }
 
-function hasToolParams(name: string, argumentsJson: string): boolean {
-  return !!formatToolParams(name, argumentsJson).trim();
-}
 
 function parseDelegatedResult(contentJson: string): { title: string; summary: string }[] | null {
   if (!contentJson) return null;
@@ -413,15 +553,6 @@ function parseAskAnswers(contentJson: string): { header: string; question: strin
   }
 }
 
-function shouldRenderAskAnswers(name: string, contentJson: string): boolean {
-  if (name !== 'ask_user_question') return false;
-  return !!parseAskAnswers(contentJson)?.length;
-}
-
-function shouldRenderDelegatedResult(name: string, contentJson: string): boolean {
-  if (name !== 'delegate_tasks' && name !== 'delegate_to_utility' && name !== 'Workspace Tool Output') return false;
-  return !!parseDelegatedResult(contentJson)?.length;
-}
 
 function formatToolResult(name: string, contentJson: string): string {
   if (!contentJson) return '';
@@ -518,7 +649,7 @@ function formatToolResult(name: string, contentJson: string): string {
     <div
       v-if="cleanedThought"
       class="tool-thought-body markdown-body"
-      v-html="renderMarkdown(cleanedThought)"
+      v-html="renderMarkdown(cleanedThought, props.id ? 'thought-' + props.id : undefined)"
     ></div>
 
     <!-- Tool Call Accordions -->
@@ -562,13 +693,13 @@ function formatToolResult(name: string, contentJson: string): string {
       >
         <div class="plan-tool-head">
           <span class="plan-tool-eyebrow">Plan</span>
-          <span v-if="getPlanTaskCount(tc.function?.arguments)" class="plan-tool-count">
-            {{ getPlanTaskCount(tc.function?.arguments) }} steps
+          <span v-if="getPlanTaskCountCached(tc.function?.arguments)" class="plan-tool-count">
+            {{ getPlanTaskCountCached(tc.function?.arguments) }} steps
           </span>
         </div>
-        <span class="plan-tool-title">{{ getPlanTitle(tc.function?.arguments) }}</span>
-        <span v-if="getPlanSummary(tc.function?.arguments)" class="plan-tool-summary">
-          {{ getPlanSummary(tc.function?.arguments) }}
+        <span class="plan-tool-title">{{ getPlanTitleCached(tc.function?.arguments) }}</span>
+        <span v-if="getPlanSummaryCached(tc.function?.arguments)" class="plan-tool-summary">
+          {{ getPlanSummaryCached(tc.function?.arguments) }}
         </span>
         <span class="plan-tool-action">Open in panel</span>
       </button>
@@ -625,10 +756,10 @@ function formatToolResult(name: string, contentJson: string): string {
             <circle cx="12" cy="12" r="3"></circle>
           </svg>
           
-          <span class="step-row-label">{{ getStepLabel(tc.function?.name, tc.function?.arguments, idx) }}</span>
+          <span class="step-row-label">{{ getStepLabelCached(tc.function?.name, tc.function?.arguments, idx) }}</span>
           
           <template v-if="toolResponses[idx]">
-            <svg v-if="isToolSuccess(toolResponses[idx].content)" class="status-icon success" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" title="Success">
+            <svg v-if="isToolSuccessCached(toolResponses[idx].content)" class="status-icon success" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" title="Success">
               <polyline points="20 6 9 17 4 12"></polyline>
             </svg>
             <svg v-else class="status-icon error" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" title="Error">
@@ -641,15 +772,15 @@ function formatToolResult(name: string, contentJson: string): string {
 
         <div v-if="detailsExpanded[idx]" class="tool-call-details">
           <!-- If it has custom result cards (Q&A or Delegated sub-agents) -->
-          <template v-if="toolResponses[idx] && (shouldRenderAskAnswers(tc.function?.name, toolResponses[idx].content) || shouldRenderDelegatedResult(tc.function?.name, toolResponses[idx].content))">
+          <template v-if="toolResponses[idx] && (shouldRenderAskAnswersCached(tc.function?.name, toolResponses[idx].content) || shouldRenderDelegatedResultCached(tc.function?.name, toolResponses[idx].content))">
             <!-- Parameters (inside standard wrapper) -->
-            <div v-if="hasToolParams(tc.function?.name, tc.function?.arguments)" class="code-block-wrapper">
+            <div v-if="hasToolParamsCached(tc.function?.name, tc.function?.arguments)" class="code-block-wrapper">
               <div class="code-block-header">
-                <span class="code-block-lang">{{ getSingleBoxHeaderLabel(tc.function?.name, tc.function?.arguments) }} (params)</span>
+                <span class="code-block-lang">{{ getSingleBoxHeaderLabelCached(tc.function?.name, tc.function?.arguments) }} (params)</span>
                 <button 
                   class="code-block-copy-btn" 
                   :class="{ copied: copiedParameters[idx] }" 
-                  @click.stop="copyParameters(idx, formatToolParams(tc.function?.name, tc.function?.arguments))"
+                  @click.stop="copyParameters(idx, formatToolParamsCached(tc.function?.name, tc.function?.arguments))"
                   title="Copy parameters"
                 >
                   <svg v-if="copiedParameters[idx]" class="check-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -661,15 +792,15 @@ function formatToolResult(name: string, contentJson: string): string {
                   </svg>
                 </button>
               </div>
-              <pre class="faint-code"><code>{{ formatToolParams(tc.function?.name, tc.function?.arguments) }}</code></pre>
+              <pre class="faint-code"><code>{{ formatToolParamsCached(tc.function?.name, tc.function?.arguments) }}</code></pre>
 
               <!-- Answer rendered inside the same params box. -->
               <div
-                v-if="shouldRenderAskAnswers(tc.function?.name, toolResponses[idx].content)"
+                v-if="shouldRenderAskAnswersCached(tc.function?.name, toolResponses[idx].content)"
                 class="ask-answer-list"
               >
               <section
-                v-for="(ans, aIdx) in parseAskAnswers(toolResponses[idx].content)"
+                v-for="(ans, aIdx) in parseAskAnswersCached(toolResponses[idx].content)"
                 :key="aIdx"
                 class="ask-answer-card"
               >
@@ -693,16 +824,16 @@ function formatToolResult(name: string, contentJson: string): string {
             </div>
 
             <div
-              v-if="shouldRenderDelegatedResult(tc.function?.name, toolResponses[idx].content)"
+              v-if="shouldRenderDelegatedResultCached(tc.function?.name, toolResponses[idx].content)"
               class="delegated-result-list"
             >
               <section
-                v-for="section in parseDelegatedResult(toolResponses[idx].content)"
+                v-for="section in parseDelegatedResultCached(toolResponses[idx].content)"
                 :key="section.title"
                 class="delegated-result-card"
               >
                 <div class="delegated-result-title">{{ section.title }}</div>
-                <div class="delegated-result-body markdown-body" v-html="renderMarkdown(section.summary)"></div>
+                <div class="delegated-result-body markdown-body" v-html="renderMarkdown(section.summary, 'delegated-' + toolResponses[idx].id + '-' + section.title)"></div>
               </section>
             </div>
           </template>
@@ -711,11 +842,11 @@ function formatToolResult(name: string, contentJson: string): string {
           <template v-else>
             <div class="code-block-wrapper">
               <div class="code-block-header">
-                <span class="code-block-lang">{{ getSingleBoxHeaderLabel(tc.function?.name, tc.function?.arguments) }}</span>
+                <span class="code-block-lang">{{ getSingleBoxHeaderLabelCached(tc.function?.name, tc.function?.arguments) }}</span>
                 <button 
                   class="code-block-copy-btn" 
                   :class="{ copied: copiedResults[idx] }" 
-                  @click.stop="copyResult(idx, formatSingleBoxContent(tc.function?.name, tc.function?.arguments, toolResponses[idx]))"
+                  @click.stop="copyResult(idx, formatSingleBoxContentCached(tc.function?.name, tc.function?.arguments, toolResponses[idx]))"
                   title="Copy results"
                 >
                   <svg v-if="copiedResults[idx]" class="check-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -727,7 +858,7 @@ function formatToolResult(name: string, contentJson: string): string {
                   </svg>
                 </button>
               </div>
-              <pre class="faint-code"><code>{{ formatSingleBoxContent(tc.function?.name, tc.function?.arguments, toolResponses[idx]) }}</code></pre>
+              <pre class="faint-code"><code>{{ formatSingleBoxContentCached(tc.function?.name, tc.function?.arguments, toolResponses[idx]) }}</code></pre>
             </div>
           </template>
         </div>

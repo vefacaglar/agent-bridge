@@ -204,7 +204,7 @@ watch(() => props.groupedMessages, () => {
     // Restore pre scroll states in the container
     restorePreScrollStates(containerEl.value, preScrollStates);
   });
-}, { deep: true });
+});
 
 // Lightbox state
 const activeLightboxImage = ref<string | null>(null);
@@ -375,6 +375,7 @@ const formattedElapsedTime = computed(() => {
           @toggle="toggleReasoning(group.id)"
         />
         <ToolGroup
+          :id="group.message.id"
           :thought="group.message.role === 'tool' ? '' : group.message.content"
           :tool-calls="group.toolCalls"
           :tool-responses="group.toolResponses"

@@ -16,7 +16,7 @@ export function registerPermissionRoutes(server: FastifyInstance, ctx: AppContex
       return { error: "Invalid permission id" };
     }
 
-    const removed = ctx.permissionRepo.deleteById(numericId);
+    const removed = await ctx.permissionRepo.deleteById(numericId);
     if (!removed) {
       reply.status(404);
       return { error: `Permission with id "${id}" not found` };
@@ -26,7 +26,7 @@ export function registerPermissionRoutes(server: FastifyInstance, ctx: AppContex
 
   // Revoke all permissions.
   server.delete("/api/permissions", async () => {
-    ctx.permissionRepo.clear();
+    await ctx.permissionRepo.clear();
     return { success: true };
   });
 }

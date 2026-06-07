@@ -1,5 +1,5 @@
 import { utilityProcess, type UtilityProcess } from "electron";
-import { backendScript, dbPath, settingsPath } from "./paths";
+import { backendScript, dbPath, dbWriterBinary, settingsPath } from "./paths";
 
 let child: UtilityProcess | null = null;
 
@@ -15,6 +15,7 @@ function backendEnv(port: number): Record<string, string> {
     PORT: String(port),
     LOCAGENS_SETTINGS_PATH: settingsPath(),
     LOCAGENS_DB_PATH: dbPath(),
+    LOCAGENS_DB_WRITER_PATH: dbWriterBinary(),
   };
 }
 

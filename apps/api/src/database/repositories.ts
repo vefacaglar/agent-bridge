@@ -1,5 +1,5 @@
 import type { Run, RunMessage, RunStatus, Project, PermissionRule, Plan, PlanTask, Memory, MemoryScope, MemoryCategory } from "@agent-bridge/shared";
-import { db, runQueuedWrite } from "./db.js";
+import { db, runDbWrite } from "./db.js";
 
 
 // Mapper from database row to Run model
@@ -49,7 +49,7 @@ function mapRowToMessage(row: any): RunMessage {
 }
 
 export class RunRepository {
-  create(run: Run): void {
+  async create(run: Run): Promise<void> {
     const stmt = db.prepare(`
       INSERT INTO runs (
         id, title, task, project_path, project_name, status,
@@ -60,7 +60,7 @@ export class RunRepository {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
-    runQueuedWrite(() => stmt.run(
+    await runDbWrite({ op: "run.create", args: { run } }, () => stmt.run(
       run.id,
       run.title,
       run.task,
@@ -98,9 +98,11 @@ export class RunRepository {
     return rows.map(mapRowToRun);
   }
 
-  update(id: string, updates: Partial<Run>): void {
+  async update(id: string, updates: Partial<Run>): Promise<void> {
     const fields: string[] = [];
     const values: any[] = [];
+    const updatedAt = updates.updatedAt ?? new Date().toISOString();
+    const writerUpdates = { ...updates, updatedAt };
 
     const mappings: Record<string, string> = {
       title: "title",
@@ -136,24 +138,19 @@ export class RunRepository {
     if (fields.length === 0) return;
 
     // Automatically set updated_at if not explicitly provided
-    if (!updates.updatedAt) {
-      fields.push("updated_at = ?");
-      values.push(new Date().toISOString());
-    } else {
-      fields.push("updated_at = ?");
-      values.push(updates.updatedAt);
-    }
+    fields.push("updated_at = ?");
+    values.push(updatedAt);
 
     const sql = `UPDATE runs SET ${fields.join(", ")} WHERE id = ?`;
     values.push(id);
 
     const stmt = db.prepare(sql);
-    runQueuedWrite(() => stmt.run(...values));
+    await runDbWrite({ op: "run.update", args: { id, updates: writerUpdates } }, () => stmt.run(...values));
   }
 }
 
 export class MessageRepository {
-  create(message: RunMessage): void {
+  async create(message: RunMessage): Promise<void> {
     const stmt = db.prepare(`
       INSERT INTO messages (
         id, run_id, role, agent_role, agent_name,
@@ -163,7 +160,7 @@ export class MessageRepository {
     `);
     const updateRunStmt = db.prepare("UPDATE runs SET updated_at = ?, last_active_at = ? WHERE id = ?");
 
-    runQueuedWrite(() => {
+    await runDbWrite({ op: "message.create", args: { message } }, () => {
       stmt.run(
         message.id,
         message.runId,
@@ -188,7 +185,7 @@ export class MessageRepository {
     return rows.map(mapRowToMessage);
   }
 
-  update(id: string, updates: Partial<RunMessage>): void {
+  async update(id: string, updates: Partial<RunMessage>): Promise<void> {
     const fields: string[] = [];
     const values: any[] = [];
 
@@ -212,7 +209,7 @@ export class MessageRepository {
     values.push(id);
 
     const stmt = db.prepare(sql);
-    runQueuedWrite(() => stmt.run(...values));
+    await runDbWrite({ op: "message.update", args: { id, updates } }, () => stmt.run(...values));
   }
 }
 
@@ -269,14 +266,23 @@ export class PlanRepository {
    * active plan exists) it supersedes any previous active plan and inserts a new
    * versioned one; otherwise it overwrites the current active plan in place.
    */
-  upsert(runId: string, input: PlanInput): Plan {
+  async upsert(runId: string, input: PlanInput): Promise<Plan> {
     const now = new Date().toISOString();
     const tasks = (input.tasks || []).map(normalizeTask).filter((t): t is PlanTask => t !== null);
     const tasksJson = JSON.stringify(tasks);
     const existing = this.getActive(runId);
 
     if (existing && !input.startNew) {
-      runQueuedWrite(() => db.prepare(`
+      await runDbWrite({
+        op: "plan.updateActive",
+        args: {
+          existingId: existing.id,
+          title: input.title?.trim() || existing.title,
+          body: input.body ?? existing.body ?? null,
+          tasksJson,
+          now
+        }
+      }, () => db.prepare(`
         UPDATE plans SET title = ?, body = ?, tasks = ?, status = 'active', updated_at = ? WHERE id = ?
       `).run(
         input.title?.trim() || existing.title,
@@ -289,12 +295,12 @@ export class PlanRepository {
     }
 
     if (existing && input.startNew) {
-      runQueuedWrite(() => db.prepare("UPDATE plans SET status = 'completed', updated_at = ? WHERE id = ?").run(now, existing.id));
+      await runDbWrite({ op: "plan.complete", args: { id: existing.id, updatedAt: now } }, () => db.prepare("UPDATE plans SET status = 'completed', updated_at = ? WHERE id = ?").run(now, existing.id));
     }
 
     const id = `plan-${runId}-${Date.now()}`;
     const version = existing ? existing.version + 1 : 1;
-    runQueuedWrite(() => db.prepare(`
+    await runDbWrite({ op: "plan.create", args: { id, runId, title: input.title?.trim() || "Plan", body: input.body ?? null, tasksJson, version, now } }, () => db.prepare(`
       INSERT INTO plans (id, run_id, title, body, tasks, status, version, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?)
     `).run(id, runId, input.title?.trim() || "Plan", input.body ?? null, tasksJson, version, now, now));
@@ -312,12 +318,12 @@ function mapRowToProject(row: any): Project {
 }
 
 export class ProjectRepository {
-  create(project: Project): void {
+  async create(project: Project): Promise<void> {
     const stmt = db.prepare(`
       INSERT OR REPLACE INTO projects (path, name, created_at)
       VALUES (?, ?, ?)
     `);
-    runQueuedWrite(() => stmt.run(project.path, project.name, project.createdAt));
+    await runDbWrite({ op: "project.create", args: { project } }, () => stmt.run(project.path, project.name, project.createdAt));
   }
 
   list(): Project[] {
@@ -326,9 +332,9 @@ export class ProjectRepository {
     return rows.map(mapRowToProject);
   }
 
-  delete(path: string): void {
+  async delete(path: string): Promise<void> {
     const stmt = db.prepare("DELETE FROM projects WHERE path = ?");
-    runQueuedWrite(() => stmt.run(path));
+    await runDbWrite({ op: "project.delete", args: { path } }, () => stmt.run(path));
   }
 
   get(path: string): Project | null {
@@ -371,27 +377,27 @@ export class PermissionRepository {
     return false;
   }
 
-  allowProject(projectPath: string, tool: string, command: string): void {
-    runQueuedWrite(() => db.prepare(`
+  async allowProject(projectPath: string, tool: string, command: string): Promise<void> {
+    await runDbWrite({ op: "permission.allowProject", args: { projectPath, tool, command } }, () => db.prepare(`
       INSERT OR REPLACE INTO permissions (scope, project_path, tool, command, status)
       VALUES ('project', ?, ?, ?, 'allowed')
     `).run(projectPath, tool, command));
   }
 
-  allowGlobal(tool: string, command: string): void {
-    runQueuedWrite(() => db.prepare(`
+  async allowGlobal(tool: string, command: string): Promise<void> {
+    await runDbWrite({ op: "permission.allowGlobal", args: { tool, command } }, () => db.prepare(`
       INSERT OR REPLACE INTO permissions (scope, project_path, tool, command, status)
       VALUES ('global', '', ?, ?, 'allowed')
     `).run(tool, command));
   }
 
-  deleteById(id: number): boolean {
-    const info = runQueuedWrite(() => db.prepare("DELETE FROM permissions WHERE id = ?").run(id));
-    return info.changes > 0;
+  async deleteById(id: number): Promise<boolean> {
+    const info = await runDbWrite<{ changes: number | bigint }>({ op: "permission.deleteById", args: { id } }, () => db.prepare("DELETE FROM permissions WHERE id = ?").run(id));
+    return Number(info.changes) > 0;
   }
 
-  clear(): void {
-    runQueuedWrite(() => db.prepare("DELETE FROM permissions").run());
+  async clear(): Promise<void> {
+    await runDbWrite({ op: "permission.clear" }, () => db.prepare("DELETE FROM permissions").run());
   }
 }
 
@@ -436,22 +442,22 @@ export class MemoryRepository {
     return rows.map(mapRowToMemory);
   }
 
-  create(input: MemoryInput): Memory {
+  async create(input: MemoryInput): Promise<Memory> {
     const now = new Date().toISOString();
     const scope: MemoryScope = input.scope === "global" ? "global" : "project";
     const projectPath = scope === "global" ? "" : (input.projectPath || "");
     const category: MemoryCategory = MEMORY_CATEGORIES.includes(input.category) ? input.category : "project";
-    const info = runQueuedWrite(() => db.prepare(`
+    const info = await runDbWrite<{ lastInsertRowid: number | bigint }>({ op: "memory.create", args: { scope, projectPath, category, content: input.content.trim(), now } }, () => db.prepare(`
       INSERT INTO memory (scope, project_path, category, content, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?)
     `).run(scope, projectPath, category, input.content.trim(), now, now));
     return this.getById(Number(info.lastInsertRowid))!;
   }
 
-  update(id: number, content: string): Memory | null {
+  async update(id: number, content: string): Promise<Memory | null> {
     const now = new Date().toISOString();
-    const info = runQueuedWrite(() => db.prepare("UPDATE memory SET content = ?, updated_at = ? WHERE id = ?").run(content.trim(), now, id));
-    if (info.changes === 0) return null;
+    const info = await runDbWrite<{ changes: number | bigint }>({ op: "memory.update", args: { id, content: content.trim(), now } }, () => db.prepare("UPDATE memory SET content = ?, updated_at = ? WHERE id = ?").run(content.trim(), now, id));
+    if (Number(info.changes) === 0) return null;
     return this.getById(id);
   }
 
@@ -460,12 +466,12 @@ export class MemoryRepository {
     return row ? mapRowToMemory(row) : null;
   }
 
-  deleteById(id: number): boolean {
-    const info = runQueuedWrite(() => db.prepare("DELETE FROM memory WHERE id = ?").run(id));
-    return info.changes > 0;
+  async deleteById(id: number): Promise<boolean> {
+    const info = await runDbWrite<{ changes: number | bigint }>({ op: "memory.deleteById", args: { id } }, () => db.prepare("DELETE FROM memory WHERE id = ?").run(id));
+    return Number(info.changes) > 0;
   }
 
-  clear(): void {
-    runQueuedWrite(() => db.prepare("DELETE FROM memory").run());
+  async clear(): Promise<void> {
+    await runDbWrite({ op: "memory.clear" }, () => db.prepare("DELETE FROM memory").run());
   }
 }

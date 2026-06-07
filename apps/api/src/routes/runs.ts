@@ -72,7 +72,7 @@ export function registerRunRoutes(server: FastifyInstance, ctx: AppContext) {
       updatedAt: new Date().toISOString()
     };
 
-    ctx.runRepo.create(run);
+    await ctx.runRepo.create(run);
 
     // Run orchestration asynchronously in the background.
     ctx.orchestrator.run(runId).catch(err => {
@@ -85,7 +85,7 @@ export function registerRunRoutes(server: FastifyInstance, ctx: AppContext) {
   // Cancel a running orchestration job.
   server.post("/api/runs/:id/cancel", async (request, reply) => {
     const { id } = request.params as { id: string };
-    const success = ctx.orchestrator.cancel(id);
+    const success = await ctx.orchestrator.cancel(id);
     if (!success) {
       const run = ctx.runRepo.getById(id);
       if (run) {
@@ -161,7 +161,7 @@ export function registerRunRoutes(server: FastifyInstance, ctx: AppContext) {
       updates.utilityReasoningEffort = normalizeReasoningEffort(ctx, utilityProviderId, utilityModel, utilityReasoningEffort);
     }
     if (Object.keys(updates).length > 0) {
-      ctx.runRepo.update(id, updates);
+      await ctx.runRepo.update(id, updates);
     }
 
     // Persist the user message and surface it immediately.
@@ -172,10 +172,10 @@ export function registerRunRoutes(server: FastifyInstance, ctx: AppContext) {
       content: task,
       createdAt: new Date().toISOString()
     };
-    ctx.messageRepo.create(userMsg);
+    await ctx.messageRepo.create(userMsg);
     eventBus.emit(`run:${id}`, { type: "message_created", message: userMsg });
 
-    ctx.runRepo.update(id, { status: "generating" });
+    await ctx.runRepo.update(id, { status: "generating" });
     eventBus.emit(`run:${id}`, { type: "status_changed", status: "generating" });
 
     ctx.orchestrator.continueRun(id, task).catch(err => {
@@ -222,12 +222,12 @@ export function registerRunRoutes(server: FastifyInstance, ctx: AppContext) {
         if (neverPersist) {
           // no-op: keep asking every time
         } else if (decision === "allow_always") {
-          ctx.permissionRepo.allowGlobal(tool, command);
+          await ctx.permissionRepo.allowGlobal(tool, command);
         } else if (decision === "allow_project" && run.projectPath) {
-          ctx.permissionRepo.allowProject(run.projectPath, tool, command);
+          await ctx.permissionRepo.allowProject(run.projectPath, tool, command);
         } else if (fullAccessAutoGrant) {
-          if (run.projectPath) ctx.permissionRepo.allowProject(run.projectPath, tool, command);
-          else ctx.permissionRepo.allowGlobal(tool, command);
+          if (run.projectPath) await ctx.permissionRepo.allowProject(run.projectPath, tool, command);
+          else await ctx.permissionRepo.allowGlobal(tool, command);
         }
       }
     } catch (err: any) {

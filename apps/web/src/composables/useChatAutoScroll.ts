@@ -41,11 +41,19 @@ export function useChatAutoScroll(
   });
 
   watch(
-    messages,
-    (newMessages) => {
+    () => {
+      const last = messages.value[messages.value.length - 1];
+      return {
+        length: messages.value.length,
+        lastId: last?.id,
+        lastContentLength: last?.content?.length ?? 0,
+        lastReasoningLength: last?.reasoningContent?.length ?? 0
+      };
+    },
+    () => {
       if (!container.value) return;
 
-      const lastMsg = newMessages && newMessages.length > 0 ? newMessages[newMessages.length - 1] : null;
+      const lastMsg = messages.value.length > 0 ? messages.value[messages.value.length - 1] : null;
 
       // Avoid scrolling the main chat screen down when the model is only in the thinking/reasoning phase
       const isThinking = lastMsg && lastMsg.role === 'assistant' && lastMsg.reasoningContent && !lastMsg.content;
@@ -77,8 +85,7 @@ export function useChatAutoScroll(
           }
         }
       });
-    },
-    { deep: true }
+    }
   );
 
   // Watch container in case it gets mounted/unmounted.

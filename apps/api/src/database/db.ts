@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import fs from "fs";
 import path from "path";
+import { DbWriterClient, type DbWriteRequest } from "./DbWriterClient.js";
 
 function findWorkspaceRoot(): string {
   let currentDir = process.cwd();
@@ -18,12 +19,14 @@ const wsRoot = findWorkspaceRoot();
 const defaultProjectName = "Locagens";
 const isTest = process.env.NODE_ENV === "test";
 const dbPath = isTest ? ":memory:" : (process.env.LOCAGENS_DB_PATH || path.join(wsRoot, "locagens.db"));
+const useDbWriter = dbPath !== ":memory:" && process.env.LOCAGENS_DB_WRITER_DISABLED !== "1";
 
 console.log(`[Database] Connecting to SQLite database at: ${dbPath}`);
 if (dbPath !== ":memory:") {
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 }
 export const db = new DatabaseSync(dbPath);
+const dbWriter = useDbWriter ? new DbWriterClient(dbPath) : null;
 
 try {
   db.exec("PRAGMA busy_timeout = 10000");
@@ -60,6 +63,13 @@ export function runQueuedWrite<T>(operation: () => T): T {
       wait(delays[attempt]);
     }
   }
+}
+
+export async function runDbWrite<T>(request: DbWriteRequest, fallback: () => T): Promise<T> {
+  if (dbWriter) {
+    return await dbWriter.write<T>(request);
+  }
+  return runQueuedWrite(fallback);
 }
 
 // Create Runs Table

@@ -70,7 +70,7 @@ test("Orchestrator Integration Tests", async (t) => {
       updatedAt: new Date().toISOString()
     };
 
-    runRepo.create(runData);
+    await runRepo.create(runData);
 
     // Track status transitions via eventBus
     const statusesEmitted: RunStatus[] = [];
@@ -135,7 +135,7 @@ test("Orchestrator Integration Tests", async (t) => {
       updatedAt: new Date().toISOString()
     };
 
-    runRepo.create(runData);
+    await runRepo.create(runData);
 
     const createdFilePath = path.join(process.cwd(), "test_output_file.json");
     t.after(() => {
@@ -221,7 +221,7 @@ test("Orchestrator Integration Tests", async (t) => {
       updatedAt: new Date().toISOString()
     };
 
-    runRepo.create(runData);
+    await runRepo.create(runData);
 
     let systemPromptUsed = "";
     globalThis.fetch = async (url: any, options: any) => {
@@ -255,6 +255,8 @@ test("Orchestrator Integration Tests", async (t) => {
     const prompt = buildSystemPrompt("Test Project", "/tmp/test-project", "chat", true);
 
     assert.ok(prompt.includes("CURRENT OPERATIONAL MODE: CHAT MODE"));
+    assert.ok(prompt.includes("Do not claim you can run commands"));
+    assert.ok(prompt.includes("sub-agents"));
     assert.ok(prompt.includes("Do not use emojis"));
     assert.ok(prompt.includes("Do not use bold text except for real section headings"));
     assert.ok(!prompt.includes("INITIAL PROJECT GUIDANCE"));
@@ -288,6 +290,8 @@ test("Orchestrator Integration Tests", async (t) => {
     assert.ok(plan.includes("Do not use bold text except for real section headings"));
     assert.ok(build.includes("implementation must stay strictly within it"));
     assert.ok(architect.includes("To change files, call delegate_tasks"));
+    assert.ok(architect.includes("Never delegate shell/delete/write work to utility"));
+    assert.ok(utility.includes("You cannot run commands, delete files, edit files"));
   });
 
   await t.test("Tool schemas - stay compact", () => {
@@ -329,7 +333,7 @@ test("Orchestrator Integration Tests", async (t) => {
       updatedAt: new Date().toISOString()
     };
 
-    runRepo.create(runData);
+    await runRepo.create(runData);
 
     const createdFilePath = path.join(process.cwd(), "test_perm_file.json");
     t.after(() => {
@@ -418,7 +422,7 @@ test("Orchestrator Integration Tests", async (t) => {
       updatedAt: new Date().toISOString()
     };
 
-    runRepo.create(runData);
+    await runRepo.create(runData);
 
     t.after(() => {
       if (fs.existsSync(tempJsonPath)) {
@@ -519,7 +523,7 @@ test("Orchestrator Integration Tests", async (t) => {
       updatedAt: new Date().toISOString()
     };
 
-    runRepo.create(runData);
+    await runRepo.create(runData);
 
     let callCount = 0;
     globalThis.fetch = async (_url: any, _options: any) => {
@@ -615,7 +619,7 @@ test("Orchestrator Integration Tests", async (t) => {
       updatedAt: new Date().toISOString()
     };
 
-    runRepo.create(runData);
+    await runRepo.create(runData);
 
     let callCount = 0;
     globalThis.fetch = async (_url: any, _options: any) => {
@@ -688,7 +692,7 @@ test("Orchestrator Integration Tests", async (t) => {
       if (fs.existsSync(blockedFilePath)) fs.unlinkSync(blockedFilePath);
     });
 
-    runRepo.create({
+    await runRepo.create({
       id: runId,
       title: "Plan block",
       task: "Plan only",
@@ -758,7 +762,7 @@ test("Orchestrator Integration Tests", async (t) => {
     const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository());
 
     const runId = "run-test-delegate-clamp";
-    runRepo.create({
+    await runRepo.create({
       id: runId,
       title: "Clamp",
       task: "Too many",
@@ -815,6 +819,91 @@ test("Orchestrator Integration Tests", async (t) => {
     assert.strictEqual(result.results.length, 3, "should clamp 5 requested tasks to 3");
   });
 
+  await t.test("Orchestrator - delegate_tasks supports 3 parallel sub-agents writing the same run", async () => {
+    const registry = new ProviderRegistry(testConfigPath);
+    const runRepo = new RunRepository();
+    const messageRepo = new MessageRepository();
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository());
+
+    const runId = "run-test-delegate-parallel";
+    await runRepo.create({
+      id: runId,
+      title: "Parallel",
+      task: "Parallel work",
+      status: "created",
+      providerId: "test-provider",
+      providerDisplayName: "Test Provider",
+      model: "model-1",
+      coderProviderId: "test-provider",
+      coderModel: "model-1",
+      projectPath: process.cwd(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
+
+    let callCount = 0;
+    let activeCoderCalls = 0;
+    let maxActiveCoderCalls = 0;
+    globalThis.fetch = async () => {
+      callCount++;
+      if (callCount === 1) {
+        return {
+          ok: true,
+          json: async () => ({
+            choices: [{
+              message: {
+                role: "assistant",
+                content: "Delegating in parallel.",
+                tool_calls: [{
+                  id: "call_delegate_parallel",
+                  type: "function",
+                  function: {
+                    name: "delegate_tasks",
+                    arguments: JSON.stringify({
+                      parallel: true,
+                      tasks: [
+                        { title: "Task A", instructions: "Do A" },
+                        { title: "Task B", instructions: "Do B" },
+                        { title: "Task C", instructions: "Do C" }
+                      ]
+                    })
+                  }
+                }]
+              }
+            }]
+          })
+        } as any;
+      }
+
+      if (callCount >= 2 && callCount <= 4) {
+        activeCoderCalls++;
+        maxActiveCoderCalls = Math.max(maxActiveCoderCalls, activeCoderCalls);
+        await new Promise(resolve => setTimeout(resolve, 5));
+        activeCoderCalls--;
+      }
+
+      const text = callCount === 5 ? "All subtasks complete." : `Coder finished ${callCount - 1}`;
+      return {
+        ok: true,
+        json: async () => ({ choices: [{ message: { role: "assistant", content: text } }] })
+      } as any;
+    };
+
+    await orchestrator.run(runId);
+
+    assert.ok(maxActiveCoderCalls > 1, "coder sub-agents should overlap when parallel=true");
+
+    const finishedRun = runRepo.getById(runId);
+    assert.strictEqual(finishedRun?.status, "done");
+
+    const savedMsgs = messageRepo.listByRunId(runId);
+    const toolMsg = savedMsgs.find(m => m.role === "tool");
+    assert.ok(toolMsg);
+    const result = JSON.parse(toolMsg!.content);
+    assert.strictEqual(result.parallel, true);
+    assert.strictEqual(result.results.length, 3);
+  });
+
   await t.test("Orchestrator - remember saves a memory and later runs inject it", async () => {
     const registry = new ProviderRegistry(testConfigPath);
     const runRepo = new RunRepository();
@@ -824,7 +913,7 @@ test("Orchestrator Integration Tests", async (t) => {
 
     const projectPath = process.cwd();
     const runId = "run-test-remember";
-    runRepo.create({
+    await runRepo.create({
       id: runId,
       title: "Remember",
       task: "I always want 2-space indentation",
@@ -888,7 +977,7 @@ test("Orchestrator Integration Tests", async (t) => {
 
     // A subsequent run injects the memory into the system prompt.
     const run2Id = "run-test-remember-2";
-    runRepo.create({
+    await runRepo.create({
       id: run2Id,
       title: "Next session",
       task: "Write some code",

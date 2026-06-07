@@ -50,6 +50,14 @@ export class Orchestrator {
     questions: UserQuestion[];
   }>();
 
+  // Throttles high-frequency SQLite writes during live message token streaming
+  private pendingMessageDbUpdates = new Map<string, {
+    msg: RunMessage;
+    lastWriteTime: number;
+    timer: NodeJS.Timeout | null;
+  }>();
+  private pendingDbWrites = new Set<Promise<unknown>>();
+
   constructor(
     private runRepo: RunRepository,
     private messageRepo: MessageRepository,
@@ -101,7 +109,7 @@ export class Orchestrator {
     if (!this.activeRuns.has(runId)) return { selections: [], notes: [] };
     return await new Promise<QuestionAnswerInput>((resolve) => {
       this.pendingQuestions.set(runId, { resolve, questions });
-      this.emitStatus(runId, "awaiting_input");
+      void this.emitStatus(runId, "awaiting_input");
       eventBus.emit(`run:${runId}`, { type: "question_requested", runId, questions });
     });
   }
@@ -183,7 +191,7 @@ export class Orchestrator {
 
       return await new Promise<PermissionDecision>((resolve) => {
         this.pendingPermissions.set(runId, { resolve, toolCall });
-        this.emitStatus(runId, "awaiting_permission");
+        void this.emitStatus(runId, "awaiting_permission");
         eventBus.emit(`run:${runId}`, {
           type: "permission_requested",
           runId,
@@ -198,28 +206,94 @@ export class Orchestrator {
 
   // --- Event helpers -------------------------------------------------------
 
-  private emitStatus(runId: string, status: RunStatus, extraUpdates?: Partial<Run>) {
-    this.runRepo.update(runId, { status, ...extraUpdates });
+  private trackDbWrite<T>(promise: Promise<T>): Promise<T> {
+    this.pendingDbWrites.add(promise);
+    void promise.then(
+      () => this.pendingDbWrites.delete(promise),
+      () => this.pendingDbWrites.delete(promise)
+    );
+    return promise;
+  }
+
+  private async emitStatus(runId: string, status: RunStatus, extraUpdates?: Partial<Run>) {
+    await this.trackDbWrite(this.runRepo.update(runId, { status, ...extraUpdates }));
     eventBus.emit(`run:${runId}`, { type: "status_changed", status });
   }
 
   private emitMessage(runId: string, msg: RunMessage) {
-    this.messageRepo.create(msg);
+    this.trackDbWrite(this.messageRepo.create(msg)).catch((err) => {
+      console.error(`[Orchestrator] Failed to persist message ${msg.id}:`, err.message);
+    });
     eventBus.emit(`run:${runId}`, { type: "message_created", message: msg });
   }
 
   private updateMessage(runId: string, msg: RunMessage) {
-    this.messageRepo.update(msg.id, {
-      content: msg.content,
-      reasoningContent: msg.reasoningContent,
-      rawResponse: msg.rawResponse
-    });
+    this.scheduleMessageDbUpdate(msg);
     eventBus.emit(`run:${runId}`, { type: "message_updated", message: msg });
+  }
+
+  private scheduleMessageDbUpdate(msg: RunMessage) {
+    const now = Date.now();
+    const existing = this.pendingMessageDbUpdates.get(msg.id);
+
+    if (existing) {
+      existing.msg = msg;
+      if (!existing.timer) {
+        const elapsed = now - existing.lastWriteTime;
+        const delay = Math.max(0, 1000 - elapsed);
+        existing.timer = setTimeout(() => {
+          void this.flushMessageDbUpdate(msg.id).catch((err) => {
+            console.error(`[Orchestrator] Failed to flush message update ${msg.id}:`, err.message);
+          });
+        }, delay);
+      }
+    } else {
+      // First update for this message: write immediately
+      this.trackDbWrite(this.messageRepo.update(msg.id, {
+        content: msg.content,
+        reasoningContent: msg.reasoningContent,
+        rawResponse: msg.rawResponse
+      })).catch((err) => {
+        console.error(`[Orchestrator] Failed to persist message update ${msg.id}:`, err.message);
+      });
+      this.pendingMessageDbUpdates.set(msg.id, {
+        msg,
+        lastWriteTime: now,
+        timer: null
+      });
+    }
+  }
+
+  private async flushMessageDbUpdate(msgId: string) {
+    const entry = this.pendingMessageDbUpdates.get(msgId);
+    if (!entry) return;
+
+    if (entry.timer) {
+      clearTimeout(entry.timer);
+      entry.timer = null;
+    }
+
+    await this.trackDbWrite(this.messageRepo.update(msgId, {
+      content: entry.msg.content,
+      reasoningContent: entry.msg.reasoningContent,
+      rawResponse: entry.msg.rawResponse
+    }));
+    this.pendingMessageDbUpdates.delete(msgId);
+  }
+
+  private async flushAllPendingDbUpdates() {
+    for (const msgId of this.pendingMessageDbUpdates.keys()) {
+      await this.flushMessageDbUpdate(msgId);
+    }
+    if (this.pendingDbWrites.size > 0) {
+      await Promise.allSettled([...this.pendingDbWrites]);
+    }
   }
 
   // --- Run lifecycle -------------------------------------------------------
 
-  cancel(runId: string): boolean {
+  async cancel(runId: string): Promise<boolean> {
+    await this.flushAllPendingDbUpdates();
     // Unblock any pending permission promise so the run loop can unwind.
     const pending = this.pendingPermissions.get(runId);
     if (pending) {
@@ -236,7 +310,7 @@ export class Orchestrator {
 
     if (this.activeRuns.has(runId)) {
       this.activeRuns.delete(runId);
-      this.emitStatus(runId, "cancelled");
+      await this.emitStatus(runId, "cancelled");
       eventBus.emit(`run:${runId}`, { type: "run_failed", errorMessage: "Chat generation cancelled by user." });
       console.log(`[Orchestrator] Run ${runId} has been cancelled by user.`);
       return true;
@@ -245,7 +319,7 @@ export class Orchestrator {
     // Fallback for runs marked active in DB but not in memory (e.g. after restart).
     const run = this.runRepo.getById(runId);
     if (run && (run.status === "created" || run.status === "generating" || run.status === "awaiting_permission")) {
-      this.emitStatus(runId, "cancelled");
+      await this.emitStatus(runId, "cancelled");
       eventBus.emit(`run:${runId}`, { type: "run_failed", errorMessage: "Chat generation cancelled by user." });
       console.log(`[Orchestrator] Run ${runId} (inactive in memory) has been marked as cancelled.`);
       return true;
@@ -405,7 +479,7 @@ export class Orchestrator {
   ): Promise<void> {
     try {
       console.log(`[Orchestrator] Run ${runId} - Entering GENERATING state`);
-      this.emitStatus(runId, "generating");
+      await this.emitStatus(runId, "generating");
 
       // Dual-model: when a coder model is wired up, the main model is the
       // architect — it gets the delegate_tasks tool and architect instructions.
@@ -470,7 +544,7 @@ export class Orchestrator {
         agentRole: delegation ? "planner" : undefined
       });
 
-      this.emitStatus(runId, "done");
+      await this.emitStatus(runId, "done");
       eventBus.emit(`run:${runId}`, { type: "run_completed", finalOutput: finalText });
       console.log(`[Orchestrator] Run ${runId} - Completed successfully.`);
     } catch (error: any) {
@@ -488,10 +562,11 @@ export class Orchestrator {
         };
         this.emitMessage(runId, errorMsg);
 
-        this.emitStatus(runId, "failed", { errorMessage: error.message });
+        await this.emitStatus(runId, "failed", { errorMessage: error.message });
         eventBus.emit(`run:${runId}`, { type: "run_failed", errorMessage: error.message });
       }
     } finally {
+      await this.flushAllPendingDbUpdates();
       this.activeRuns.delete(runId);
       this.permissionChain.delete(runId);
       this.pendingQuestions.delete(runId);
@@ -575,6 +650,7 @@ export class Orchestrator {
       });
 
       checkCancelled();
+      await this.flushMessageDbUpdate(msgId);
 
       // Prompt-cache measurement: one line per model call so cache hit-rate is
       // observable live in the server console during a run. inputTokens is the
@@ -965,7 +1041,7 @@ export class Orchestrator {
       if (decision === "deny") {
         return JSON.stringify({ success: false, error: "Permission denied by user." });
       }
-      this.emitStatus(runId, "generating");
+      await this.emitStatus(runId, "generating");
     }
     return executeWorkspaceToolAsync(run, toolCall);
   }
@@ -974,7 +1050,7 @@ export class Orchestrator {
    * Renames the run from the model's set_chat_title call and broadcasts the new
    * title to the UI. Never throws — failures come back as a JSON error.
    */
-  private executeSetTitle(runId: string, toolCall: any): string {
+  private async executeSetTitle(runId: string, toolCall: any): Promise<string> {
     try {
       const args = JSON.parse(toolCall.function.arguments || "{}");
       let title = typeof args.title === "string" ? args.title.trim() : "";
@@ -984,7 +1060,7 @@ export class Orchestrator {
         return JSON.stringify({ success: false, error: "Title was empty." });
       }
 
-      this.runRepo.update(runId, { title });
+      await this.runRepo.update(runId, { title });
       eventBus.emit(`run:${runId}`, { type: "run_title_changed", runId, title });
 
       return JSON.stringify({ success: true, title });
@@ -1051,7 +1127,7 @@ export class Orchestrator {
     if (!this.activeRuns.has(runId)) {
       return JSON.stringify({ success: false, error: "Cancelled before the user answered." });
     }
-    this.emitStatus(runId, "generating");
+    await this.emitStatus(runId, "generating");
 
     const answers = questions.map((q, i) => {
       const note = (notes[i] ?? "").trim();
@@ -1070,7 +1146,7 @@ export class Orchestrator {
    * no permission prompt, no SSE; the user manages memories in Settings. A
    * "project" memory is scoped to this run's project path. Never throws.
    */
-  private executeRemember(run: Run, toolCall: any): string {
+  private async executeRemember(run: Run, toolCall: any): Promise<string> {
     try {
       const args = JSON.parse(toolCall.function.arguments || "{}");
       const content = typeof args.content === "string" ? args.content.trim() : "";
@@ -1081,7 +1157,7 @@ export class Orchestrator {
       // Revise an existing memory in place when the model passes update_id.
       const updateId = typeof args.update_id === "number" ? args.update_id : Number(args.update_id);
       if (Number.isInteger(updateId) && updateId > 0) {
-        const updated = this.memoryRepo.update(updateId, content);
+        const updated = await this.memoryRepo.update(updateId, content);
         if (updated) {
           return JSON.stringify({ success: true, action: "updated", memory: updated });
         }
@@ -1089,7 +1165,7 @@ export class Orchestrator {
       }
 
       const scope = args.scope === "global" ? "global" : "project";
-      const memory = this.memoryRepo.create({
+      const memory = await this.memoryRepo.create({
         scope,
         projectPath: scope === "project" ? (run.projectPath || "") : "",
         category: args.category,
@@ -1106,7 +1182,7 @@ export class Orchestrator {
    * when the model invokes update_plan; never throws — failures are returned to
    * the model as a JSON error so it can react.
    */
-  private executePlanUpdate(runId: string, toolCall: any): string {
+  private async executePlanUpdate(runId: string, toolCall: any): Promise<string> {
     try {
       const args = JSON.parse(toolCall.function.arguments || "{}");
       const rawTasks = Array.isArray(args.tasks) ? args.tasks : [];
@@ -1115,7 +1191,7 @@ export class Orchestrator {
         status: t?.status === "in_progress" || t?.status === "completed" ? t.status : "pending"
       }));
 
-      const plan = this.planRepo.upsert(runId, {
+      const plan = await this.planRepo.upsert(runId, {
         title: typeof args.title === "string" ? args.title : undefined,
         body: typeof args.body === "string" ? args.body : undefined,
         tasks,

@@ -29,7 +29,7 @@ export function registerMemoryRoutes(server: FastifyInstance, ctx: AppContext) {
       reply.status(400);
       return { error: "projectPath is required for a project-scoped memory" };
     }
-    return ctx.memoryRepo.create({
+    return await ctx.memoryRepo.create({
       scope,
       projectPath: scope === "project" ? body.projectPath!.trim() : "",
       category,
@@ -51,7 +51,7 @@ export function registerMemoryRoutes(server: FastifyInstance, ctx: AppContext) {
       reply.status(400);
       return { error: "content is required" };
     }
-    const updated = ctx.memoryRepo.update(numericId, content);
+    const updated = await ctx.memoryRepo.update(numericId, content);
     if (!updated) {
       reply.status(404);
       return { error: `Memory with id "${id}" not found` };
@@ -67,7 +67,7 @@ export function registerMemoryRoutes(server: FastifyInstance, ctx: AppContext) {
       reply.status(400);
       return { error: "Invalid memory id" };
     }
-    const removed = ctx.memoryRepo.deleteById(numericId);
+    const removed = await ctx.memoryRepo.deleteById(numericId);
     if (!removed) {
       reply.status(404);
       return { error: `Memory with id "${id}" not found` };
@@ -77,7 +77,7 @@ export function registerMemoryRoutes(server: FastifyInstance, ctx: AppContext) {
 
   // Clear all memories.
   server.delete("/api/memories", async () => {
-    ctx.memoryRepo.clear();
+    await ctx.memoryRepo.clear();
     return { success: true };
   });
 }

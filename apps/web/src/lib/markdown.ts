@@ -80,13 +80,39 @@ marked.use({
   }
 });
 
+const markdownCache = new Map<string, { content: string; rendered: string }>();
+const MAX_CACHE_SIZE = 500;
+
+export function clearMarkdownCache(): void {
+  markdownCache.clear();
+}
+
 /** Renders markdown to HTML, falling back to raw text on parse errors. */
 export function renderMarkdown(content: string, idPrefix?: string): string {
   if (!content) return '';
+
+  const cacheKey = idPrefix ? `${idPrefix}:${content.length}` : null;
+  if (cacheKey) {
+    const cached = markdownCache.get(cacheKey);
+    if (cached && cached.content === content) {
+      return cached.rendered;
+    }
+  }
+
   codeBlockCounter = 0;
   currentPrefix = idPrefix || '';
   try {
-    return marked.parse(content) as string;
+    const rendered = marked.parse(content) as string;
+    if (cacheKey) {
+      if (markdownCache.size >= MAX_CACHE_SIZE) {
+        const firstKey = markdownCache.keys().next().value;
+        if (firstKey !== undefined) {
+          markdownCache.delete(firstKey);
+        }
+      }
+      markdownCache.set(cacheKey, { content, rendered });
+    }
+    return rendered;
   } catch (err) {
     console.error('Markdown parsing error:', err);
     return content;
