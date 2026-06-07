@@ -947,6 +947,19 @@ export class Orchestrator {
       return JSON.stringify({ success: false, error: `Invalid ask_user_question arguments: ${e.message}` });
     }
 
+    // In plan mode, once a plan exists the plan panel already carries the
+    // approve/revise/reject controls ("Start building"). Block ask_user_question
+    // here so the model can't pop a redundant approval card alongside the panel;
+    // it should simply end its turn and let the user approve via the panel.
+    const run = this.runRepo.getById(runId);
+    if (run?.mode === "plan" && this.planRepo.getActive(runId)) {
+      return JSON.stringify({
+        success: false,
+        error:
+          "Do not ask for approval here. A plan already exists; the plan panel provides the approve/revise/reject controls. End your turn and let the user decide via the panel."
+      });
+    }
+
     const rawQuestions = Array.isArray(args.questions) ? args.questions : [];
     const questions: UserQuestion[] = rawQuestions
       .filter((q: any) => q && typeof q.question === "string" && q.question.trim() && Array.isArray(q.options))

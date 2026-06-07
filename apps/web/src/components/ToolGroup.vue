@@ -23,6 +23,85 @@ const detailsExpanded = ref<Record<number, boolean>>({});
 const copiedParameters = ref<Record<number, boolean>>({});
 const copiedResults = ref<Record<number, boolean>>({});
 
+// Consecutive read-only inspection calls in the same turn are visually noisy
+// (a long stack of "File read: …" / "Directory listed: …" rows). We fold any
+// run of >= CLUSTER_MIN such calls into a single collapsible summary row.
+const CLUSTERABLE = new Set(['read_file', 'list_directory', 'search_files']);
+const CLUSTER_MIN = 3;
+
+interface ToolCluster {
+  firstIdx: number;
+  indices: number[];
+}
+
+const clusters = computed<ToolCluster[]>(() => {
+  const out: ToolCluster[] = [];
+  let run: number[] = [];
+  const flush = () => {
+    if (run.length >= CLUSTER_MIN) out.push({ firstIdx: run[0], indices: [...run] });
+    run = [];
+  };
+  props.toolCalls.forEach((tc, idx) => {
+    if (CLUSTERABLE.has(tc.function?.name)) run.push(idx);
+    else flush();
+  });
+  flush();
+  return out;
+});
+
+// idx -> the cluster it belongs to (if any), and idx -> cluster it starts.
+const clusterByIndex = computed(() => {
+  const m = new Map<number, ToolCluster>();
+  for (const c of clusters.value) for (const i of c.indices) m.set(i, c);
+  return m;
+});
+const clusterByFirst = computed(() => {
+  const m = new Map<number, ToolCluster>();
+  for (const c of clusters.value) m.set(c.firstIdx, c);
+  return m;
+});
+
+const clustersExpanded = ref<Record<number, boolean>>({});
+
+function toggleCluster(firstIdx: number) {
+  clustersExpanded.value[firstIdx] = !clustersExpanded.value[firstIdx];
+}
+function isClusterExpanded(firstIdx: number): boolean {
+  return !!clustersExpanded.value[firstIdx];
+}
+
+/** The cluster that STARTS at this index, for rendering the summary header. */
+function clusterStart(idx: number): ToolCluster | undefined {
+  return clusterByFirst.value.get(idx);
+}
+function isClustered(idx: number): boolean {
+  return clusterByIndex.value.has(idx);
+}
+/** A clustered row is hidden until its summary header is expanded. */
+function isRowVisible(idx: number): boolean {
+  const c = clusterByIndex.value.get(idx);
+  return c ? isClusterExpanded(c.firstIdx) : true;
+}
+
+function clusterLabel(c: ToolCluster): string {
+  const names = c.indices.map(i => props.toolCalls[i].function?.name);
+  const n = c.indices.length;
+  if (names.every(name => name === 'read_file')) return `Read ${n} files`;
+  if (names.every(name => name === 'list_directory')) return `Listed ${n} directories`;
+  if (names.every(name => name === 'search_files')) return `Ran ${n} searches`;
+  return `Inspected ${n} items`;
+}
+
+function clusterStatus(c: ToolCluster): 'success' | 'failed' | 'pending' {
+  let anyPending = false;
+  for (const i of c.indices) {
+    const res = props.toolResponses[i];
+    if (!res) anyPending = true;
+    else if (!isToolSuccess(res.content)) return 'failed';
+  }
+  return anyPending ? 'pending' : 'success';
+}
+
 function copyParameters(idx: number, text: string) {
   navigator.clipboard.writeText(text);
   copiedParameters.value[idx] = true;
@@ -445,6 +524,35 @@ function formatToolResult(name: string, contentJson: string): string {
     <!-- Tool Call Accordions -->
     <div class="tool-calls-list">
       <template v-for="(tc, idx) in toolCalls" :key="idx">
+      <!-- Summary header for a folded run of consecutive inspection calls. -->
+      <header
+        v-if="clusterStart(idx)"
+        class="step-row tool-cluster-header"
+        :class="{ 'is-expanded': isClusterExpanded(idx) }"
+        @click="toggleCluster(idx)"
+      >
+        <svg class="step-row-toggle" :class="{ rotated: isClusterExpanded(idx) }" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m6 9 6 6 6-6"></path>
+        </svg>
+        <svg class="step-row-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="8" y1="6" x2="21" y2="6"></line>
+          <line x1="8" y1="12" x2="21" y2="12"></line>
+          <line x1="8" y1="18" x2="21" y2="18"></line>
+          <line x1="3" y1="6" x2="3.01" y2="6"></line>
+          <line x1="3" y1="12" x2="3.01" y2="12"></line>
+          <line x1="3" y1="18" x2="3.01" y2="18"></line>
+        </svg>
+        <span class="step-row-label">{{ clusterLabel(clusterStart(idx)!) }}</span>
+        <svg v-if="clusterStatus(clusterStart(idx)!) === 'success'" class="status-icon success" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" title="Success">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+        <svg v-else-if="clusterStatus(clusterStart(idx)!) === 'failed'" class="status-icon error" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" title="Error">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+        <span v-else class="status-dot pending" title="Running..."></span>
+      </header>
+
       <!-- update_plan renders as a clickable card that opens the plan panel -->
       <button
         v-if="tc.function?.name === 'update_plan'"
@@ -466,9 +574,9 @@ function formatToolResult(name: string, contentJson: string): string {
       </button>
 
       <div
-        v-else
+        v-else-if="isRowVisible(idx)"
         class="tool-call-accordion"
-        :class="{ 'is-expanded': detailsExpanded[idx] }"
+        :class="{ 'is-expanded': detailsExpanded[idx], 'clustered-row': isClustered(idx) }"
       >
         <header class="step-row" @click="toggleDetails(idx)">
           <svg class="step-row-toggle" :class="{ rotated: detailsExpanded[idx] }" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -739,6 +847,19 @@ function formatToolResult(name: string, contentJson: string): string {
 .tool-call-accordion {
   width: 100%;
   overflow: hidden;
+}
+
+/* Folded inspection-call summary header (shares the .step-row look). */
+.tool-cluster-header {
+  cursor: pointer;
+  user-select: none;
+}
+
+/* Individual rows revealed under an expanded cluster sit indented beneath it. */
+.tool-call-accordion.clustered-row {
+  margin-left: 18px;
+  border-left: 1px solid var(--border-soft);
+  padding-left: 8px;
 }
 
 .status-icon {
