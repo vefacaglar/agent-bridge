@@ -842,8 +842,17 @@ export class Orchestrator {
    */
   private async runToolCall(runId: string, run: Run, toolCall: any): Promise<string> {
     // update_plan is an internal bookkeeping tool (no filesystem/network side
-    // effects), so it runs silently without any permission prompt.
+    // effects), so it runs silently without any permission prompt. The stable
+    // plan PANEL belongs to Plan mode only — in any other mode (Build/Chat) we
+    // reject the call (some models invoke it out of habit even though it isn't
+    // offered) and tell the model to write the plan as plain inline text instead.
     if (toolCall.function?.name === "update_plan") {
+      if (run.mode !== "plan") {
+        return JSON.stringify({
+          success: false,
+          error: `update_plan is only available in Plan mode. In ${run.mode} mode, do not create a plan panel — write any plan as plain text directly in your reply, then proceed.`
+        });
+      }
       return this.executePlanUpdate(runId, toolCall);
     }
 

@@ -268,7 +268,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeyDown, true));
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 8px 12px;
-  overflow-x: auto;
+  /* Keep long commands/args contained: a small box that scrolls inside itself
+     instead of stretching the whole card and pushing the options off-screen. */
+  max-height: 180px;
+  overflow: auto;
 }
 
 .cc-perm-pathbox code {

@@ -1,5 +1,6 @@
 import type { CompletionRequest, CompletionResponse } from "@agent-bridge/shared";
 import type { ModelProvider } from "./ModelProvider.js";
+import { DEFAULT_MAX_TOKENS } from "./ModelProvider.js";
 
 // Max time to wait with no response data before aborting. Reset on every chunk,
 // so a model that keeps streaming (e.g. long reasoning) is never cut off.
@@ -116,7 +117,7 @@ export class OpenAICompatibleProvider implements ModelProvider {
       model: request.model,
       messages,
       temperature: request.temperature ?? 0.7,
-      max_tokens: request.maxTokens
+      max_tokens: request.maxTokens ?? DEFAULT_MAX_TOKENS
     };
 
     if (request.tools && request.tools.length > 0) {

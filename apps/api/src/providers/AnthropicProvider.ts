@@ -1,5 +1,6 @@
 import type { CompletionRequest, CompletionResponse, ChatMessage } from "@agent-bridge/shared";
 import type { ModelProvider } from "./ModelProvider.js";
+import { DEFAULT_MAX_TOKENS } from "./ModelProvider.js";
 
 // Max time to wait for the (non-streamed) response before aborting. Generous so
 // long generations aren't cut off prematurely.
@@ -154,7 +155,7 @@ export class AnthropicProvider implements ModelProvider {
     const body: any = {
       model: request.model,
       messages,
-      max_tokens: request.maxTokens ?? 4096, // Anthropic requires max_tokens
+      max_tokens: request.maxTokens ?? DEFAULT_MAX_TOKENS, // Anthropic requires max_tokens
       temperature: request.temperature ?? 0.7
     };
 
