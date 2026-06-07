@@ -69,6 +69,13 @@ function isPlanExpanded(messageId: string): boolean {
 // only applies to reasoning panels.
 const expandedReasoning = ref<Record<string, boolean>>({});
 
+// System Error Accordion State
+const expandedErrors = ref<Record<string, boolean>>({});
+
+function toggleError(id: string) {
+  expandedErrors.value[id] = !expandedErrors.value[id];
+}
+
 // The most recent group (assistant or tool_group) that carries reasoning.
 const latestReasoningId = computed(() => {
   for (let i = props.groupedMessages.length - 1; i >= 0; i--) {
@@ -419,44 +426,70 @@ const formattedElapsedTime = computed(() => {
         </div>
       </article>
 
-      <article v-else-if="group.type === 'system'" class="assistant-message system-error-message">
-        <div class="assistant-meta">
-          <span class="agent-badge danger-badge">System Error</span>
-          <span>{{ formatTime(group.message.createdAt) }}</span>
+      <div v-else-if="group.type === 'system'" class="system-error-accordion" :class="{ 'is-expanded': expandedErrors[group.id] }">
+        <header class="step-row" @click="toggleError(group.id)">
+          <svg class="step-row-toggle" :class="{ rotated: expandedErrors[group.id] }" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m6 9 6 6 6-6"></path>
+          </svg>
+          <svg class="step-row-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+          <span class="step-row-label">System Error</span>
+          <span style="font-size: 0.72rem; color: var(--faint); font-family: monospace; margin-left: 6px; user-select: none;">
+            {{ formatTime(group.message.createdAt) }}
+          </span>
+        </header>
+
+        <div v-if="expandedErrors[group.id]" class="error-details">
+          <div class="error-bubble">
+            <div class="error-icon-wrap">
+              <svg class="error-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+            </div>
+            <div class="error-text">
+              {{ formatSystemErrorMessage(group.message.content) }}
+            </div>
+          </div>
         </div>
+      </div>
+    </template>
+
+    <div v-if="activeRun.status === 'failed' && !hasSystemErrorInHistory" class="system-error-accordion" :class="{ 'is-expanded': expandedErrors['trailing-error'] }">
+      <header class="step-row" @click="toggleError('trailing-error')">
+        <svg class="step-row-toggle" :class="{ rotated: expandedErrors['trailing-error'] }" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m6 9 6 6 6-6"></path>
+        </svg>
+        <svg class="step-row-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        <span class="step-row-label">System Error</span>
+        <span style="font-size: 0.72rem; color: var(--faint); font-family: monospace; margin-left: 6px; user-select: none;">
+          {{ formatTime(activeRun.updatedAt) }}
+        </span>
+      </header>
+
+      <div v-if="expandedErrors['trailing-error']" class="error-details">
         <div class="error-bubble">
           <div class="error-icon-wrap">
-            <svg class="error-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect width="18" height="18" x="3" y="3" rx="2" />
-              <path d="m15 9-6 6" />
-              <path d="m9 9 6 6" />
+            <svg class="error-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
             </svg>
           </div>
           <div class="error-text">
-            {{ formatSystemErrorMessage(group.message.content) }}
+            {{ formatSystemErrorMessage(activeRun.errorMessage || 'Chat generation failed.') }}
           </div>
         </div>
-      </article>
-    </template>
-
-    <article v-if="activeRun.status === 'failed' && !hasSystemErrorInHistory" class="assistant-message system-error-message">
-      <div class="assistant-meta">
-        <span class="agent-badge danger-badge">System Error</span>
-        <span>{{ formatTime(activeRun.updatedAt) }}</span>
       </div>
-      <div class="error-bubble">
-        <div class="error-icon-wrap">
-          <svg class="error-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect width="18" height="18" x="3" y="3" rx="2" />
-            <path d="m15 9-6 6" />
-            <path d="m9 9 6 6" />
-          </svg>
-        </div>
-        <div class="error-text">
-          {{ formatSystemErrorMessage(activeRun.errorMessage || 'Chat generation failed.') }}
-        </div>
-      </div>
-    </article>
+    </div>
 
     <!-- Lightbox Modal -->
     <Transition name="fade">
@@ -929,6 +962,7 @@ const formattedElapsedTime = computed(() => {
 .assistant-message,
 .plan-thread-link,
 .coder-shortcut-row,
+.system-error-accordion,
 :deep(.tool-group-wrap),
 :deep(.reasoning-terminal-container) {
   animation: messageEnter 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -951,6 +985,28 @@ const formattedElapsedTime = computed(() => {
    .step-row classes (style.css). Only the navigate nudge stays component-local. */
 .coder-shortcut-btn:hover .arrow-right-icon {
   transform: translateX(1px);
+}
+
+.system-error-accordion {
+  width: 100%;
+  margin: 2px 0;
+}
+
+.system-error-accordion .step-row-icon {
+  color: var(--danger);
+}
+
+.system-error-accordion .step-row-label {
+  color: var(--danger);
+  font-weight: 550;
+}
+
+.error-details {
+  padding: 8px 0 12px;
+}
+
+.error-details .error-bubble {
+  margin-top: 0;
 }
 
 </style>
