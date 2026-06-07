@@ -32,11 +32,7 @@ watch(
   { immediate: true }
 );
 
-const commentPlaceholder = computed(() => {
-  const opts = currentQuestion.value?.options || [];
-  const isTurkish = opts.includes('Hayır') || opts.includes('Evet') || /[\u011e\u011f\u0130\u0131\u015e\u015f\u00c7\u00e7\u00d6\u00f6\u00dc\u00fc]/i.test(currentQuestion.value?.question || '');
-  return isTurkish ? 'Özel notunuz (isteğe bağlı)...' : 'Your own comment (optional)...';
-});
+const commentPlaceholder = computed(() => 'Your own comment (optional)...');
 
 
 function handleOptionSelect(opt: string) {
@@ -55,20 +51,26 @@ function goNext() {
 }
 
 function submit() {
-  let reply = '';
+  const parts: string[] = [];
   confirmations.value.forEach((q, idx) => {
     const sel = selections.value[idx];
     const note = notes.value[idx]?.trim();
-    if (idx > 0) reply += '\n\n';
-    
-    reply += `${q.question ? q.question + ': ' : ''}${sel}`;
-    if (note) {
-      const isTurkish = q.options.includes('Hayır') || q.options.includes('Evet') || /[\u011e\u011f\u0130\u0131\u015e\u015f\u00c7\u00e7\u00d6\u00f6\u00dc\u00fc]/i.test(props.group?.message?.content || '');
-      reply += isTurkish ? ` (Not: ${note})` : ` (Note: ${note})`;
+    if (!sel) {
+      // Free-form answer typed in the note field (no Yes/No picked).
+      if (note) parts.push(note);
+      return;
     }
+    let line = `${q.question ? q.question + ': ' : ''}${sel}`;
+    if (note) {
+      line += ` (Note: ${note})`;
+    }
+    parts.push(line);
   });
   
-  emit('reply', reply);
+  // Nothing selected and nothing typed — don't send an empty reply.
+  if (parts.length === 0) return;
+
+  emit('reply', parts.join('\n\n'));
   currentIndex.value = 0;
   selections.value = [];
   notes.value = [];
@@ -93,12 +95,13 @@ function submit() {
           {{ opt }}
         </ThemedButton>
       </div>
-      <textarea
+      <input
         v-model="notes[currentIndex]"
+        type="text"
         class="confirm-note"
-        rows="2"
         :placeholder="commentPlaceholder"
-      ></textarea>
+        @keydown.enter.prevent="submit"
+      />
       
       <div v-if="confirmations.length > 1" class="confirm-card-footer">
         <ThemedButton
