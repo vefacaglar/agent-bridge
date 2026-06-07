@@ -7,6 +7,7 @@ interface PendingRequest {
   resolve: (value: any) => void;
   reject: (err: Error) => void;
   timer: NodeJS.Timeout;
+  request: DbWriteRequest;
 }
 
 export interface DbWriteRequest {
@@ -40,10 +41,37 @@ export class DbWriterClient {
   private pending = new Map<string, PendingRequest>();
   private nextId = 1;
   private stderrTail = "";
+  private closing = false;
 
-  constructor(private dbPath: string, private timeoutMs = 15000) {}
+  constructor(private dbPath: string, private timeoutMs = 15000) {
+    // Run recovery in the background on startup
+    this.recoverPendingWrites().catch(err => {
+      console.error("[DbWriterClient] Background recovery failed:", err);
+    });
+
+    const cleanUp = () => {
+      this.close();
+    };
+
+    process.on("exit", cleanUp);
+    process.on("SIGINT", () => {
+      this.close();
+      process.exit(0);
+    });
+    process.on("SIGTERM", () => {
+      this.close();
+      process.exit(0);
+    });
+    process.on("SIGHUP", () => {
+      this.close();
+      process.exit(0);
+    });
+  }
 
   async write<T = unknown>(request: DbWriteRequest): Promise<T> {
+    if (this.closing) {
+      throw new Error("DB writer is closing, cannot accept new writes.");
+    }
     const child = this.ensureStarted();
     const id = String(this.nextId++);
     const payload = JSON.stringify({ id, ...request }) + "\n";
@@ -57,7 +85,8 @@ export class DbWriterClient {
       this.pending.set(id, {
         resolve,
         reject,
-        timer
+        timer,
+        request
       });
 
       child.stdin.write(payload, "utf8", (err) => {
@@ -72,10 +101,53 @@ export class DbWriterClient {
   }
 
   close(): void {
+    if (this.closing) return;
+    this.closing = true;
+    this.savePendingWrites();
     if (!this.child) return;
     this.child.stdin.end();
     this.child.kill();
     this.child = null;
+  }
+
+  private savePendingWrites(): void {
+    if (this.pending.size === 0) return;
+    const writes = Array.from(this.pending.values()).map(p => p.request);
+    const backupPath = this.dbPath + ".pending-writes.json";
+    try {
+      fs.writeFileSync(backupPath, JSON.stringify(writes, null, 2), "utf8");
+      console.log(`[DbWriterClient] Saved ${writes.length} pending writes to ${backupPath}`);
+    } catch (err) {
+      console.error(`[DbWriterClient] Failed to save pending writes:`, err);
+    }
+  }
+
+  private async recoverPendingWrites(): Promise<void> {
+    const backupPath = this.dbPath + ".pending-writes.json";
+    if (!fs.existsSync(backupPath)) return;
+
+    try {
+      const data = fs.readFileSync(backupPath, "utf8");
+      const writes: DbWriteRequest[] = JSON.parse(data);
+      console.log(`[DbWriterClient] Recovering ${writes.length} pending database writes...`);
+
+      for (const request of writes) {
+        try {
+          await this.write(request);
+        } catch (err: any) {
+          if (err.message && err.message.includes("UNIQUE constraint failed")) {
+            console.log(`[DbWriterClient] Recovered write for ${request.op} already exists, skipping.`);
+          } else {
+            console.error(`[DbWriterClient] Failed to execute recovered write for ${request.op}:`, err);
+          }
+        }
+      }
+
+      fs.unlinkSync(backupPath);
+      console.log("[DbWriterClient] Pending database writes recovery completed.");
+    } catch (err) {
+      console.error("[DbWriterClient] Error during pending database writes recovery:", err);
+    }
   }
 
   private ensureStarted(): ChildProcessWithoutNullStreams {

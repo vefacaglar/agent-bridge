@@ -21,12 +21,16 @@ function backendEnv(port: number): Record<string, string> {
 
 /** Forks the bundled backend as a child process (prod). */
 export function startBackend(port: number): void {
+  if (child) return;
   child = utilityProcess.fork(backendScript(), [], {
     env: backendEnv(port),
     stdio: "pipe",
   });
   child.stdout?.on("data", (d) => process.stdout.write(`[backend] ${d}`));
   child.stderr?.on("data", (d) => process.stderr.write(`[backend] ${d}`));
+  child.once("exit", () => {
+    child = null;
+  });
 }
 
 /** Stops the running backend child, resolving once it has exited. */

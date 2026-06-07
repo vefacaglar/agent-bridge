@@ -110,8 +110,11 @@ app.whenReady().then(async () => {
   const port = await ensureBackend();
   createWindow(port);
 
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow(resolvePort());
+  app.on("activate", async () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      const port = await ensureBackend();
+      createWindow(port);
+    }
   });
 });
 
@@ -120,6 +123,14 @@ app.on("window-all-closed", async () => {
   if (process.platform !== "darwin") app.quit();
 });
 
-app.on("before-quit", async () => {
-  await stopBackend();
+let isQuitting = false;
+
+app.on("before-quit", (event) => {
+  if (!isQuitting) {
+    event.preventDefault();
+    isQuitting = true;
+    stopBackend().finally(() => {
+      app.quit();
+    });
+  }
 });
