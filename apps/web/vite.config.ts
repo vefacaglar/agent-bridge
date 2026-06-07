@@ -31,7 +31,12 @@ function resolveBackendPort(): number {
 }
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ command }) => ({
+  // The packaged Electron app loads index.html over file://, so built asset
+  // paths must be relative ("./assets/...") rather than absolute ("/assets/...")
+  // which would resolve to the filesystem root and 404 (blank window). The dev
+  // server keeps the absolute base.
+  base: command === "build" ? "./" : "/",
   plugins: [vue()],
   server: {
     // Fixed port so the Electron dev window can rely on it (no fallback to 5174).
@@ -41,4 +46,4 @@ export default defineConfig({
   define: {
     'import.meta.env.VITE_API_BASE': JSON.stringify(`http://localhost:${resolveBackendPort()}`),
   },
-})
+}))
