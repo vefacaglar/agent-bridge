@@ -45,9 +45,14 @@ export function registerRunRoutes(server: FastifyInstance, ctx: AppContext) {
     const providerDisplayName = providerMeta ? providerMeta.displayName : providerId;
 
     const runId = `run-${Date.now()}`;
-    // Sessions start unnamed; the model renames them via the set_chat_title tool
-    // once the user's intent is clear.
-    const title = "New session…";
+    // Sessions start named with the user's first message; the model can rename them later.
+    let title = "New session…";
+    if (task) {
+      const firstLine = task.trim().split('\n')[0].trim();
+      if (firstLine) {
+        title = firstLine.length > 40 ? firstLine.substring(0, 40).trim() + "…" : firstLine;
+      }
+    }
     const project = normalizeProject(ctx, projectPath, projectName);
 
     const run = {

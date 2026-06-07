@@ -119,22 +119,26 @@ export function useChatSession(options: ChatSessionOptions) {
     clearPendingMessageUpdates();
     clearMarkdownCache();
 
-    activeRunId.value = run.id;
-    localStorage.setItem('activeRunId', run.id);
-    activeRun.value = { ...run };
-    options.activeProjectPath.value = run.projectPath || options.activeProjectPath.value;
+    // Refresh the list of runs to get the latest titles, statuses, etc. from server
+    await loadRuns();
+    const latestRun = runs.value.find(r => r.id === run.id) || run;
+
+    activeRunId.value = latestRun.id;
+    localStorage.setItem('activeRunId', latestRun.id);
+    activeRun.value = { ...latestRun };
+    options.activeProjectPath.value = latestRun.projectPath || options.activeProjectPath.value;
     taskInput.value = '';
     showPermissionModal.value = false;
     pendingPermissionRequest.value = null;
     pendingQuestionRequest.value = null;
 
-    await loadMessages(run.id);
-    currentPlan.value = await api.getRunPlan(run.id);
-    await hydratePendingRequest(run.id);
+    await loadMessages(latestRun.id);
+    currentPlan.value = await api.getRunPlan(latestRun.id);
+    await hydratePendingRequest(latestRun.id);
 
-    if (ACTIVE_STATUSES.includes(run.status)) {
+    if (ACTIVE_STATUSES.includes(latestRun.status)) {
       isRunning.value = true;
-      connectEventSource(run.id);
+      connectEventSource(latestRun.id);
     } else {
       isRunning.value = false;
     }
