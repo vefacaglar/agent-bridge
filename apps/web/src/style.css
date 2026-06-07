@@ -16,7 +16,7 @@
   --sidebar: #0f0f11;
   --sidebar-active: #26262a;
   --card-bg: #0f0f11;
-  --surface: #1c1c1f;
+  --surface: rgba(255, 255, 255, 0.03);
   --surface-strong: #333338;
   --surface-elevated: #222225;
   --control-bg: #242423;

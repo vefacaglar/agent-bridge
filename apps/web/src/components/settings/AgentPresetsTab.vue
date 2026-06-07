@@ -504,6 +504,7 @@ async function handleDelete(preset: AgentPreset) {
   justify-content: space-between;
   gap: 16px;
   padding: 14px 16px;
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
   margin-bottom: 10px;

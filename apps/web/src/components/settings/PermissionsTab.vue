@@ -99,7 +99,7 @@ function ruleScopeText(rule: PermissionRule): string {
   align-items: flex-start;
   gap: 12px;
   padding: 14px 16px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
   height: 84px; /* default collapsed height */

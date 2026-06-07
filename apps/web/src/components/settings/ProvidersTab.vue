@@ -469,7 +469,7 @@ async function handleFetchModels() {
 
 .provider-item {
   padding: 16px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
   display: flex;
@@ -542,7 +542,7 @@ async function handleFetchModels() {
 
 /* Edit form styling */
 .edit-form-card {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 20px;

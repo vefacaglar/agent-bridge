@@ -199,7 +199,7 @@ function submitAdd() {
   gap: 10px;
   padding: 14px;
   margin-bottom: 18px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
 }
@@ -283,7 +283,7 @@ function submitAdd() {
   align-items: flex-start;
   gap: 10px;
   padding: 12px 14px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
 }
