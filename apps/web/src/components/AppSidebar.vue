@@ -211,7 +211,7 @@ function onDeleteProject(path: string, event: Event) {
 <style scoped>
 .sidebar {
   gap: 6px;
-  padding: 0 12px 12px !important;
+  padding: var(--shell-inset) 12px 12px !important;
 }
 
 .nav-action {
@@ -223,13 +223,13 @@ function onDeleteProject(path: string, event: Event) {
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  height: 36px;
+  height: var(--top-bar-h);
   flex: 0 0 auto;
   padding: 0;
   background: transparent;
   border: none;
   gap: 6px;
-  margin-top: 4px;
+  margin-top: 0;
 }
 
 .search-btn,

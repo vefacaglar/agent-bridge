@@ -457,13 +457,11 @@ defineExpose({
   display: flex;
   flex-direction: column;
   min-height: 0;
-  border: 1px solid var(--border-soft);
-  border-radius: 14px;
-  margin: 12px 12px 12px 0;
+  border: none;
+  border-radius: 0;
+  margin: 0;
+  padding-top: var(--shell-inset);
   background: var(--card-bg);
-  box-shadow:
-    0 20px 60px rgba(0, 0, 0, 0.34),
-    inset 0 1px 0 rgba(255, 255, 255, 0.035);
   overflow: hidden;
   opacity: 1;
   transform: translateX(0);
@@ -475,7 +473,7 @@ defineExpose({
 }
 
 .workspace-panel.collapsed {
-  margin: 12px 0;
+  margin: 0;
   border-color: transparent;
   opacity: 0;
   pointer-events: none;
@@ -488,7 +486,7 @@ defineExpose({
   gap: 10px;
   height: var(--top-bar-h);
   padding: 0 var(--card-pad-x);
-  border-bottom: 1px solid var(--border-soft);
+  border-bottom: none;
   flex: 0 0 auto;
 }
 
