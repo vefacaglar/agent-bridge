@@ -62,11 +62,40 @@
 *, *::before, *::after {
   box-sizing: border-box;
   border-radius: 4px !important;
+}
+
+/* Scrollbar variable setup & transition on scrollable containers to avoid global style recalculation storms */
+.runs-block,
+.messages-scroll,
+.settings-scroll-area,
+.themed-select-menu,
+.plan-scroll-area,
+.plan-columns,
+.plan-diff-scroller,
+textarea,
+pre {
   --scrollbar-color: rgba(255, 255, 255, 0);
   transition: --scrollbar-color 0.3s ease;
 }
 
-*.is-scrolling {
+.runs-block:hover,
+.messages-scroll:hover,
+.settings-scroll-area:hover,
+.themed-select-menu:hover,
+.plan-scroll-area:hover,
+.plan-columns:hover,
+.plan-diff-scroller:hover,
+textarea:hover,
+pre:hover,
+.runs-block.is-scrolling,
+.messages-scroll.is-scrolling,
+.settings-scroll-area.is-scrolling,
+.themed-select-menu.is-scrolling,
+.plan-scroll-area.is-scrolling,
+.plan-columns.is-scrolling,
+.plan-diff-scroller.is-scrolling,
+textarea.is-scrolling,
+pre.is-scrolling {
   --scrollbar-color: rgba(255, 255, 255, 0.3);
   transition: --scrollbar-color 0.05s ease;
 }
@@ -1295,6 +1324,7 @@ pre {
 /* Restore full saturation for high contrast syntax highlighting */
 .hljs {
   filter: none;
+  background: transparent !important;
 }
 
 .hljs-comment,
@@ -1338,7 +1368,7 @@ pre {
   border: 1px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
-  background: #262626;
+  background: var(--control-bg);
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
   width: 100%;
   max-width: 100%;

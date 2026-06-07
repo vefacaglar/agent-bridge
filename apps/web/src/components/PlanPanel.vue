@@ -960,12 +960,15 @@ defineExpose({
 }
 
 .plan-panel-prose :deep(pre) {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px 12px;
-  overflow-x: auto;
-  margin: 0.6em 0;
+  margin: 0;
+  padding: 14px;
+  overflow: auto;
+  max-height: 480px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  white-space: pre !important;
+  word-break: normal !important;
 }
 
 .plan-panel-prose :deep(pre code) {
