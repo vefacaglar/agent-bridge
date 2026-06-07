@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref } from 'vue';
 import type { PermissionRule } from '@agent-bridge/shared';
 
 defineProps<{
@@ -10,6 +11,12 @@ const emit = defineEmits<{
   (e: 'revoke', id: number): void;
   (e: 'clear-all'): void;
 }>();
+
+const expandedIds = ref<Record<number, boolean>>({});
+
+function toggleExpand(id: number) {
+  expandedIds.value[id] = !expandedIds.value[id];
+}
 
 function basename(path: string): string {
   const parts = path.replace(/\/+$/, '').split('/');
@@ -54,15 +61,24 @@ function ruleScopeText(rule: PermissionRule): string {
     </div>
 
     <ul v-else class="perm-rule-list">
-      <li v-for="rule in permissions" :key="rule.id" class="perm-rule-item">
+      <li
+        v-for="rule in permissions"
+        :key="rule.id"
+        class="perm-rule-item"
+        :class="{ expanded: expandedIds[rule.id] }"
+      >
         <span class="perm-rule-scope">{{ rule.scope }}</span>
-        <div class="perm-rule-text">
-          <span class="perm-rule-title">{{ ruleTitle(rule) }}</span>
-          <span class="perm-rule-sub">
-            {{ rule.scope === 'global' ? ruleScopeText(rule) : rule.projectPath }}
-          </span>
+        <div class="perm-rule-content" @click="toggleExpand(rule.id)">
+          <div class="perm-rule-text">
+            <span class="perm-rule-title">{{ ruleTitle(rule) }}</span>
+            <span class="perm-rule-sub">
+              {{ rule.scope === 'global' ? ruleScopeText(rule) : rule.projectPath }}
+            </span>
+          </div>
+          <!-- Clickable Shadow overlay to expand -->
+          <div v-if="!expandedIds[rule.id]" class="shadow-fade-overlay"></div>
         </div>
-        <button class="perm-rule-revoke" title="Revoke" @click="emit('revoke', rule.id)">Revoke</button>
+        <button class="perm-rule-revoke" title="Revoke" @click.stop="emit('revoke', rule.id)">Revoke</button>
       </li>
     </ul>
   </div>
@@ -80,12 +96,22 @@ function ruleScopeText(rule: PermissionRule): string {
 
 .perm-rule-item {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 14px;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--border);
   border-radius: 8px;
+  height: 84px; /* default collapsed height */
+  box-sizing: border-box;
+  overflow: hidden;
+  position: relative;
+  transition: height 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.perm-rule-item.expanded {
+  height: auto;
+  min-height: 84px;
 }
 
 .perm-rule-scope {
@@ -101,18 +127,32 @@ function ruleScopeText(rule: PermissionRule): string {
   border-radius: 5px;
 }
 
+.perm-rule-content {
+  flex: 1 1 auto;
+  min-width: 0;
+  cursor: pointer;
+  position: relative;
+  align-self: stretch;
+  overflow: hidden;
+}
+
+.perm-rule-item.expanded .perm-rule-content {
+  overflow: visible;
+  height: auto;
+}
+
 .perm-rule-text {
   display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
-  flex: 1 1 auto;
 }
 
 .perm-rule-title {
   font-size: 0.9rem;
   color: var(--text);
   font-weight: 500;
+  word-break: break-all;
 }
 
 .perm-rule-sub {
@@ -124,8 +164,19 @@ function ruleScopeText(rule: PermissionRule): string {
   white-space: nowrap;
 }
 
+.shadow-fade-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 28px;
+  background: linear-gradient(to bottom, rgba(25, 25, 25, 0), rgba(25, 25, 25, 1));
+  pointer-events: none; /* allows clicks to pass through to the content container */
+}
+
 .perm-rule-revoke {
   flex: 0 0 auto;
+  align-self: flex-start;
   background: var(--danger-soft);
   color: var(--danger);
   border: 1px solid var(--danger-border);
