@@ -1,18 +1,30 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import type { ProviderModelSettings, ReasoningEffort, ReasoningOption, ReasoningStyle } from '@agent-bridge/shared';
 import { api } from '../../api/client';
 import { useCustomDialog } from '../../composables/useCustomDialog';
 import ThemedSelect from './ThemedSelect.vue';
+
+const props = defineProps<{
+  providersConfig: Record<string, any>;
+  isLoading: boolean;
+}>();
+
+const emit = defineEmits<{
+  (e: 'saved'): void;
+}>();
 
 const { showAlert, showConfirm } = useCustomDialog();
 
 const PRESERVE_API_KEY_VALUE = '__LOCAGENS_PRESERVE_API_KEY__';
 
 const configs = ref<Record<string, any>>({});
+watch(() => props.providersConfig, (newVal) => {
+  configs.value = { ...newVal };
+}, { immediate: true });
+
 const isEditing = ref(false);
 const editingProviderId = ref<string | null>(null);
-const isLoading = ref(false);
 
 // Form fields
 const formId = ref('');
@@ -55,23 +67,7 @@ function emptyModelRow(name = ''): ModelRow {
   return { name, reasoningStyle: defaultReasoningStyle(), reasoningOptions: [] };
 }
 
-async function fetchConfigs() {
-  isLoading.value = true;
-  try {
-    const data = await api.getProvidersConfig();
-    if (data) {
-      configs.value = data;
-    }
-  } catch (err) {
-    console.error('Failed to load configs:', err);
-  } finally {
-    isLoading.value = false;
-  }
-}
 
-onMounted(() => {
-  fetchConfigs();
-});
 
 function handleAddProvider() {
   editingProviderId.value = null;
@@ -176,7 +172,7 @@ async function handleDeleteProvider() {
     await api.saveProvidersConfig(newConfigs);
     configs.value = newConfigs;
     isEditing.value = false;
-    window.location.reload();
+    emit('saved');
   } catch (err: any) {
     await showAlert(err.message || 'An error occurred.');
   }
@@ -234,7 +230,7 @@ async function handleSave() {
     await api.saveProvidersConfig(newConfigs);
     configs.value = newConfigs;
     isEditing.value = false;
-    window.location.reload();
+    emit('saved');
   } catch (err: any) {
     await showAlert(err.message || 'An error occurred.');
   }

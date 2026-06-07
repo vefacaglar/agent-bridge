@@ -13,20 +13,45 @@ export function useAppShell() {
   const agentPresets = ref<AgentPreset[]>([]);
   const runs = ref<Run[]>([]);
   const messagesContainer = ref<HTMLElement | null>(null);
+  const providersConfig = ref<Record<string, any>>({});
+  const isProvidersConfigLoading = ref(false);
 
   const settings = useComposerSettings(providers, agentPresets);
 
   async function loadAgentPresets() {
     agentPresets.value = (await api.getAgentPresets()) ?? [];
   }
+
+  async function loadProvidersConfig() {
+    isProvidersConfigLoading.value = true;
+    try {
+      const data = await api.getProvidersConfig();
+      if (data) providersConfig.value = data;
+    } finally {
+      isProvidersConfigLoading.value = false;
+    }
+  }
+
+  async function reloadProviders() {
+    await Promise.all([
+      loadProvidersConfig(),
+      chat.loadProviders()
+    ]);
+  }
+
   const projects = useProjects(runs);
   const permissions = usePermissions();
   const memories = useMemories();
 
-  // Opening the settings screen loads both the permissions and memory tabs so
-  // either is ready when the user switches to it.
+  // Opening the settings screen loads all settings tabs so they are ready when
+  // the user switches between them.
   async function openSettings() {
-    await Promise.all([permissions.openSettings(), memories.loadMemories()]);
+    await Promise.all([
+      permissions.openSettings(),
+      memories.loadMemories(),
+      loadProvidersConfig(),
+      loadAgentPresets()
+    ]);
   }
   const chat = useChatSession({
     providers,
@@ -111,6 +136,9 @@ export function useAppShell() {
     selectProject,
     selectProjectAndNewChat,
     submitProject,
-    deleteProject
+    deleteProject,
+    providersConfig,
+    isProvidersConfigLoading,
+    reloadProviders
   };
 }

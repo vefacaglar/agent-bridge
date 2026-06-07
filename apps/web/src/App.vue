@@ -26,7 +26,10 @@ const {
   selectProject,
   selectProjectAndNewChat,
   submitProject,
-  deleteProject
+  deleteProject,
+  providersConfig,
+  isProvidersConfigLoading,
+  reloadProviders
 } = useAppShell();
 
 const {
@@ -502,6 +505,9 @@ onUnmounted(() => {
       :permissions="permissions.permissions.value"
       :is-loading="permissions.isLoading.value"
       :providers="chat.providers.value"
+      :providers-config="providersConfig"
+      :providers-config-loading="isProvidersConfigLoading"
+      :presets="agentPresets"
       :memories="memories.memories.value"
       :memories-loading="memories.isLoading.value"
       :active-project-path="projects.activeProjectPath.value"
@@ -509,6 +515,7 @@ onUnmounted(() => {
       @close="permissions.closeSettings"
       @revoke="permissions.revokePermission"
       @clear-all="permissions.clearPermissions"
+      @providers-saved="reloadProviders"
       @presets-saved="loadAgentPresets"
       @add-memory="memories.addMemory"
       @update-memory="memories.updateMemory($event.id, $event.content)"

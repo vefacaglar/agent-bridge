@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue';
+import { ref, computed, watch } from 'vue';
 import type { AgentPreset, ProviderMetadata, ReasoningEffort, ReasoningOption } from '@agent-bridge/shared';
 import { api } from '../../api/client';
 import { useCustomDialog } from '../../composables/useCustomDialog';
@@ -7,6 +7,7 @@ import ThemedSelect from './ThemedSelect.vue';
 
 const props = defineProps<{
   providers: ProviderMetadata[];
+  presets: AgentPreset[];
 }>();
 
 const emit = defineEmits<{
@@ -16,6 +17,9 @@ const emit = defineEmits<{
 const { showAlert, showConfirm } = useCustomDialog();
 
 const presets = ref<AgentPreset[]>([]);
+watch(() => props.presets, (newVal) => {
+  presets.value = [...newVal];
+}, { immediate: true });
 const isEditing = ref(false);
 const editingOriginalId = ref<string | null>(null);
 
@@ -117,11 +121,7 @@ watch(formUtility, () => {
   if (!safeEffort(formUtilityEffort.value, formUtility.value)) formUtilityEffort.value = '';
 });
 
-async function fetchPresets() {
-  presets.value = (await api.getAgentPresets()) ?? [];
-}
 
-onMounted(fetchPresets);
 
 function handleAdd() {
   editingOriginalId.value = null;
@@ -193,7 +193,6 @@ function toBlocks(list: AgentPreset[]): Record<string, any> {
 
 async function persist(list: AgentPreset[]) {
   await api.saveAgentPresets(toBlocks(list));
-  await fetchPresets();
   emit('saved');
 }
 

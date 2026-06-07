@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import type { Memory, MemoryCategory, MemoryScope, PermissionRule, ProviderMetadata } from '@agent-bridge/shared';
+import type { Memory, MemoryCategory, MemoryScope, PermissionRule, ProviderMetadata, AgentPreset } from '@agent-bridge/shared';
 import PermissionsTab from './PermissionsTab.vue';
 import ProvidersTab from './ProvidersTab.vue';
 import AgentPresetsTab from './AgentPresetsTab.vue';
@@ -11,6 +11,9 @@ const props = defineProps<{
   permissions: PermissionRule[];
   isLoading: boolean;
   providers: ProviderMetadata[];
+  providersConfig: Record<string, any>;
+  providersConfigLoading: boolean;
+  presets: AgentPreset[];
   memories: Memory[];
   memoriesLoading: boolean;
   activeProjectPath: string;
@@ -21,6 +24,7 @@ const emit = defineEmits<{
   (e: 'close'): void;
   (e: 'revoke', id: number): void;
   (e: 'clear-all'): void;
+  (e: 'providers-saved'): void;
   (e: 'presets-saved'): void;
   (e: 'add-memory', payload: { scope: MemoryScope; category: MemoryCategory; content: string; projectPath?: string }): void;
   (e: 'update-memory', payload: { id: number; content: string }): void;
@@ -152,10 +156,16 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
                 @delete="emit('delete-memory', $event)"
                 @clear-all="emit('clear-memories')"
               />
-              <ProvidersTab v-else-if="activeTab === 'providers'" :providers="providers" />
+              <ProvidersTab
+                v-else-if="activeTab === 'providers'"
+                :providers-config="providersConfig"
+                :is-loading="providersConfigLoading"
+                @saved="emit('providers-saved')"
+              />
               <AgentPresetsTab
                 v-else-if="activeTab === 'agents'"
                 :providers="providers"
+                :presets="presets"
                 @saved="emit('presets-saved')"
               />
             </div>
