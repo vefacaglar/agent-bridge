@@ -33,7 +33,7 @@ export function registerProjectRoutes(server: FastifyInstance, ctx: AppContext) 
       createdAt: new Date().toISOString()
     };
 
-    ctx.projectRepo.create(project);
+    await ctx.projectRepo.create(project);
     return project;
   });
 
@@ -46,7 +46,7 @@ export function registerProjectRoutes(server: FastifyInstance, ctx: AppContext) 
       return { error: "Missing required query parameter: path" };
     }
 
-    ctx.projectRepo.delete(projectPath);
+    await ctx.projectRepo.delete(projectPath);
     return { success: true };
   });
 

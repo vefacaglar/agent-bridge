@@ -11,8 +11,9 @@
     "dev:web": "pnpm --filter @agent-bridge/web dev",
     "dev": "pnpm --recursive --parallel dev",
     "dev:desktop": "pnpm --filter @agent-bridge/desktop start",
+    "build:db-writer": "mkdir -p .locagens-dev/go-cache && GOCACHE=\"$PWD/.locagens-dev/go-cache\" go -C apps/db-writer build -o dist/db-writer .",
     "build": "pnpm --recursive build",
-    "dist": "pnpm --filter @agent-bridge/shared build && pnpm --filter @agent-bridge/web build && pnpm --filter @agent-bridge/api run build:bundle && pnpm --filter @agent-bridge/desktop run dist",
+    "dist": "pnpm run build:db-writer && pnpm --filter @agent-bridge/shared build && pnpm --filter @agent-bridge/web build && pnpm --filter @agent-bridge/api run build:bundle && pnpm --filter @agent-bridge/desktop run dist",
     "clean": "pnpm --recursive exec rm -rf dist node_modules"
   },
   "devDependencies": {

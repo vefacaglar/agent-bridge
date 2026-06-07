@@ -31,6 +31,10 @@
       {
         "from": "../api/dist/server.bundle.cjs",
         "to": "api/server.bundle.cjs"
+      },
+      {
+        "from": "../db-writer/dist/db-writer",
+        "to": "db-writer/db-writer"
       }
     ],
     "mac": {
