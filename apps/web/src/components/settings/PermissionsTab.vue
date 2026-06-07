@@ -212,8 +212,14 @@ const projectPermissionsGroups = computed(() => {
   align-items: center;
   gap: 8px;
   cursor: pointer;
-  padding: 4px 0;
+  padding: 6px 8px;
   user-select: none;
+  border-radius: 6px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.perm-accordion-header:hover {
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .perm-accordion-arrow {
@@ -320,6 +326,15 @@ const projectPermissionsGroups = computed(() => {
   font-weight: 400;
   cursor: pointer;
   user-select: none;
+  transition: color 0.15s ease;
+}
+
+.perm-group-title:hover {
+  color: var(--text);
+}
+
+.perm-group-title:hover .group-arrow {
+  color: var(--text);
 }
 
 .group-arrow {
@@ -327,7 +342,7 @@ const projectPermissionsGroups = computed(() => {
   align-items: center;
   justify-content: center;
   color: var(--faint);
-  transition: transform 0.2s ease;
+  transition: transform 0.2s ease, color 0.15s ease;
 }
 
 .group-arrow.rotated {

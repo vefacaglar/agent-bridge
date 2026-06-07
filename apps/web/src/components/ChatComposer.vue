@@ -721,13 +721,18 @@ onBeforeUnmount(() => {
   border-radius: 9px;
   cursor: pointer;
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
-  transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .composer-send-btn:hover:not(:disabled) {
-  opacity: 0.95;
+  background: #f0f0f0;
   transform: translateY(-1px);
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+}
+
+.composer-send-btn:active:not(:disabled) {
+  background: #d8d8d8;
+  transform: translateY(0);
 }
 
 .composer-send-btn:disabled {
@@ -746,6 +751,10 @@ onBeforeUnmount(() => {
 
 .composer-send-btn.stop-mode:hover {
   background: var(--danger-soft-strong);
+}
+
+.composer-send-btn.stop-mode:active {
+  background: rgba(255, 107, 107, 0.12);
 }
 
 .composer-menu-row {

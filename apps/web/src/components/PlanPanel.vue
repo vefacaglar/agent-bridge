@@ -6,6 +6,7 @@ import { renderMarkdown, cleanMessageContent } from '../lib/markdown';
 import { changeDiffRows, type WorkspaceChange } from '../lib/workspaceChanges';
 import ToolGroup from './ToolGroup.vue';
 import ReasoningPanel from './ReasoningPanel.vue';
+import ThemedButton from './ThemedButton.vue';
 
 const props = defineProps<{
   plan: Plan | null;
@@ -472,9 +473,9 @@ defineExpose({
     </div>
 
     <footer v-if="showActions && plan && activeTab === 'plan'" class="plan-panel-actions">
-      <button type="button" class="plan-action start" @click="$emit('start')">Start building</button>
-      <button type="button" class="plan-action" @click="$emit('revise')">Revise</button>
-      <button type="button" class="plan-action reject" @click="$emit('reject')">Reject</button>
+      <ThemedButton variant="primary" class="plan-action-btn" @click="$emit('start')">Start building</ThemedButton>
+      <ThemedButton variant="secondary" class="plan-action-btn" @click="$emit('revise')">Revise</ThemedButton>
+      <ThemedButton variant="danger" class="plan-action-btn" @click="$emit('reject')">Reject</ThemedButton>
     </footer>
   </aside>
 </template>
@@ -946,6 +947,12 @@ defineExpose({
 }
 
 .plan-panel-prose :deep(a) {
+  color: var(--planner);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.plan-panel-prose :deep(a:hover) {
   color: var(--text);
   text-decoration: underline;
 }
@@ -1027,10 +1034,19 @@ defineExpose({
   gap: 10px;
   padding: 7px 8px;
   border-radius: 6px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.plan-task:hover {
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .plan-task.in_progress {
   background: rgba(255, 255, 255, 0.03);
+}
+
+.plan-task.in_progress:hover {
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .plan-task-box {
@@ -1063,11 +1079,16 @@ defineExpose({
   font-size: 0.84rem;
   color: var(--text);
   line-height: 1.45;
+  transition: color 0.15s ease;
 }
 
 .plan-task.completed .plan-task-text {
   color: var(--faint);
   text-decoration: line-through;
+}
+
+.plan-task.completed:hover .plan-task-text {
+  color: var(--muted);
 }
 
 .plan-task-status {
@@ -1096,47 +1117,8 @@ defineExpose({
   border-top: 1px solid var(--border);
 }
 
-.plan-action {
+.plan-action-btn {
   flex: 1 1 auto;
-  padding: 8px 10px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text);
-  font-size: 0.82rem;
-  font-weight: 550;
-  cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
-}
-
-.plan-action:hover {
-  border-color: var(--muted);
-  background: var(--surface-strong);
-}
-
-.plan-action.start {
-  border-color: var(--text);
-  background: var(--text);
-  color: var(--bg);
-}
-
-.plan-action.start:hover {
-  border-color: var(--text);
-  background: var(--text);
-  color: var(--bg);
-  opacity: 0.85;
-}
-
-.plan-action.reject {
-  border-color: var(--danger-border);
-  background: var(--danger-soft);
-  color: var(--danger);
-}
-
-.plan-action.reject:hover {
-  border-color: var(--danger);
-  background: var(--danger-soft-strong);
-  color: var(--danger);
 }
 
 /* Minimal: the transcript just gets breathing room and a hairline separator —

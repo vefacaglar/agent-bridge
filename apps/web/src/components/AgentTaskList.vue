@@ -77,10 +77,11 @@ const allDone = computed(() => tasks.value.length > 0 && doneCount.value === tas
   font-weight: 500;
   cursor: pointer;
   user-select: none;
+  transition: background 0.15s ease;
 }
 
 .task-list-header:hover {
-  background: rgba(255, 255, 255, 0.02);
+  background: #2c2c31;
 }
 
 .task-title {

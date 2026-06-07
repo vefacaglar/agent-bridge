@@ -742,7 +742,7 @@ function formatToolResult(name: string, contentJson: string): string {
 
 .plan-tool-card:hover {
   border-color: transparent;
-  background: #252529;
+  background: #2c2c31;
 }
 
 .plan-tool-head {
