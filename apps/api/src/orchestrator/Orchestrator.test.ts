@@ -1007,4 +1007,73 @@ test("Orchestrator Integration Tests", async (t) => {
     assert.ok(systemPromptUsed.includes("REMEMBERED CONTEXT"));
     assert.ok(systemPromptUsed.includes("Prefers 2-space indentation."));
   });
+
+  await t.test("Orchestrator - architect is blocked from executing delete_file directly when preset is active", async () => {
+    const registry = new ProviderRegistry(testConfigPath);
+    const runRepo = new RunRepository();
+    const messageRepo = new MessageRepository();
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository());
+
+    const runId = "run-test-architect-blocked";
+    await runRepo.create({
+      id: runId,
+      title: "Blocked Command",
+      task: "Delete some files",
+      status: "created",
+      providerId: "test-provider",
+      providerDisplayName: "Test Provider",
+      model: "model-1",
+      coderProviderId: "test-provider",
+      coderModel: "model-1",
+      projectPath: process.cwd(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
+
+    let callCount = 0;
+    globalThis.fetch = async () => {
+      callCount++;
+      if (callCount === 1) {
+        return {
+          ok: true,
+          json: async () => ({
+            choices: [{
+              message: {
+                role: "assistant",
+                content: "I will delete the file myself.",
+                tool_calls: [{
+                  id: "call_blocked_delete",
+                  type: "function",
+                  function: {
+                    name: "delete_file",
+                    arguments: JSON.stringify({ path: "some_file.json" })
+                  }
+                }]
+              }
+            }]
+          })
+        } as any;
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          choices: [{
+            message: {
+              role: "assistant",
+              content: "Understood, I cannot do that directly."
+            }
+          }]
+        })
+      } as any;
+    };
+
+    await orchestrator.run(runId);
+
+    const savedMsgs = messageRepo.listByRunId(runId);
+    const toolMsg = savedMsgs.find(m => m.role === "tool");
+    assert.ok(toolMsg);
+    const result = JSON.parse(toolMsg!.content);
+    assert.strictEqual(result.success, false);
+    assert.match(result.error, /Blocked: Architect model is not allowed/);
+  });
 });

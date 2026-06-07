@@ -7,7 +7,7 @@ import { appendFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { db } from "../database/db.js";
 import { buildSystemPrompt, buildCoderSystemPrompt, buildUtilitySystemPrompt, formatMemoryContext } from "./systemPrompt.js";
-import { WORKSPACE_TOOLS, UPDATE_PLAN_TOOL, DELEGATE_TASKS_TOOL, DELEGATE_UTILITY_TOOL, UTILITY_TOOLS, SET_TITLE_TOOL, ASK_QUESTION_TOOL, REMEMBER_TOOL, executeWorkspaceToolAsync, buildPermissionPreview, DANGEROUS_TOOLS, READONLY_TOOLS, MODIFYING_TOOLS, permissionKey, commandEscapesWorkspace } from "./workspaceTools.js";
+import { WORKSPACE_TOOLS, UPDATE_PLAN_TOOL, DELEGATE_TASKS_TOOL, DELEGATE_UTILITY_TOOL, UTILITY_TOOLS, UTILITY_TOOL_NAMES, SET_TITLE_TOOL, ASK_QUESTION_TOOL, REMEMBER_TOOL, executeWorkspaceToolAsync, buildPermissionPreview, DANGEROUS_TOOLS, READONLY_TOOLS, MODIFYING_TOOLS, permissionKey, commandEscapesWorkspace } from "./workspaceTools.js";
 
 type PermissionDecision = "allow_once" | "allow_project" | "allow_always" | "deny";
 
@@ -719,7 +719,7 @@ export class Orchestrator {
 
         for (const tc of response.toolCalls) {
           checkCancelled();
-          const result = await this.runToolCall(runId, run, tc);
+          const result = await this.runToolCall(runId, run, tc, opts.agentRole);
 
           const toolMsg: RunMessage = {
             id: randomId("msg-tool"),
@@ -976,7 +976,7 @@ export class Orchestrator {
    * run is in ask_permissions mode or the tool is inherently dangerous (e.g.
    * run_command always asks before executing), then runs it.
    */
-  private async runToolCall(runId: string, run: Run, toolCall: any): Promise<string> {
+  private async runToolCall(runId: string, run: Run, toolCall: any, agentRole?: string): Promise<string> {
     // update_plan is an internal bookkeeping tool (no filesystem/network side
     // effects), so it runs silently without any permission prompt. The stable
     // plan PANEL belongs to Plan mode only — in any other mode (Build/Chat) we
@@ -1021,10 +1021,28 @@ export class Orchestrator {
       return this.executeUtilityTasks(runId, run, toolCall);
     }
 
+    const toolName = toolCall.function?.name;
+    const isDelegated = !!(run.coderModel && run.coderProviderId);
+
+    // Block the Architect (non-coder/non-utility role in a delegation setup) from calling write/delete/run_command directly.
+    if (isDelegated && agentRole !== "coder" && agentRole !== "utility" && !READONLY_TOOLS.has(toolName) && toolName !== "delegate_tasks" && toolName !== "delegate_to_utility" && toolName !== "update_plan" && toolName !== "set_chat_title" && toolName !== "ask_user_question" && toolName !== "remember") {
+      return JSON.stringify({
+        success: false,
+        error: `Blocked: Architect model is not allowed to run mutating or command tools directly when a coder preset is configured. You must delegate this implementation task to a coder sub-agent using delegate_tasks.`
+      });
+    }
+
+    // Block the Utility sub-agent from calling tools outside the utility set.
+    if (agentRole === "utility" && !UTILITY_TOOL_NAMES.has(toolName)) {
+      return JSON.stringify({
+        success: false,
+        error: `Blocked: Utility sub-agent is not allowed to execute "${toolName}". It is restricted to: read_file, list_directory, search_files, and move_file.`
+      });
+    }
+
     // HARD RULE: plan mode is read-only. No file mutation, no run_command, no
     // fetch_url — even if the user approves. The model must switch to Build mode
     // before anything changes. We block here regardless of any permission grant.
-    const toolName = toolCall.function?.name;
     const isBuildMode = run.mode === "accept_edits" || run.mode === "auto" || run.mode === "ask_permissions" || run.mode === "full_access";
     if (!isBuildMode && MODIFYING_TOOLS.has(toolName)) {
       return JSON.stringify({
