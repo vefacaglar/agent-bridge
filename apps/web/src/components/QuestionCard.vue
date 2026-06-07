@@ -146,7 +146,7 @@ function submit() {
   bottom: calc(100% - 6px);
   left: 12px;
   right: 12px;
-  background: var(--surface);
+  background: var(--surface-elevated);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 16px;

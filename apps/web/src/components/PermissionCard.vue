@@ -166,7 +166,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeyDown, true));
   bottom: calc(100% - 6px);
   left: 12px;
   right: 12px;
-  background: var(--surface);
+  background: var(--surface-elevated);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 14px;

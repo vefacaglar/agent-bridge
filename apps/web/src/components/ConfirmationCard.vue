@@ -136,7 +136,7 @@ function submit() {
 .composer-confirmation-card {
   position: relative;
   margin: 0 0 10px;
-  background: var(--surface);
+  background: var(--surface-elevated);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 14px 16px;
