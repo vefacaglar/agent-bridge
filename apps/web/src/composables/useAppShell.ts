@@ -16,7 +16,10 @@ export function useAppShell() {
   const providersConfig = ref<Record<string, any>>({});
   const isProvidersConfigLoading = ref(false);
 
-  const settings = useComposerSettings(providers, agentPresets);
+  const activeRunId = ref<string | null>(localStorage.getItem('activeRunId'));
+  const activeRun = ref<Run | null>(null);
+
+  const settings = useComposerSettings(providers, agentPresets, activeRunId, activeRun);
 
   async function loadAgentPresets() {
     agentPresets.value = (await api.getAgentPresets()) ?? [];
@@ -54,6 +57,8 @@ export function useAppShell() {
     ]);
   }
   const chat = useChatSession({
+    activeRunId,
+    activeRun,
     providers,
     runs,
     selectedModelCombined: settings.selectedModelCombined,
@@ -63,6 +68,7 @@ export function useAppShell() {
     agentRunFields: settings.agentRunFields,
     currentMode: settings.currentMode,
     bypassPermissions: settings.bypassPermissions,
+    selectedPresetId: settings.selectedPresetId,
     activeProject: projects.activeProject,
     activeProjectPath: projects.activeProjectPath
   });

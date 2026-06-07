@@ -1,5 +1,5 @@
-import { computed, ref, watch, type Ref } from 'vue';
-import type { ProviderMetadata, AgentPreset, ReasoningOption, ProviderModelSettings } from '@agent-bridge/shared';
+import { computed, ref, watch, nextTick, type Ref } from 'vue';
+import type { ProviderMetadata, AgentPreset, ReasoningOption, ProviderModelSettings, Run } from '@agent-bridge/shared';
 import { splitCombined } from '../lib/format';
 
 // Four modes are exposed: Chat (lightweight conversation — no proactive
@@ -43,31 +43,133 @@ const REASONING_EFFORT_IDS = new Set(REASONING_EFFORTS.map(x => x.id));
  */
 export function useComposerSettings(
   providers: Ref<ProviderMetadata[]>,
-  agentPresets: Ref<AgentPreset[]>
+  agentPresets: Ref<AgentPreset[]>,
+  activeRunId: Ref<string | null>,
+  activeRun: Ref<Run | null>
 ) {
-  const selectedModelCombined = ref(localStorage.getItem('bm_selected_model') || '');
-  const storedReasoningEffort = localStorage.getItem('bm_reasoning_effort') || 'default';
-  const selectedReasoningEffort = ref(
-    REASONING_EFFORT_IDS.has(storedReasoningEffort as any) ? storedReasoningEffort : 'default'
-  );
-  // The optional dual-model preset selected next to the model picker. Empty string
-  // (or an id no longer present) means single-model mode — the default.
-  const selectedPresetId = ref(localStorage.getItem('bm_selected_preset') || '');
-  watch(selectedPresetId, (v) => localStorage.setItem('bm_selected_preset', v));
-  // Keep a persisted Plan/Build choice; migrate anything else (or first run) to Chat.
-  const storedMode = localStorage.getItem('bm_current_mode');
-  const currentMode = ref<ChatMode>(
-    storedMode === 'plan' ? 'plan'
-      : storedMode === 'accept_edits' ? 'accept_edits'
-      : storedMode === 'full_access' ? 'full_access'
-      : 'chat'
-  );
-  const bypassPermissions = ref(localStorage.getItem('bm_bypass_permissions') === 'true');
+  const selectedModelCombined = ref('');
+  const selectedReasoningEffort = ref('default');
+  const selectedPresetId = ref('');
+  const currentMode = ref<ChatMode>('chat');
+  const bypassPermissions = ref(false);
 
-  watch(selectedModelCombined, (v) => { if (v) localStorage.setItem('bm_selected_model', v); });
-  watch(selectedReasoningEffort, (v) => localStorage.setItem('bm_reasoning_effort', v || 'default'));
-  watch(currentMode, (v) => localStorage.setItem('bm_current_mode', v));
-  watch(bypassPermissions, (v) => localStorage.setItem('bm_bypass_permissions', String(v)));
+  let isLoadingSettings = false;
+
+  function saveSetting(keySuffix: string, value: string) {
+    if (isLoadingSettings) return;
+    const runId = activeRunId.value;
+    if (runId) {
+      localStorage.setItem(`bm_run_${runId}_${keySuffix}`, value);
+    } else {
+      localStorage.setItem(`bm_draft_${keySuffix}`, value);
+    }
+  }
+
+  watch(selectedModelCombined, (v) => { if (v) saveSetting('selected_model', v); });
+  watch(selectedReasoningEffort, (v) => saveSetting('reasoning_effort', v || 'default'));
+  watch(selectedPresetId, (v) => saveSetting('selected_preset', v));
+  watch(currentMode, (v) => saveSetting('current_mode', v));
+  watch(bypassPermissions, (v) => saveSetting('bypass_permissions', String(v)));
+
+  function sanitizeReasoning(val: string | null): string {
+    return val && REASONING_EFFORT_IDS.has(val as any) ? val : 'default';
+  }
+
+  function loadSettingsForRun(runId: string | null) {
+    isLoadingSettings = true;
+    try {
+      if (runId) {
+        const storedModel = localStorage.getItem(`bm_run_${runId}_selected_model`);
+        const storedReasoning = localStorage.getItem(`bm_run_${runId}_reasoning_effort`);
+        const storedPreset = localStorage.getItem(`bm_run_${runId}_selected_preset`);
+        const storedMode = localStorage.getItem(`bm_run_${runId}_current_mode`);
+        const storedBypass = localStorage.getItem(`bm_run_${runId}_bypass_permissions`);
+
+        const runObj = activeRun.value;
+
+        let modelVal = '';
+        if (storedModel !== null) {
+          modelVal = storedModel;
+        } else if (runObj && runObj.providerId && runObj.model) {
+          modelVal = `${runObj.providerId}:${runObj.model}`;
+        } else {
+          modelVal = localStorage.getItem('bm_last_used_selected_model') || localStorage.getItem('bm_selected_model') || '';
+        }
+
+        let reasoningVal = 'default';
+        if (storedReasoning !== null) {
+          reasoningVal = sanitizeReasoning(storedReasoning);
+        } else if (runObj && runObj.reasoningEffort) {
+          reasoningVal = sanitizeReasoning(runObj.reasoningEffort);
+        } else {
+          reasoningVal = sanitizeReasoning(localStorage.getItem('bm_last_used_reasoning_effort'));
+        }
+
+        let presetVal = '';
+        if (storedPreset !== null) {
+          presetVal = storedPreset;
+        } else if (runObj && runObj.agentPreset) {
+          presetVal = runObj.agentPreset;
+        } else {
+          presetVal = localStorage.getItem('bm_last_used_selected_preset') || '';
+        }
+
+        let modeVal: ChatMode = 'chat';
+        if (storedMode !== null) {
+          modeVal = storedMode as ChatMode;
+        } else if (runObj && runObj.mode) {
+          modeVal = runObj.mode as ChatMode;
+        } else {
+          modeVal = (localStorage.getItem('bm_last_used_current_mode') || 'chat') as ChatMode;
+        }
+
+        let bypassVal = false;
+        if (storedBypass !== null) {
+          bypassVal = storedBypass === 'true';
+        } else {
+          bypassVal = localStorage.getItem('bm_last_used_bypass_permissions') === 'true';
+        }
+
+        selectedModelCombined.value = modelVal;
+        selectedReasoningEffort.value = reasoningVal;
+        selectedPresetId.value = presetVal;
+        currentMode.value = modeVal;
+        bypassPermissions.value = bypassVal;
+      } else {
+        const storedModel = localStorage.getItem('bm_draft_selected_model');
+        const storedReasoning = localStorage.getItem('bm_draft_reasoning_effort');
+        const storedPreset = localStorage.getItem('bm_draft_selected_preset');
+        const storedMode = localStorage.getItem('bm_draft_current_mode');
+        const storedBypass = localStorage.getItem('bm_draft_bypass_permissions');
+
+        const lastUsedModel = localStorage.getItem('bm_last_used_selected_model') || localStorage.getItem('bm_selected_model') || '';
+        const lastUsedReasoning = localStorage.getItem('bm_last_used_reasoning_effort') || 'default';
+        const lastUsedPreset = localStorage.getItem('bm_last_used_selected_preset') || '';
+        const lastUsedMode = localStorage.getItem('bm_last_used_current_mode') || 'chat';
+        const lastUsedBypass = localStorage.getItem('bm_last_used_bypass_permissions') === 'true';
+
+        selectedModelCombined.value = storedModel !== null ? storedModel : lastUsedModel;
+        selectedReasoningEffort.value = sanitizeReasoning(storedReasoning !== null ? storedReasoning : lastUsedReasoning);
+        selectedPresetId.value = storedPreset !== null ? storedPreset : lastUsedPreset;
+        currentMode.value = (storedMode !== null ? storedMode : lastUsedMode) as ChatMode;
+        bypassPermissions.value = storedBypass !== null ? (storedBypass === 'true') : lastUsedBypass;
+      }
+    } finally {
+      nextTick(() => {
+        isLoadingSettings = false;
+      });
+    }
+  }
+
+  watch(activeRunId, (newId) => {
+    loadSettingsForRun(newId);
+  }, { immediate: true });
+
+  watch(activeRun, (newRun) => {
+    if (newRun && activeRunId.value === newRun.id) {
+      loadSettingsForRun(newRun.id);
+    }
+  });
 
   const modelOptions = computed<ModelOption[]>(() => {
     const options: ModelOption[] = [];

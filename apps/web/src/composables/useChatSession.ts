@@ -8,6 +8,8 @@ import { useCustomDialog } from './useCustomDialog';
 import { clearMarkdownCache } from '../lib/markdown';
 
 interface ChatSessionOptions {
+  activeRunId: Ref<string | null>;
+  activeRun: Ref<Run | null>;
   providers: Ref<ProviderMetadata[]>;
   runs: Ref<Run[]>;
   selectedModelCombined: Ref<string>;
@@ -27,6 +29,7 @@ interface ChatSessionOptions {
   }>;
   currentMode: Ref<string>;
   bypassPermissions: Ref<boolean>;
+  selectedPresetId: Ref<string>;
   activeProject: ComputedRef<{ path: string; name: string } | undefined>;
   activeProjectPath: Ref<string>;
 }
@@ -43,8 +46,8 @@ export function useChatSession(options: ChatSessionOptions) {
   const runs = options.runs;
   const messages = ref<RunMessage[]>([]);
 
-  const activeRunId = ref<string | null>(localStorage.getItem('activeRunId'));
-  const activeRun = ref<Run | null>(null);
+  const activeRunId = options.activeRunId;
+  const activeRun = options.activeRun;
   const isRunning = ref(false);
   const currentPlan = ref<Plan | null>(null);
 
@@ -160,6 +163,13 @@ export function useChatSession(options: ChatSessionOptions) {
     clearPendingMessageUpdates();
     clearMarkdownCache();
 
+    // Clear draft settings so it initializes with last used settings
+    localStorage.removeItem('bm_draft_selected_model');
+    localStorage.removeItem('bm_draft_reasoning_effort');
+    localStorage.removeItem('bm_draft_selected_preset');
+    localStorage.removeItem('bm_draft_current_mode');
+    localStorage.removeItem('bm_draft_bypass_permissions');
+
     isRunning.value = false;
     activeRunId.value = null;
     localStorage.removeItem('activeRunId');
@@ -258,9 +268,10 @@ export function useChatSession(options: ChatSessionOptions) {
       }
 
       if (data.type === 'run_title_changed') {
-        if (activeRun.value?.id === runId) activeRun.value.title = data.title;
-        const run = runs.value.find(r => r.id === runId);
-        if (run) run.title = data.title;
+        if (activeRun.value?.id === runId) {
+          activeRun.value = { ...activeRun.value, title: data.title };
+        }
+        runs.value = runs.value.map(r => r.id === runId ? { ...r, title: data.title } : r);
       }
 
       if (data.type === 'run_completed') {
@@ -270,9 +281,9 @@ export function useChatSession(options: ChatSessionOptions) {
 
       if (data.type === 'run_failed') {
         if (activeRun.value?.id === runId) {
-          activeRun.value.errorMessage = data.errorMessage;
-          updateRunStatus(runId, 'failed');
+          activeRun.value = { ...activeRun.value, errorMessage: data.errorMessage, status: 'failed' };
         }
+        runs.value = runs.value.map(r => r.id === runId ? { ...r, errorMessage: data.errorMessage, status: 'failed' } : r);
         finishEventStream();
       }
     };
@@ -281,9 +292,10 @@ export function useChatSession(options: ChatSessionOptions) {
   }
 
   function updateRunStatus(runId: string, status: RunStatus) {
-    if (activeRun.value?.id === runId) activeRun.value.status = status;
-    const run = runs.value.find(r => r.id === runId);
-    if (run) run.status = status;
+    if (activeRun.value?.id === runId) {
+      activeRun.value = { ...activeRun.value, status };
+    }
+    runs.value = runs.value.map(r => r.id === runId ? { ...r, status } : r);
   }
 
   function finishEventStream(options: { sendQueuedMessage?: boolean } = {}) {
@@ -311,6 +323,13 @@ export function useChatSession(options: ChatSessionOptions) {
 
   async function handleSendTask() {
     if (!taskInput.value.trim() || isRunning.value || !options.selectedModelCombined.value) return;
+
+    // Record last used settings in localStorage
+    localStorage.setItem('bm_last_used_selected_model', options.selectedModelCombined.value);
+    localStorage.setItem('bm_last_used_reasoning_effort', options.selectedReasoningEffort.value);
+    localStorage.setItem('bm_last_used_selected_preset', options.selectedPresetId.value);
+    localStorage.setItem('bm_last_used_current_mode', options.currentMode.value);
+    localStorage.setItem('bm_last_used_bypass_permissions', String(options.bypassPermissions.value));
 
     const { providerId, model } = options.effectiveModel.value;
     const agentFields = options.agentRunFields.value;
@@ -360,6 +379,14 @@ export function useChatSession(options: ChatSessionOptions) {
           ...agentFields
         });
         taskInput.value = '';
+
+        // Initialize settings for the new run
+        localStorage.setItem(`bm_run_${run.id}_selected_model`, options.selectedModelCombined.value);
+        localStorage.setItem(`bm_run_${run.id}_reasoning_effort`, options.selectedReasoningEffort.value);
+        localStorage.setItem(`bm_run_${run.id}_selected_preset`, options.selectedPresetId.value);
+        localStorage.setItem(`bm_run_${run.id}_current_mode`, options.currentMode.value);
+        localStorage.setItem(`bm_run_${run.id}_bypass_permissions`, String(options.bypassPermissions.value));
+
         activeRunId.value = run.id;
         localStorage.setItem('activeRunId', run.id);
         activeRun.value = run;
