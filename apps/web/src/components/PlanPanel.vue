@@ -567,6 +567,7 @@ defineExpose({
   flex: 1;
   overflow-y: auto;
   padding: var(--card-pad-x);
+  scrollbar-gutter: stable;
 }
 
 .panel-section-heading {

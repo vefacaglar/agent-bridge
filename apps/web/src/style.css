@@ -251,6 +251,7 @@ pre {
   min-height: 0;
   flex: 1;
   overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 .sidebar-label {
@@ -359,6 +360,7 @@ pre {
   overflow-y: auto;
   padding: 34px 24px 24px;
   scroll-behavior: smooth;
+  scrollbar-gutter: stable;
 }
 
 .messages-inner {
