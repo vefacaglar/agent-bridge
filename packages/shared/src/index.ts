@@ -100,6 +100,7 @@ export interface Run {
   errorMessage?: string;
   createdAt: string;
   updatedAt: string;
+  lastActiveAt?: string;
 }
 
 // One end of a dual-model agent preset: which provider + model to use.

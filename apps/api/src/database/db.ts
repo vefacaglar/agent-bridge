@@ -76,7 +76,8 @@ db.exec(`
 
     error_message TEXT,
     created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
+    updated_at TEXT NOT NULL,
+    last_active_at TEXT
   );
 `);
 
@@ -85,6 +86,20 @@ try {
   db.exec("ALTER TABLE runs ADD COLUMN mode TEXT NOT NULL DEFAULT 'accept_edits'");
 } catch (e) {
   // Ignored if column already exists or runs table schema migration is not needed
+}
+
+// Migration: Add last_active_at column to runs if missing.
+try {
+  db.exec("ALTER TABLE runs ADD COLUMN last_active_at TEXT");
+} catch (e) {
+  // Ignored if column already exists
+}
+
+// Populate last_active_at if null on startup
+try {
+  db.exec("UPDATE runs SET last_active_at = COALESCE(updated_at, created_at) WHERE last_active_at IS NULL");
+} catch (e) {
+  // Ignored
 }
 
 // Migration: Add dual-model (architect + coder) columns to runs. All nullable;

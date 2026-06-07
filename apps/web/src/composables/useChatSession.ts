@@ -279,6 +279,7 @@ export function useChatSession(options: ChatSessionOptions) {
       }
 
       await loadMessages(runId);
+      await loadRuns();
       connectEventSource(runId);
     } else {
       messages.value = [];

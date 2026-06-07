@@ -22,7 +22,8 @@ function mapRowToRun(row: any): Run {
     agentPreset: row.agent_preset || undefined,
     errorMessage: row.error_message || undefined,
     createdAt: row.created_at,
-    updatedAt: row.updated_at
+    updatedAt: row.updated_at,
+    lastActiveAt: row.last_active_at || undefined
   };
 }
 
@@ -52,8 +53,8 @@ export class RunRepository {
         provider_id, provider_display_name, model, mode,
         coder_provider_id, coder_model, agent_preset,
         utility_provider_id, utility_model,
-        error_message, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        error_message, created_at, updated_at, last_active_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     runQueuedWrite(() => stmt.run(
@@ -74,7 +75,8 @@ export class RunRepository {
       run.utilityModel || null,
       run.errorMessage || null,
       run.createdAt,
-      run.updatedAt
+      run.updatedAt,
+      run.lastActiveAt || run.createdAt
     ));
   }
 
@@ -85,7 +87,7 @@ export class RunRepository {
   }
 
   list(): Run[] {
-    const stmt = db.prepare("SELECT * FROM runs ORDER BY created_at DESC");
+    const stmt = db.prepare("SELECT * FROM runs ORDER BY last_active_at DESC");
     const rows = stmt.all() as any[];
     return rows.map(mapRowToRun);
   }
@@ -110,7 +112,8 @@ export class RunRepository {
       utilityModel: "utility_model",
       agentPreset: "agent_preset",
       errorMessage: "error_message",
-      createdAt: "created_at"
+      createdAt: "created_at",
+      lastActiveAt: "last_active_at"
     };
 
     for (const [key, val] of Object.entries(updates)) {
@@ -149,21 +152,25 @@ export class MessageRepository {
         content, reasoning_content, raw_response, created_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
+    const updateRunStmt = db.prepare("UPDATE runs SET updated_at = ?, last_active_at = ? WHERE id = ?");
 
-    runQueuedWrite(() => stmt.run(
-      message.id,
-      message.runId,
-      message.role,
-      message.agentRole || null,
-      message.agentName || null,
-      message.providerId || null,
-      message.providerDisplayName || null,
-      message.model || null,
-      message.content,
-      message.reasoningContent || null,
-      message.rawResponse || null,
-      message.createdAt
-    ));
+    runQueuedWrite(() => {
+      stmt.run(
+        message.id,
+        message.runId,
+        message.role,
+        message.agentRole || null,
+        message.agentName || null,
+        message.providerId || null,
+        message.providerDisplayName || null,
+        message.model || null,
+        message.content,
+        message.reasoningContent || null,
+        message.rawResponse || null,
+        message.createdAt
+      );
+      updateRunStmt.run(message.createdAt, message.createdAt, message.runId);
+    });
   }
 
   listByRunId(runId: string): RunMessage[] {
