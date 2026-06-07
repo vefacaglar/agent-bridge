@@ -112,9 +112,6 @@ export function useChatAutoScroll(
 
       const lastMsg = messages.value.length > 0 ? messages.value[messages.value.length - 1] : null;
 
-      // Avoid scrolling the main chat screen down when the model is only in the thinking/reasoning phase
-      const isThinking = lastMsg && lastMsg.role === 'assistant' && lastMsg.reasoningContent && !lastMsg.content;
-
       const isUserMsg = lastMsg && lastMsg.role === 'user';
 
       // Only force scroll when a different run is loaded. Streaming updates
@@ -129,7 +126,7 @@ export function useChatAutoScroll(
       nextTick(() => {
         if (isUserMsg && (forceScroll || wasAtBottom)) {
           scrollToUserMessage();
-        } else if (!isThinking && (forceScroll || wasAtBottom)) {
+        } else if (forceScroll || wasAtBottom) {
           scrollToBottom(forceScroll || wasAtBottom);
           if (forceScroll) {
             requestAnimationFrame(() => scrollToBottom(true));
