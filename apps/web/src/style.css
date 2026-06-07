@@ -30,7 +30,7 @@
   --text: #ffffff;
   --muted: #dcdcdc;
   --faint: #adadad;
-  --planner: #64b5f6;
+  --planner: #d9c18b;
   --executor: #81c784;
   --danger: #ff6b6b;
   --success: #66bb6a;
@@ -141,10 +141,6 @@ pre {
   font-family: inherit;
 }
 
-.muted-emoji {
-  filter: saturate(30%) opacity(0.85);
-  display: inline-block;
-}
 
 ::-webkit-scrollbar {
   width: 8px;
@@ -533,8 +529,8 @@ pre {
 }
 
 .user-bubble {
-  align-self: flex-end;
-  max-width: min(680px, 82%);
+  align-self: stretch;
+  max-width: 100%;
   border-radius: 18px;
   background: var(--surface-strong);
   color: var(--text);

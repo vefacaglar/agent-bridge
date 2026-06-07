@@ -49,6 +49,40 @@ function getMessageTokens(msg: any): number {
   return estimateTokens((msg.content || '') + (msg.reasoningContent || ''));
 }
 
+// User message collapse/expand states
+const expandedUserMessages = ref<Record<string, boolean>>({});
+const userMessageExpandable = ref<Record<string, boolean>>({});
+
+function checkBubbleHeight(el: HTMLElement | null, messageId: string) {
+  if (!el) return;
+  const body = el.querySelector('.user-raw-message') as HTMLElement | null;
+  if (!body) return;
+  
+  // 3 lines * 1.55 line-height * 15px is around 70px.
+  // We use 74px to be safe against rounding.
+  const isLong = body.scrollHeight > 74;
+  if (userMessageExpandable.value[messageId] !== isLong) {
+    userMessageExpandable.value[messageId] = isLong;
+  }
+}
+
+function handleUserMessageClick(event: MouseEvent, messageId: string) {
+  const target = event.target as HTMLElement;
+  // If user clicked a link or image, do not toggle collapse/expand
+  if (target.tagName === 'A' || target.tagName === 'IMG' || target.closest('a')) {
+    return;
+  }
+  if (userMessageExpandable.value[messageId]) {
+    expandedUserMessages.value[messageId] = true;
+  }
+}
+
+// Reset collapse states when the active run changes
+watch(() => props.activeRun?.id, () => {
+  expandedUserMessages.value = {};
+  userMessageExpandable.value = {};
+});
+
 // Plan Accordion State
 const expandedPlans = ref<Record<string, boolean>>({});
 
@@ -237,16 +271,24 @@ const formattedElapsedTime = computed(() => {
 
   <div v-else ref="containerEl" class="messages-inner" @click="handleImageClick">
     <div class="user-message-container">
-      <article class="user-bubble">
-        <div class="user-markdown-body" v-html="renderMarkdown(activeRun.task, activeRun.id)"></div>
+      <article 
+        class="user-bubble"
+        :class="{ 
+          'is-collapsed': !expandedUserMessages[activeRun?.id || ''], 
+          'is-expandable': userMessageExpandable[activeRun?.id || ''] 
+        }"
+        @click="handleUserMessageClick($event, activeRun?.id || '')"
+        :ref="(el) => checkBubbleHeight(el as HTMLElement, activeRun?.id || '')"
+      >
+        <div class="user-raw-message">{{ activeRun?.task || '' }}</div>
       </article>
       <div class="user-response-footer">
         <button 
           class="copy-button-icon" 
           title="Copy message"
-          @click.stop="copyTextWithStatus(activeRun.task, activeRun.id)"
+          @click.stop="copyTextWithStatus(activeRun?.task || '', activeRun?.id || '')"
         >
-          <svg v-if="copiedMessageId === activeRun.id" class="check-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7bd88f" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <svg v-if="copiedMessageId === activeRun?.id" class="check-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7bd88f" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M20 6 9 17l-5-5"/>
           </svg>
           <svg v-else class="copy-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -295,8 +337,16 @@ const formattedElapsedTime = computed(() => {
 
     <template v-for="(group, idx) in groupedMessages" :key="group.id">
       <div v-if="group.type === 'user'" class="user-message-container">
-        <article class="user-bubble">
-          <div class="user-markdown-body" v-html="renderMarkdown(group.message.content, group.message.id)"></div>
+        <article 
+          class="user-bubble"
+          :class="{ 
+            'is-collapsed': !expandedUserMessages[group.message.id], 
+            'is-expandable': userMessageExpandable[group.message.id] 
+          }"
+          @click="handleUserMessageClick($event, group.message.id)"
+          :ref="(el) => checkBubbleHeight(el as HTMLElement, group.message.id)"
+        >
+          <div class="user-raw-message">{{ group.message.content || '' }}</div>
         </article>
         <div class="user-response-footer">
           <button 
@@ -772,9 +822,35 @@ const formattedElapsedTime = computed(() => {
   max-width: 100%;
   align-self: stretch;
   padding: 14px 16px;
-  border: 1px solid var(--border-soft);
+  border: none;
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition: background 0.2s ease, max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease;
+  overflow: hidden;
+  position: relative;
+}
+
+.user-bubble.is-expandable.is-collapsed {
+  cursor: pointer;
+}
+
+.user-bubble.is-expandable.is-collapsed:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.user-bubble.is-collapsed.is-expandable {
+  max-height: 6.5rem;
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 -36px 36px -18px rgba(20, 20, 22, 0.98);
+}
+
+.user-bubble.is-expanded.is-expandable {
+  max-height: 2000px;
   box-shadow:
     0 12px 32px rgba(0, 0, 0, 0.2),
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
@@ -783,23 +859,26 @@ const formattedElapsedTime = computed(() => {
 .user-message-container {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  max-width: min(850px, 85%);
-  align-self: flex-end;
+  align-items: stretch;
+  max-width: 100%;
+  align-self: stretch;
 }
 
 .user-response-footer {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   margin-top: 6px;
   padding-right: 8px;
 }
 
-.user-markdown-body {
+.user-raw-message {
   color: var(--text);
   font-family: inherit;
   font-size: 0.94rem;
   line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 .user-markdown-body :deep(p) {
   margin: 0;
