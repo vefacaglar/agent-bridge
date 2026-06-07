@@ -139,14 +139,22 @@ function submitAdd() {
       <section v-if="globalMemories.length > 0" class="mem-group">
         <h4 class="mem-group-title">Global</h4>
         <ul class="mem-list">
-          <li v-for="m in globalMemories" :key="m.id" class="mem-item">
+          <li v-for="m in globalMemories" :key="m.id" class="mem-item" :class="{ editing: editingId === m.id }">
             <span class="mem-category">{{ m.category }}</span>
             <div class="mem-body">
               <template v-if="editingId === m.id">
-                <textarea v-model="editDraft" class="mem-textarea" rows="3"></textarea>
-                <div class="mem-edit-actions">
-                  <ThemedButton variant="primary" size="sm" :disabled="!editDraft.trim()" @click="saveEdit(m.id)">Save</ThemedButton>
-                  <ThemedButton variant="secondary" size="sm" @click="cancelEdit">Cancel</ThemedButton>
+                <div class="mem-edit-row">
+                  <input
+                    v-model="editDraft"
+                    type="text"
+                    class="mem-edit-input"
+                    @keyup.enter="saveEdit(m.id)"
+                    @keyup.esc="cancelEdit"
+                  />
+                  <div class="mem-edit-actions">
+                    <ThemedButton variant="primary" size="sm" :disabled="!editDraft.trim()" @click="saveEdit(m.id)">Save</ThemedButton>
+                    <ThemedButton variant="secondary" size="sm" @click="cancelEdit">Cancel</ThemedButton>
+                  </div>
                 </div>
               </template>
               <span v-else class="mem-content">{{ m.content }}</span>
@@ -164,14 +172,22 @@ function submitAdd() {
           Project · <span class="mem-group-path">{{ group.label }}</span>
         </h4>
         <ul class="mem-list">
-          <li v-for="m in group.items" :key="m.id" class="mem-item">
+          <li v-for="m in group.items" :key="m.id" class="mem-item" :class="{ editing: editingId === m.id }">
             <span class="mem-category">{{ m.category }}</span>
             <div class="mem-body">
               <template v-if="editingId === m.id">
-                <textarea v-model="editDraft" class="mem-textarea" rows="3"></textarea>
-                <div class="mem-edit-actions">
-                  <ThemedButton variant="primary" size="sm" :disabled="!editDraft.trim()" @click="saveEdit(m.id)">Save</ThemedButton>
-                  <ThemedButton variant="secondary" size="sm" @click="cancelEdit">Cancel</ThemedButton>
+                <div class="mem-edit-row">
+                  <input
+                    v-model="editDraft"
+                    type="text"
+                    class="mem-edit-input"
+                    @keyup.enter="saveEdit(m.id)"
+                    @keyup.esc="cancelEdit"
+                  />
+                  <div class="mem-edit-actions">
+                    <ThemedButton variant="primary" size="sm" :disabled="!editDraft.trim()" @click="saveEdit(m.id)">Save</ThemedButton>
+                    <ThemedButton variant="secondary" size="sm" @click="cancelEdit">Cancel</ThemedButton>
+                  </div>
                 </div>
               </template>
               <span v-else class="mem-content">{{ m.content }}</span>
@@ -243,11 +259,42 @@ function submitAdd() {
   outline: none;
 }
 
-.mem-add-actions,
-.mem-edit-actions {
+.mem-add-actions {
   display: flex;
   gap: 8px;
   margin-top: 6px;
+}
+
+.mem-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.mem-edit-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--control-bg);
+  border: 1px solid var(--control-border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 0.88rem;
+  font-family: inherit;
+  height: 28px;
+  box-sizing: border-box;
+  padding: 0 10px;
+}
+
+.mem-edit-input:focus {
+  border-color: var(--control-border-focus);
+  outline: none;
+}
+
+.mem-edit-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .mem-group {
@@ -288,6 +335,19 @@ function submitAdd() {
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
 
+.mem-item.editing {
+  align-items: center;
+}
+
+.mem-item.editing .mem-category {
+  height: 28px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 8px;
+  transform: none;
+}
+
 .mem-item:last-child {
   border-bottom: none;
 }
@@ -300,8 +360,9 @@ function submitAdd() {
   color: var(--muted);
   background: var(--surface-strong);
   border: 1px solid var(--border);
-  padding: 3px 7px;
+  padding: 5px 8px;
   border-radius: 5px;
+  transform: translateY(-2px);
 }
 
 .mem-body {

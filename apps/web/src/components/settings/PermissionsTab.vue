@@ -19,10 +19,10 @@ function toggleExpand(id: number) {
   expandedIds.value[id] = !expandedIds.value[id];
 }
 
-const collapsedGroups = ref<Record<string, boolean>>({});
+const expandedGroups = ref<Record<string, boolean>>({});
 
 function toggleGroup(groupPath: string) {
-  collapsedGroups.value[groupPath] = !collapsedGroups.value[groupPath];
+  expandedGroups.value[groupPath] = !expandedGroups.value[groupPath];
 }
 
 function basename(path: string): string {
@@ -87,13 +87,13 @@ const projectPermissionsGroups = computed(() => {
       <section v-if="globalPermissions.length > 0" class="perm-group">
         <h4 class="perm-group-title" @click="toggleGroup('global')">
           <span>Global</span>
-          <span class="group-arrow" :class="{ rotated: !collapsedGroups['global'] }">
+          <span class="group-arrow" :class="{ rotated: expandedGroups['global'] }">
             <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <path d="m6 9 6 6 6-6"/>
             </svg>
           </span>
         </h4>
-        <ul v-if="!collapsedGroups['global']" class="perm-accordion-list">
+        <ul v-if="expandedGroups['global']" class="perm-accordion-list">
           <li
             v-for="rule in globalPermissions"
             :key="rule.id"
@@ -138,13 +138,13 @@ const projectPermissionsGroups = computed(() => {
       <section v-for="group in projectPermissionsGroups" :key="group.path" class="perm-group">
         <h4 class="perm-group-title" @click="toggleGroup(group.path)">
           <span>Project · <span class="perm-group-path">{{ group.label }}</span></span>
-          <span class="group-arrow" :class="{ rotated: !collapsedGroups[group.path] }">
+          <span class="group-arrow" :class="{ rotated: expandedGroups[group.path] }">
             <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <path d="m6 9 6 6 6-6"/>
             </svg>
           </span>
         </h4>
-        <ul v-if="!collapsedGroups[group.path]" class="perm-accordion-list">
+        <ul v-if="expandedGroups[group.path]" class="perm-accordion-list">
           <li
             v-for="rule in group.items"
             :key="rule.id"
