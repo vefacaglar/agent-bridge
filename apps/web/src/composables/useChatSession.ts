@@ -118,9 +118,13 @@ export function useChatSession(options: ChatSessionOptions) {
     activeRun.value = { ...run };
     options.activeProjectPath.value = run.projectPath || options.activeProjectPath.value;
     taskInput.value = '';
+    showPermissionModal.value = false;
+    pendingPermissionRequest.value = null;
+    pendingQuestionRequest.value = null;
 
     await loadMessages(run.id);
     currentPlan.value = await api.getRunPlan(run.id);
+    await hydratePendingRequest(run.id);
 
     if (ACTIVE_STATUSES.includes(run.status)) {
       isRunning.value = true;
@@ -129,6 +133,19 @@ export function useChatSession(options: ChatSessionOptions) {
       isRunning.value = false;
     }
     requestFocus();
+  }
+
+  async function hydratePendingRequest(runId: string) {
+    const pending = await api.getRunPending(runId);
+    if (!pending || activeRun.value?.id !== runId) return;
+
+    if (pending.permissionRequest) {
+      pendingPermissionRequest.value = pending.permissionRequest;
+      showPermissionModal.value = true;
+    }
+    if (pending.questionRequest) {
+      pendingQuestionRequest.value = pending.questionRequest;
+    }
   }
 
   function startNewRunSetup() {

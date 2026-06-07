@@ -97,6 +97,7 @@ export const api = {
   getRuns: () => getJson<Run[]>('/api/runs'),
   getMessages: (runId: string) => getJson<RunMessage[]>(`/api/runs/${runId}/messages`),
   getRunPlan: (runId: string) => getJson<Plan | null>(`/api/runs/${runId}/plan`),
+  getRunPending: (runId: string) => getJson<{ permissionRequest: any | null; questionRequest: any | null }>(`/api/runs/${runId}/pending`),
   getProjects: () => getJson<Project[]>('/api/projects'),
   getPermissions: () => getJson<PermissionRule[]>('/api/permissions'),
 

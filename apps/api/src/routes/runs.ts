@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import type { ReasoningEffort, Run, RunStatus } from "@agent-bridge/shared";
 import { type AppContext, normalizeProject } from "../context.js";
 import { eventBus } from "../orchestrator/eventBus.js";
-import { permissionKey, commandEscapesWorkspace } from "../orchestrator/workspaceTools.js";
+import { permissionKey, commandEscapesWorkspace, buildPermissionPreview } from "../orchestrator/workspaceTools.js";
 
 const PERMISSION_DECISIONS = ["allow_once", "allow_project", "allow_always", "deny"] as const;
 type PermissionDecision = (typeof PERMISSION_DECISIONS)[number];
@@ -310,6 +310,39 @@ export function registerRunRoutes(server: FastifyInstance, ctx: AppContext) {
     return ctx.planRepo.getActive(id);
   });
 
+  // Pending user-facing request for a run. Permission/question prompts are kept
+  // in memory while the orchestrator is paused; this lets the UI restore the card
+  // when the user navigates away and later returns to the run.
+  server.get("/api/runs/:id/pending", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const run = ctx.runRepo.getById(id);
+    if (!run) {
+      reply.status(404);
+      return { error: `Run with id "${id}" not found` };
+    }
+
+    const pendingPermission = ctx.orchestrator.getPendingPermission(id);
+    const pendingQuestion = ctx.orchestrator.getPendingQuestion(id);
+
+    return {
+      permissionRequest: pendingPermission
+        ? {
+            type: "permission_requested",
+            runId: id,
+            toolCall: pendingPermission.toolCall,
+            preview: buildPermissionPreview(run, pendingPermission.toolCall)
+          }
+        : null,
+      questionRequest: pendingQuestion
+        ? {
+            type: "question_requested",
+            runId: id,
+            questions: pendingQuestion.questions
+          }
+        : null
+    };
+  });
+
   // SSE event stream for a specific run.
   server.get("/api/runs/:id/events", async (request, reply) => {
     const { id } = request.params as { id: string };
@@ -341,6 +374,25 @@ export function registerRunRoutes(server: FastifyInstance, ctx: AppContext) {
       }
       reply.raw.end();
       return;
+    }
+
+    const pendingPermission = ctx.orchestrator.getPendingPermission(id);
+    if (pendingPermission) {
+      reply.raw.write(`data: ${JSON.stringify({
+        type: "permission_requested",
+        runId: id,
+        toolCall: pendingPermission.toolCall,
+        preview: buildPermissionPreview(run, pendingPermission.toolCall)
+      })}\n\n`);
+    }
+
+    const pendingQuestion = ctx.orchestrator.getPendingQuestion(id);
+    if (pendingQuestion) {
+      reply.raw.write(`data: ${JSON.stringify({
+        type: "question_requested",
+        runId: id,
+        questions: pendingQuestion.questions
+      })}\n\n`);
     }
 
     const listener = (event: any) => {
