@@ -130,6 +130,16 @@ watch([hasSidePanelContent, sidePanelOpen], ([hasContent, isOpen]) => {
 // Reset the collapsed state when switching chats so each run's panel shows.
 watch(activeRunId, () => { sidePanelCollapsed.value = false; });
 
+// Automatically re-open the panel if it was closed and the assistant revises the plan.
+watch(
+  () => currentPlan.value?.version,
+  (newVer, oldVer) => {
+    if (newVer !== undefined && oldVer !== undefined && newVer !== oldVer) {
+      sidePanelCollapsed.value = false;
+    }
+  }
+);
+
 const planPanelRef = ref<any>(null);
 
 async function openAgentTranscript(agentId: string) {

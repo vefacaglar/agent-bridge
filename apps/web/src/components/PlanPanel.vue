@@ -73,6 +73,15 @@ watch(
   }
 );
 
+watch(
+  () => props.plan?.version,
+  (newVer, oldVer) => {
+    if (newVer !== undefined && oldVer !== undefined && newVer !== oldVer) {
+      activeTab.value = 'plan';
+    }
+  }
+);
+
 function openFile(change: WorkspaceChange) {
   if (!openFileTabs.value.includes(change.id)) {
     openFileTabs.value.push(change.id);

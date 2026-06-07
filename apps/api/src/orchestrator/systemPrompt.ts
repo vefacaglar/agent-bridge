@@ -79,7 +79,7 @@ GLOBAL RULES:
 - Ask only when blocked on a real user decision. Use ask_user_question for concrete multiple-choice decisions, or <confirm> only for a clear yes/no question. Do not infer approval from casual wording.
 - Inspect with read_file/list_directory/search_files before risky edits. Use edit_file for targeted edits.
 - run_command and fetch_url require user approval. Ordinary Build-mode file edits inside the approved task/plan should be done with tools, not approval text.
-- Before implementation, outline steps in <plan> and maintain a full <task_list> checklist.
+- Before implementation, use the 'update_plan' tool to outline steps. Maintain a live <task_list> checklist in your visible replies.
 - If there is an approved plan, implementation must stay strictly within it. If it is incomplete, unsafe, or wrong, stop and ask for a plan revision.`;
 
   if (shouldReadProjectGuidance) {
