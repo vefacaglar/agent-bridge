@@ -12,9 +12,22 @@ export function useChatAutoScroll(
   const userScrollQuietMs = 700;
   let suppressAutoScrollUntil = 0;
   let programmaticScrollFrame: number | null = null;
+  let isProgrammaticScrolling = false;
+  let programmaticScrollTimeout: number | null = null;
 
   function isUserScrollActive() {
     return Date.now() < suppressAutoScrollUntil;
+  }
+
+  function setProgrammaticScrollActive(duration = 800) {
+    isProgrammaticScrolling = true;
+    if (programmaticScrollTimeout !== null) {
+      clearTimeout(programmaticScrollTimeout);
+    }
+    programmaticScrollTimeout = window.setTimeout(() => {
+      isProgrammaticScrolling = false;
+      programmaticScrollTimeout = null;
+    }, duration);
   }
 
   function markProgrammaticScroll() {
@@ -29,8 +42,15 @@ export function useChatAutoScroll(
   function scrollToBottom(force = false) {
     if (!container.value) return;
     if (!force && isUserScrollActive()) return;
+
     markProgrammaticScroll();
-    container.value.scrollTop = container.value.scrollHeight;
+
+    // Temporarily disable smooth scroll to avoid triggering pauseAutoScroll during animation
+    const el = container.value;
+    const originalScrollBehavior = el.style.scrollBehavior;
+    el.style.scrollBehavior = 'auto';
+    el.scrollTop = el.scrollHeight;
+    el.style.scrollBehavior = originalScrollBehavior;
   }
 
   function isAtBottom(el: HTMLElement, threshold = stickyBottomThreshold) {
@@ -39,13 +59,17 @@ export function useChatAutoScroll(
 
   function scrollToUserMessage() {
     if (!container.value) return;
-    if (isUserScrollActive()) return;
     const userContainers = container.value.querySelectorAll('.user-message-container');
     const lastUserContainer = userContainers[userContainers.length - 1] as HTMLElement | undefined;
     if (lastUserContainer) {
       // Put the new user turn as high as possible while leaving a small visual inset.
       const topOffset = lastUserContainer.getBoundingClientRect().top - container.value.getBoundingClientRect().top + container.value.scrollTop - 16;
+      
       markProgrammaticScroll();
+      
+      // Set programmatic scrolling active so that async smooth scroll events do not trigger pauseAutoScroll
+      setProgrammaticScrollActive(800);
+
       container.value.scrollTo({
         top: Math.max(0, topOffset),
         behavior: 'smooth'
@@ -62,7 +86,7 @@ export function useChatAutoScroll(
   }
 
   function handleScroll() {
-    if (programmaticScrollFrame !== null || !container.value) return;
+    if (programmaticScrollFrame !== null || isProgrammaticScrolling || !container.value) return;
     if (!isAtBottom(container.value)) pauseAutoScroll();
   }
 
@@ -106,7 +130,7 @@ export function useChatAutoScroll(
         if (isUserMsg && (forceScroll || wasAtBottom)) {
           scrollToUserMessage();
         } else if (!isThinking && (forceScroll || wasAtBottom)) {
-          scrollToBottom(forceScroll);
+          scrollToBottom(forceScroll || wasAtBottom);
           if (forceScroll) {
             requestAnimationFrame(() => scrollToBottom(true));
           }
@@ -145,7 +169,7 @@ export function useChatAutoScroll(
     const wasAtBottom = isAtBottom(container.value);
     nextTick(() => {
       if (wasAtBottom) {
-        scrollToBottom();
+        scrollToBottom(true);
       }
     });
   });
@@ -154,6 +178,9 @@ export function useChatAutoScroll(
     removeContainerListeners(container.value);
     if (programmaticScrollFrame !== null) {
       cancelAnimationFrame(programmaticScrollFrame);
+    }
+    if (programmaticScrollTimeout !== null) {
+      clearTimeout(programmaticScrollTimeout);
     }
   });
 
