@@ -281,6 +281,8 @@ async function rejectPlan() {
         </div>
       </header>
 
+      <div v-if="activeRun" class="header-fade-overlay"></div>
+
       <template v-if="activeRun">
         <section :ref="setMessagesContainer" class="messages-scroll">
           <MessageThread
@@ -466,12 +468,28 @@ async function rejectPlan() {
   gap: 24px;
 }
 
+.chat-shell {
+  position: relative;
+}
+
+.header-fade-overlay {
+  position: absolute;
+  top: 56px; /* 12px margin-top + 44px header height */
+  left: 0;
+  right: 0;
+  height: 24px;
+  background: linear-gradient(to bottom, var(--bg), transparent);
+  pointer-events: none;
+  z-index: 10;
+}
+
 .chat-header {
   display: block;
   /* Match the side cards' top inset so all three header rows share a baseline. */
   margin-top: var(--shell-inset);
   min-height: 0;
   padding: 0;
+  border-bottom: none;
 }
 
 .chat-header-inner {

@@ -207,7 +207,16 @@ function onDeleteProject(path: string, event: Event) {
   </aside>
 </template>
 
+
 <style scoped>
+.sidebar {
+  gap: 8px; /* reduced from 12px */
+}
+
+.nav-action {
+  padding: 6px 10px; /* reduced from 8px 10px */
+}
+
 .sidebar-header {
   display: flex;
   justify-content: flex-end;
@@ -245,7 +254,7 @@ function onDeleteProject(path: string, event: Event) {
   flex: 1;
   overflow-y: auto;
   min-height: 0;
-  margin-top: 14px;
+  margin-top: 8px; /* reduced from 14px */
 }
 
 .new-chat-action {
@@ -269,8 +278,8 @@ function onDeleteProject(path: string, event: Event) {
 .project-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-top: 8px;
+  gap: 4px; /* reduced from 6px */
+  margin-top: 6px; /* reduced from 8px */
 }
 
 .project-accordion-item {
@@ -283,7 +292,7 @@ function onDeleteProject(path: string, event: Event) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 10px;
+  padding: 6px 8px; /* reduced from 8px 10px */
   border-radius: 8px;
   color: var(--muted);
   cursor: pointer;
@@ -334,13 +343,18 @@ function onDeleteProject(path: string, event: Event) {
 }
 
 .project-chats-list {
-  padding: 4px 6px 8px 18px;
+  padding: 2px 4px 4px 14px; /* reduced from 4px 6px 8px 18px */
   margin-top: 0;
   border-left: none;
   margin-left: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px; /* reduced from 4px */
+}
+
+.chat-history-item {
+  padding: 5px 8px; /* reduced from 8px 10px 8px 16px */
+  font-size: 0.86rem; /* reduced from 0.9rem */
 }
 
 .project-header-actions {
@@ -396,7 +410,7 @@ function onDeleteProject(path: string, event: Event) {
   background: transparent;
   color: var(--faint);
   font-size: 0.78rem;
-  padding: 6px 16px;
+  padding: 4px 8px; /* reduced from 6px 16px */
   text-align: left;
   cursor: pointer;
   width: 100%;
