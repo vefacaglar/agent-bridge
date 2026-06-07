@@ -772,10 +772,6 @@ onBeforeUnmount(() => {
   margin-top: 11px;
   padding: 6px;
   gap: 10px;
-  border: 1px solid var(--composer-menu-border);
-  border-radius: 12px;
-  background: var(--composer-menu-bg);
-  box-shadow: inset 0 1px 0 var(--composer-menu-shadow);
 }
 
 .composer-menu-left {
