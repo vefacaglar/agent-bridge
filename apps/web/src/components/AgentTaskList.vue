@@ -60,7 +60,7 @@ const allDone = computed(() => tasks.value.length > 0 && doneCount.value === tas
 <style scoped>
 .agent-task-list {
   width: min(1000px, 100%);
-  margin: 0 auto 8px;
+  margin: 0 auto 0;
   background: var(--surface-strong);
   border: 1px solid var(--border);
   border-radius: 12px;
