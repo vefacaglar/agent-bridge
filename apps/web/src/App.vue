@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useAppShell } from './composables/useAppShell';
+import type { Run } from '@agent-bridge/shared';
 import AppSidebar from './components/AppSidebar.vue';
 import MessageThread from './components/MessageThread.vue';
 import ChatComposer from './components/ChatComposer.vue';
@@ -66,6 +67,30 @@ onUnmounted(() => {
 const isSidebarCollapsed = ref(false);
 function toggleSidebar() {
   isSidebarCollapsed.value = !isSidebarCollapsed.value;
+}
+
+function handleSelectRun(run: Run) {
+  chat.selectRun(run);
+  if (window.innerWidth <= 760) {
+    isSidebarCollapsed.value = true;
+    sidePanelCollapsed.value = true;
+  }
+}
+
+function handleNewChat() {
+  chat.startNewRunSetup();
+  if (window.innerWidth <= 760) {
+    isSidebarCollapsed.value = true;
+    sidePanelCollapsed.value = true;
+  }
+}
+
+function handleSelectProjectAndNewChat(path: string) {
+  selectProjectAndNewChat(path);
+  if (window.innerWidth <= 760) {
+    isSidebarCollapsed.value = true;
+    sidePanelCollapsed.value = true;
+  }
 }
 
 // Side panel resizable width logic
@@ -136,15 +161,23 @@ watch([hasSidePanelContent, sidePanelOpen], ([hasContent, isOpen]) => {
   }, SIDE_PANEL_TRANSITION_MS);
 }, { immediate: true });
 
-// Reset the collapsed state when switching chats so each run's panel shows.
-watch(activeRunId, () => { sidePanelCollapsed.value = false; });
+// Reset the collapsed state when switching chats so each run's panel shows, but keep it collapsed on mobile.
+watch(activeRunId, () => {
+  if (window.innerWidth <= 760) {
+    sidePanelCollapsed.value = true;
+  } else {
+    sidePanelCollapsed.value = false;
+  }
+});
 
-// Automatically re-open the panel if it was closed and the assistant revises the plan.
+// Automatically re-open the panel if it was closed and the assistant revises the plan (only on desktop).
 watch(
   () => currentPlan.value?.version,
   (newVer, oldVer) => {
     if (newVer !== undefined && oldVer !== undefined && newVer !== oldVer) {
-      sidePanelCollapsed.value = false;
+      if (window.innerWidth > 760) {
+        sidePanelCollapsed.value = false;
+      }
     }
   }
 );
@@ -244,6 +277,38 @@ async function rejectPlan() {
     "I reject this plan. Do NOT implement it or make any changes. Stay in Plan mode and wait for my further instructions."
   );
 }
+
+// Automatically collapse left and right panels when screen is resized to mobile width (760px)
+const isWindowResizing = ref(false);
+let resizeTimeout: ReturnType<typeof setTimeout> | null = null;
+let lastWidth = window.innerWidth;
+
+function handleWindowResize() {
+  isWindowResizing.value = true;
+  if (resizeTimeout) clearTimeout(resizeTimeout);
+  resizeTimeout = setTimeout(() => {
+    isWindowResizing.value = false;
+  }, 150);
+
+  const currentWidth = window.innerWidth;
+  if (currentWidth <= 760 && lastWidth > 760) {
+    if (!isSidebarCollapsed.value) isSidebarCollapsed.value = true;
+    if (!sidePanelCollapsed.value) sidePanelCollapsed.value = true;
+  }
+  lastWidth = currentWidth;
+}
+
+onMounted(() => {
+  window.addEventListener('resize', handleWindowResize);
+  if (window.innerWidth <= 760) {
+    isSidebarCollapsed.value = true;
+    sidePanelCollapsed.value = true;
+  }
+});
+
+onUnmounted(() => {
+  window.removeEventListener('resize', handleWindowResize);
+});
 </script>
 
 <template>
@@ -253,7 +318,8 @@ async function rejectPlan() {
       'sidebar-collapsed': isSidebarCollapsed,
       'panel-available': hasSidePanelContent,
       'panel-open': sidePanelOpen,
-      'is-resizing': isResizing
+      'is-resizing': isResizing,
+      'window-resizing': isWindowResizing
     }"
     :style="{ '--side-panel-w': `${sidePanelWidth}px` }"
   >
@@ -263,11 +329,11 @@ async function rejectPlan() {
       :runs="runs"
       :active-run-id="activeRunId"
       :is-sidebar-collapsed="isSidebarCollapsed"
-      @new-chat="chat.startNewRunSetup"
+      @new-chat="handleNewChat"
       @add-project="projects.openAddProjectModal"
       @select-project="selectProject"
-      @select-project-and-new-chat="selectProjectAndNewChat"
-      @select-run="chat.selectRun"
+      @select-project-and-new-chat="handleSelectProjectAndNewChat"
+      @select-run="handleSelectRun"
       @delete-project="deleteProject"
       @open-settings="openSettings"
       @toggle-sidebar="toggleSidebar"
@@ -411,6 +477,10 @@ async function rejectPlan() {
       @resize-start="isResizing = true"
       @resize-end="isResizing = false"
     />
+
+    <!-- Backdrop overlays for mobile drawer menus -->
+    <div v-if="!isSidebarCollapsed" class="sidebar-backdrop" @click="toggleSidebar"></div>
+    <div v-if="sidePanelOpen" class="panel-backdrop" @click="sidePanelCollapsed = true"></div>
 
     <AddProjectModal
       :show="projects.showAddProjectModal.value"

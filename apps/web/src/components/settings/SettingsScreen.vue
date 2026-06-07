@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { Memory, MemoryCategory, MemoryScope, PermissionRule, ProviderMetadata } from '@agent-bridge/shared';
 import PermissionsTab from './PermissionsTab.vue';
 import ProvidersTab from './ProvidersTab.vue';
@@ -37,6 +37,14 @@ const TABS = [
 type TabId = (typeof TABS)[number]['id'];
 
 const activeTab = ref<TabId>('permissions');
+const isSidebarCollapsed = ref(false);
+
+function selectTab(tabId: TabId) {
+  activeTab.value = tabId;
+  if (window.innerWidth <= 760) {
+    isSidebarCollapsed.value = true;
+  }
+}
 
 function onKey(e: KeyboardEvent) {
   if (props.show && e.key === 'Escape') {
@@ -45,7 +53,19 @@ function onKey(e: KeyboardEvent) {
   }
 }
 
-onMounted(() => window.addEventListener('keydown', onKey));
+watch(() => props.show, (newVal) => {
+  if (newVal) {
+    isSidebarCollapsed.value = window.innerWidth <= 760;
+  }
+});
+
+onMounted(() => {
+  window.addEventListener('keydown', onKey);
+  if (window.innerWidth <= 760) {
+    isSidebarCollapsed.value = true;
+  }
+});
+
 onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
 </script>
 
@@ -53,9 +73,19 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
   <transition name="settings-fade">
     <div v-if="show" class="settings-overlay" @click.self="emit('close')">
       <div class="settings-card">
-        <aside class="settings-sidebar">
+        <aside class="settings-sidebar" :class="{ collapsed: isSidebarCollapsed }">
           <div class="settings-sidebar-header">
             <span class="settings-sidebar-label">Settings</span>
+            <button
+              class="settings-sidebar-close-btn"
+              @click="isSidebarCollapsed = true"
+              title="Close Menu"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
           </div>
 
           <div class="settings-tabs-list">
@@ -64,7 +94,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
               :key="tab.id"
               class="settings-tab-btn"
               :class="{ active: activeTab === tab.id }"
-              @click="activeTab = tab.id"
+              @click="selectTab(tab.id)"
             >
               {{ tab.label }}
             </button>
@@ -81,10 +111,23 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
         <main class="settings-main">
           <header class="settings-main-header">
             <div class="settings-main-header-inner">
-              <div class="settings-breadcrumb">
-                <span class="breadcrumb-project">Settings</span>
-                <span class="breadcrumb-separator">/</span>
-                <span class="breadcrumb-chat-title">{{ TABS.find(t => t.id === activeTab)?.label }}</span>
+              <div class="settings-header-left">
+                <button
+                  class="settings-sidebar-toggle-btn"
+                  :class="{ active: !isSidebarCollapsed }"
+                  @click="isSidebarCollapsed = !isSidebarCollapsed"
+                  title="Toggle Sidebar"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="9" y1="3" x2="9" y2="21"></line>
+                  </svg>
+                </button>
+                <div class="settings-breadcrumb">
+                  <span class="breadcrumb-project">Settings</span>
+                  <span class="breadcrumb-separator">/</span>
+                  <span class="breadcrumb-chat-title">{{ TABS.find(t => t.id === activeTab)?.label }}</span>
+                </div>
               </div>
               <button class="settings-top-close-btn" @click="emit('close')" title="Close Settings">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -166,11 +209,62 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              padding 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.settings-sidebar.collapsed {
+  width: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  opacity: 0 !important;
+  border-right-color: transparent !important;
+  pointer-events: none;
+}
+
+.settings-header-left {
+  display: flex;
+  align-items: center;
+}
+
+.settings-sidebar-toggle-btn {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  margin-right: 12px;
+}
+
+.settings-sidebar-toggle-btn:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.settings-sidebar-toggle-btn.active {
+  color: var(--text);
 }
 
 .settings-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 24px;
   padding-left: 6px;
+}
+
+.settings-sidebar-close-btn {
+  display: none;
 }
 
 .settings-sidebar-label {
@@ -300,17 +394,15 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
   transition: all 0.2s ease;
-  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .settings-top-close-btn:hover {
   color: var(--text);
   background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.15);
 }
 
 .settings-scroll-area {
@@ -409,6 +501,103 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
   to {
     transform: scale(0.95);
     opacity: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .settings-overlay {
+    padding: 0;
+    backdrop-filter: none;
+    background: #121212;
+  }
+
+  .settings-card {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    border-radius: 0;
+    border: none;
+  }
+
+  .settings-sidebar {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100vw !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    z-index: 100;
+    background: #0e0e0e;
+    padding: 24px 20px;
+    border-right: none;
+  }
+
+  .settings-sidebar-header {
+    display: flex;
+    margin-bottom: 24px;
+  }
+
+  .settings-sidebar-close-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+  }
+
+  .settings-sidebar-close-btn:hover {
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .settings-tabs-list {
+    gap: 8px;
+  }
+
+  .settings-tab-btn {
+    padding: 12px 14px;
+    font-size: 1rem;
+  }
+
+  .settings-tab-btn.active {
+    transform: none;
+  }
+
+  .settings-close-btn {
+    padding: 12px 14px;
+    font-size: 0.95rem;
+    display: flex;
+  }
+
+  .settings-main-header {
+    padding: 0 16px;
+  }
+
+  .settings-main-header-inner {
+    height: 48px;
+  }
+
+  .settings-scroll-area {
+    padding: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .settings-tab-btn {
+    padding: 10px 12px;
+    font-size: 0.95rem;
+  }
+
+  .settings-close-btn {
+    padding: 10px 12px;
+    font-size: 0.9rem;
   }
 }
 </style>

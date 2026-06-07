@@ -264,6 +264,10 @@ watch(() => props.isRunning, (running) => {
 function adjustHeight() {
   const el = textarea.value;
   if (!el) return;
+  if (!props.taskInput) {
+    el.style.height = '';
+    return;
+  }
   el.style.height = 'auto';
   el.style.height = el.scrollHeight + 'px';
 }

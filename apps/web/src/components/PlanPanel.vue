@@ -526,6 +526,31 @@ defineExpose({
   transform: translateX(16px);
 }
 
+@media (max-width: 760px) {
+  .workspace-panel {
+    position: fixed !important;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 100vw !important;
+    max-width: none !important;
+    height: 100% !important;
+    z-index: 1001;
+    transform: translateX(0);
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    box-shadow: none;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .workspace-panel.collapsed {
+    transform: translateX(100%) !important;
+    margin: 0;
+    opacity: 1 !important;
+    pointer-events: none !important;
+  }
+}
+
 .workspace-panel-header {
   display: flex;
   align-items: center;
@@ -603,10 +628,10 @@ defineExpose({
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--border);
+  border: none;
   border-radius: 6px;
   color: var(--muted);
   cursor: pointer;
@@ -617,7 +642,6 @@ defineExpose({
 .workspace-panel-close:hover {
   color: var(--text);
   background: rgba(255, 255, 255, 0.07);
-  border-color: rgba(255, 255, 255, 0.16);
 }
 
 .workspace-panel-body {
@@ -680,15 +704,16 @@ defineExpose({
 }
 
 .agent-row {
-  padding: 12px 0;
-  border: none;
-  border-radius: 0;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  border-radius: 10px;
   background: transparent;
   box-shadow: none;
-  transition: background 0.18s ease;
+  transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
 }
 
 .agent-row:hover {
+  border-color: rgba(255, 255, 255, 0.08);
   background: transparent;
 }
 
@@ -696,11 +721,11 @@ defineExpose({
    clearly "inside" it rather than spilling onto the flat panel. */
 .agent-row.expanded {
   background: transparent;
-  border: none;
+  border-color: rgba(255, 255, 255, 0.06);
 }
 
 .agent-row.running {
-  border: none;
+  border-color: rgba(150, 167, 143, 0.15);
 }
 
 .agent-row-main {
