@@ -20,7 +20,33 @@ const emit = defineEmits<{
   (e: 'start'): void;
   (e: 'revise'): void;
   (e: 'reject'): void;
+  (e: 'resize', width: number): void;
+  (e: 'resize-start'): void;
+  (e: 'resize-end'): void;
 }>();
+
+// Drag resize handling
+function initResize(e: MouseEvent) {
+  e.preventDefault();
+  emit('resize-start');
+  document.addEventListener('mousemove', handleMouseMove);
+  document.addEventListener('mouseup', handleMouseUp);
+  document.body.style.cursor = 'ew-resize';
+  document.body.style.userSelect = 'none';
+}
+
+function handleMouseMove(e: MouseEvent) {
+  const newWidth = window.innerWidth - e.clientX;
+  emit('resize', newWidth);
+}
+
+function handleMouseUp() {
+  document.removeEventListener('mousemove', handleMouseMove);
+  document.removeEventListener('mouseup', handleMouseUp);
+  document.body.style.cursor = '';
+  document.body.style.userSelect = '';
+  emit('resize-end');
+}
 
 type StaticTab = 'plan' | 'agents' | 'review';
 type PanelTab = StaticTab | `file:${string}`;
@@ -224,6 +250,7 @@ defineExpose({
 
 <template>
   <aside class="workspace-panel">
+    <div class="panel-resize-handle" @mousedown="initResize"></div>
     <header class="workspace-panel-header">
       <div class="panel-tabs" role="tablist" aria-label="Workspace panel">
         <button
@@ -465,11 +492,30 @@ defineExpose({
   overflow: hidden;
   opacity: 1;
   transform: translateX(0);
+  position: relative;
   transition:
     margin 0.3s cubic-bezier(0.4, 0, 0.2, 1),
     opacity 0.2s ease,
     transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
     border-color 0.2s ease;
+}
+
+.panel-resize-handle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 6px;
+  height: 100%;
+  cursor: ew-resize;
+  z-index: 1000;
+  background: transparent;
+  transition: background 0.15s ease;
+}
+
+.panel-resize-handle:hover,
+.panel-resize-handle:active {
+  background: rgba(255, 255, 255, 0.04);
+  border-left: 1px solid var(--border-soft);
 }
 
 .workspace-panel.collapsed {
@@ -634,28 +680,27 @@ defineExpose({
 }
 
 .agent-row {
-  padding: 14px;
-  border: 1px solid var(--border-soft);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.03);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
-  transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+  padding: 12px 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  transition: background 0.18s ease;
 }
 
 .agent-row:hover {
-  border-color: rgba(255, 255, 255, 0.13);
-  background: rgba(255, 255, 255, 0.045);
+  background: transparent;
 }
 
 /* An open card reads as a raised, distinct container so its transcript is
    clearly "inside" it rather than spilling onto the flat panel. */
 .agent-row.expanded {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: var(--border);
+  background: transparent;
+  border: none;
 }
 
 .agent-row.running {
-  border-color: rgba(150, 167, 143, 0.36);
+  border: none;
 }
 
 .agent-row-main {
@@ -700,7 +745,7 @@ defineExpose({
 .agent-row-text p,
 .agent-row-meta {
   margin: 4px 0 0;
-  color: var(--faint);
+  color: var(--muted);
   font-size: 0.76rem;
 }
 
@@ -719,7 +764,7 @@ defineExpose({
 .agent-transcript-btn {
   padding: 0;
   background: transparent;
-  color: var(--faint);
+  color: var(--muted);
   cursor: pointer;
   font-size: 0.76rem;
   transition: color 0.15s ease;
@@ -1075,6 +1120,18 @@ defineExpose({
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.agent-transcript-body :deep(.step-row) {
+  color: var(--muted);
+}
+
+.agent-transcript-body :deep(.step-row:hover) {
+  color: var(--text);
+}
+
+.agent-transcript-body :deep(.coder-tool-model) {
+  color: var(--muted);
 }
 
 .coder-text {

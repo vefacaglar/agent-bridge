@@ -68,6 +68,15 @@ function toggleSidebar() {
   isSidebarCollapsed.value = !isSidebarCollapsed.value;
 }
 
+// Side panel resizable width logic
+const sidePanelWidth = ref(Number(localStorage.getItem('sidePanelWidth') || '480'));
+const isResizing = ref(false);
+function handleSidePanelResize(newWidth: number) {
+  const clamped = Math.max(360, Math.min(800, newWidth));
+  sidePanelWidth.value = clamped;
+  localStorage.setItem('sidePanelWidth', String(clamped));
+}
+
 const currentProjectName = computed(() => {
   const current = projects.projectOptions.value.find(p => p.path === projects.activeProjectPath.value);
   return current ? current.name : 'Unknown Project';
@@ -238,7 +247,16 @@ async function rejectPlan() {
 </script>
 
 <template>
-  <div class="app-shell" :class="{ 'sidebar-collapsed': isSidebarCollapsed, 'panel-available': hasSidePanelContent, 'panel-open': sidePanelOpen }">
+  <div
+    class="app-shell"
+    :class="{
+      'sidebar-collapsed': isSidebarCollapsed,
+      'panel-available': hasSidePanelContent,
+      'panel-open': sidePanelOpen,
+      'is-resizing': isResizing
+    }"
+    :style="{ '--side-panel-w': `${sidePanelWidth}px` }"
+  >
     <AppSidebar
       :project-options="projects.projectOptions.value"
       :active-project-path="projects.activeProjectPath.value"
@@ -389,6 +407,9 @@ async function rejectPlan() {
       @start="startPlan"
       @revise="revisePlan"
       @reject="rejectPlan"
+      @resize="handleSidePanelResize"
+      @resize-start="isResizing = true"
+      @resize-end="isResizing = false"
     />
 
     <AddProjectModal
