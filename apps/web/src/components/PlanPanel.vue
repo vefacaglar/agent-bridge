@@ -179,6 +179,7 @@ function compactNumber(value: number): string {
 const expandedTranscripts = ref<Record<string, boolean>>({});
 const expandedReasoning = ref<Record<string, boolean>>({});
 const panelBody = ref<HTMLElement | null>(null);
+const stickyBottomThreshold = 24;
 
 function latestReasoningBody(root: HTMLElement | null): HTMLElement | undefined {
   const bodies = root?.querySelectorAll('.reasoning-terminal-container .plan-body');
@@ -197,7 +198,7 @@ watch(
       : true;
     const previousReasoningScrollTop = activeReasoningBodyBefore?.scrollTop ?? 0;
 
-    const panelWasAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 180;
+    const panelWasAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= stickyBottomThreshold;
     
     nextTick(() => {
       const activeReasoningBodyAfter = latestReasoningBody(el);

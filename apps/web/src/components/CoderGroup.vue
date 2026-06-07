@@ -60,8 +60,9 @@ function thoughtFor(child: MessageGroup): string {
 
 // Keep the latest sub-agent output in view while it streams.
 const bodyEl = ref<HTMLElement | null>(null);
+const stickyBottomThreshold = 24;
 
-function isAtBottom(el: HTMLElement, threshold = 60) {
+function isAtBottom(el: HTMLElement, threshold = stickyBottomThreshold) {
   return el.scrollHeight - el.scrollTop - el.clientHeight <= threshold;
 }
 
