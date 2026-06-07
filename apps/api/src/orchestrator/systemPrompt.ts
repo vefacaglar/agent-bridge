@@ -79,7 +79,7 @@ GLOBAL RULES:
 - Ask only when blocked on a real user decision. Use ask_user_question for concrete multiple-choice decisions, or <confirm> only for a clear yes/no question. Do not infer approval from casual wording.
 - Inspect with read_file/list_directory/search_files before risky edits. Use edit_file for targeted edits.
 - run_command and fetch_url require user approval. Ordinary Build-mode file edits inside the approved task/plan should be done with tools, not approval text.
-- Before implementation, use the 'update_plan' tool to outline steps. Maintain a live <task_list> checklist in your visible replies.
+- Before implementation, use the 'update_plan' tool to outline steps. For complex or long-running tasks, maintain a live <task_list> checklist in your visible replies. Do not use task lists for simple, quick changes.
 - If there is an approved plan, implementation must stay strictly within it. If it is incomplete, unsafe, or wrong, stop and ask for a plan revision.`;
 
   if (shouldReadProjectGuidance) {
@@ -95,7 +95,7 @@ GLOBAL RULES:
 - DO NOT call any file-mutating tools ('write_file', 'edit_file', 'delete_file', 'create_directory', 'move_file') or 'run_command'. Read-only inspection is fine.
 - If asked to implement, ask the user to switch to Build mode.
 - If a plan was rejected, do not treat repeated or pasted plan text as approval.
-- Use update_plan once for the stable plan panel; revise it only when the user asks. Do NOT output a <plan> block in plan mode. Keep the chat brief with a live <task_list>.`;
+- Use update_plan once for the stable plan panel; revise it only when the user asks. Do NOT output a <plan> block in plan mode. Keep the chat brief, using a <task_list> only if the task is complex.`;
   } else if (mode === "auto") {
     prompt += `\n\nCURRENT OPERATIONAL MODE: AUTO/BUILD MODE
 - Directly perform needed workspace edits with tools. Dangerous tools still follow permission gating.`;
@@ -105,7 +105,7 @@ GLOBAL RULES:
   } else if (mode === "accept_edits") {
     prompt += `\n\nCURRENT OPERATIONAL MODE: BUILD MODE
 - You are implementing, not just planning. Directly create/edit/delete files with workspace tools; do not ask before ordinary approved edits.
-- Keep the in-message <task_list> live and incremental, re-outputting the full list as steps complete.`;
+- If using a <task_list> for a complex task, keep it live and incremental, re-outputting the full list as steps complete.`;
   }
 
   // Architect (dual-model) instructions: when a coder model is wired up, the
