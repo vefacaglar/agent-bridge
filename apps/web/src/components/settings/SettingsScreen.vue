@@ -54,8 +54,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
     <div v-if="show" class="settings-screen">
       <div class="app-shell">
         <aside class="sidebar">
-          <div class="sidebar-header" style="justify-content: flex-start; margin-bottom: 8px; padding-bottom: 4px;">
-            <span class="sidebar-label" style="font-size: 1.05rem; font-weight: 600; color: var(--text);">Settings</span>
+          <div class="sidebar-header">
+            <span class="sidebar-label">Settings</span>
           </div>
 
           <div class="sidebar-block" style="flex: 1; display: flex; flex-direction: column; gap: 6px;">
@@ -141,6 +141,23 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
   background: var(--sidebar-active);
   color: var(--text);
   font-weight: 600;
+}
+
+.sidebar-header {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  height: var(--top-bar-h);
+  flex: 0 0 auto;
+  padding: 0;
+  background: transparent;
+  border: none;
+}
+
+.sidebar-label {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text);
 }
 
 .settings-container-wrap {

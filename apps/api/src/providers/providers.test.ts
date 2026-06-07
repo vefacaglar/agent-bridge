@@ -2,7 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import assert from "node:assert";
-import { ProviderRegistry } from "./ProviderRegistry.js";
+import { PRESERVE_API_KEY_VALUE, ProviderRegistry } from "./ProviderRegistry.js";
+import { InMemoryProviderSecretStore } from "./ProviderSecretStore.js";
 import { OpenAICompatibleProvider } from "./OpenAICompatibleProvider.js";
 import { AnthropicProvider } from "./AnthropicProvider.js";
 
@@ -28,6 +29,7 @@ const mockConfig = {
 
 test("Provider Registry and Model Providers Unit Tests", async (t) => {
   const testConfigPath = path.join(process.cwd(), "providers.test-temp.json");
+  const createRegistry = () => new ProviderRegistry(testConfigPath, new InMemoryProviderSecretStore());
   
   // Write mock config
   fs.writeFileSync(testConfigPath, JSON.stringify(mockConfig, null, 2));
@@ -45,7 +47,7 @@ test("Provider Registry and Model Providers Unit Tests", async (t) => {
   });
 
   await t.test("ProviderRegistry - loads configuration correctly", () => {
-    const registry = new ProviderRegistry(testConfigPath);
+    const registry = createRegistry();
     const safeMetadata = registry.getSafeMetadata();
 
     assert.strictEqual(safeMetadata.length, 2);
@@ -61,7 +63,7 @@ test("Provider Registry and Model Providers Unit Tests", async (t) => {
   });
 
   await t.test("ProviderRegistry - instantiates and caches providers", () => {
-    const registry = new ProviderRegistry(testConfigPath);
+    const registry = createRegistry();
     const provider1 = registry.getProvider("mock-openai");
     const provider2 = registry.getProvider("mock-openai");
 
@@ -71,6 +73,71 @@ test("Provider Registry and Model Providers Unit Tests", async (t) => {
 
     const anthropicProvider = registry.getProvider("mock-anthropic");
     assert.ok(anthropicProvider instanceof AnthropicProvider);
+  });
+
+  await t.test("ProviderRegistry - editable config masks API keys", () => {
+    const registry = createRegistry();
+    const editableConfigs = registry.getEditableConfigs();
+
+    assert.strictEqual(editableConfigs["mock-openai"].apiKey, PRESERVE_API_KEY_VALUE);
+    assert.strictEqual(editableConfigs["mock-openai"].hasApiKey, true);
+    assert.notStrictEqual((editableConfigs["mock-openai"] as any).apiKey, "sk-mock-key-123");
+  });
+
+  await t.test("ProviderRegistry - save preserves existing API key without persisting it inline", () => {
+    const secretStore = new InMemoryProviderSecretStore();
+    const registry = new ProviderRegistry(testConfigPath, secretStore);
+
+    registry.saveConfigs({
+      "mock-openai": {
+        type: "openai-compatible",
+        displayName: "Renamed OpenAI",
+        baseUrl: "http://localhost:9999/openai",
+        apiKey: PRESERVE_API_KEY_VALUE,
+        models: ["gpt-4o"]
+      }
+    });
+
+    const saved = JSON.parse(fs.readFileSync(testConfigPath, "utf-8"));
+    assert.strictEqual(saved.providers["mock-openai"].apiKey, undefined);
+    assert.strictEqual(saved.providers["mock-openai"].apiKeyRef, "memory:mock-openai");
+    assert.strictEqual(secretStore.get(saved.providers["mock-openai"].apiKeyRef), "sk-mock-key-123");
+    assert.strictEqual(saved.providers["mock-openai"].displayName, "Renamed OpenAI");
+  });
+
+  await t.test("ProviderRegistry - deleting all presets persists an explicit empty set", () => {
+    const presetConfigPath = path.join(process.cwd(), "providers.presets-test-temp.json");
+    fs.writeFileSync(
+      presetConfigPath,
+      JSON.stringify({
+        ...mockConfig,
+        agentPresets: {
+          opusplan: {
+            displayName: "Opus Plan",
+            architect: { providerId: "mock-anthropic", model: "claude-3-opus" },
+            coder: { providerId: "mock-openai", model: "gpt-4o" },
+            maxSubAgents: 3
+          }
+        }
+      }, null, 2)
+    );
+
+    try {
+      const registry = new ProviderRegistry(presetConfigPath, new InMemoryProviderSecretStore());
+      assert.strictEqual(registry.getAgentPresets().length, 1);
+
+      registry.saveAgentPresets({});
+
+      const saved = JSON.parse(fs.readFileSync(presetConfigPath, "utf-8"));
+      assert.deepStrictEqual(saved.agentPresets, {});
+
+      const reloaded = new ProviderRegistry(presetConfigPath, new InMemoryProviderSecretStore());
+      assert.deepStrictEqual(reloaded.getAgentPresets(), []);
+    } finally {
+      if (fs.existsSync(presetConfigPath)) {
+        fs.unlinkSync(presetConfigPath);
+      }
+    }
   });
 
   await t.test("OpenAICompatibleProvider - completes successfully and maps format", async () => {

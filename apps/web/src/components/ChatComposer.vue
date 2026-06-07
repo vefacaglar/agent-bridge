@@ -231,6 +231,9 @@ const activePresetLabel = computed(() => {
   const p = props.agentPresets?.find(x => x.id === props.selectedPresetId);
   return p ? p.displayName : 'Single model';
 });
+const selectedPresetIsActive = computed(() =>
+  !!props.selectedPresetId && !!props.agentPresets?.some(x => x.id === props.selectedPresetId)
+);
 
 function selectPreset(value: string) {
   emit('update:selectedPresetId', value);
@@ -501,13 +504,13 @@ onBeforeUnmount(() => {
           <div class="model-dropdown-wrap">
             <button
               class="model-select-display-btn"
-              :disabled="!!selectedPresetId"
-              :title="selectedPresetId ? 'Architect model is set by the selected agent preset' : ''"
+              :disabled="selectedPresetIsActive"
+              :title="selectedPresetIsActive ? 'Architect model is set by the selected agent preset' : ''"
               @click.stop="showModelMenu = !showModelMenu"
             >
-              {{ selectedPresetId ? 'Architect: preset' : activeModelDisplayName }}
+              {{ selectedPresetIsActive ? 'Architect: preset' : activeModelDisplayName }}
             </button>
-            <div v-if="showModelMenu && !selectedPresetId" class="model-dropdown-list">
+            <div v-if="showModelMenu && !selectedPresetIsActive" class="model-dropdown-list">
               <div
                 v-for="option in modelOptions"
                 :key="option.value"

@@ -79,12 +79,18 @@ agent-bridge/
 
 ## Provider Configuration
 
-Provider credentials are read from local JSON config.
+Provider settings are read from local JSON config outside the project by
+default. API keys are stored in macOS Keychain when available; the JSON config
+keeps only an `apiKeyRef`.
 
 ```txt
 providers.example.json   committed template
-providers.local.json     local secrets, git-ignored
+~/Library/Application Support/Locagens/providers.local.json   local provider config on macOS
 ```
+
+`LOCAGENS_PROVIDER_CONFIG_PATH` can override the local config path. A legacy
+project-level `providers.local.json` is still read as a fallback so existing
+setups can migrate by saving provider settings once.
 
 Example:
 
@@ -109,9 +115,10 @@ Example:
 }
 ```
 
-Provider secrets live in local config. Public provider metadata omits API keys;
-the local settings API can read and save full provider config for this
-local-first app.
+Provider secrets do not live in the JSON config on macOS. Public provider
+metadata omits API keys. The local settings API returns editable provider config
+with API keys masked; saves can preserve an existing key without sending it back
+to the browser.
 
 `providers.local.json` may also include `agentPresets`, which define an
 architect provider/model, coder provider/model, `maxSubAgents`, and optionally a

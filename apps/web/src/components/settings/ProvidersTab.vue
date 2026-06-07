@@ -5,6 +5,8 @@ import { useCustomDialog } from '../../composables/useCustomDialog';
 
 const { showAlert, showConfirm } = useCustomDialog();
 
+const PRESERVE_API_KEY_VALUE = '__LOCAGENS_PRESERVE_API_KEY__';
+
 const configs = ref<Record<string, any>>({});
 const isEditing = ref(false);
 const editingProviderId = ref<string | null>(null);
@@ -56,7 +58,7 @@ function handleEditProvider(id: string) {
   formType.value = block.type;
   formDisplayName.value = block.displayName;
   formBaseUrl.value = block.baseUrl;
-  formApiKey.value = block.apiKey || '';
+  formApiKey.value = block.apiKey === PRESERVE_API_KEY_VALUE ? '' : block.apiKey || '';
   formModelsList.value = block.models ? [...block.models] : [''];
   isEditing.value = true;
 }
@@ -105,11 +107,13 @@ async function handleSave() {
     .map(m => m.trim())
     .filter(Boolean);
 
+  const currentBlock = editingProviderId.value ? configs.value[editingProviderId.value] : null;
+  const trimmedApiKey = formApiKey.value.trim();
   const updatedBlock = {
     type: formType.value,
     displayName: formDisplayName.value.trim(),
     baseUrl: formBaseUrl.value.trim(),
-    apiKey: formApiKey.value.trim(),
+    apiKey: trimmedApiKey || (currentBlock?.hasApiKey ? PRESERVE_API_KEY_VALUE : ''),
     models: modelsArray
   };
 
@@ -178,7 +182,7 @@ async function handleFetchModels() {
       <div>
         <h3 class="settings-section-title">Providers</h3>
         <p class="settings-section-desc">
-          Configure model providers and API keys. The configurations are saved to <code>providers.local.json</code>.
+          Configure model providers and API keys. Secrets are stored in macOS Keychain when available.
         </p>
       </div>
       <button 
@@ -231,7 +235,7 @@ async function handleFetchModels() {
 
         <div class="form-group">
           <label>API Key</label>
-          <input v-model="formApiKey" type="password" placeholder="API Key or secret token" />
+          <input v-model="formApiKey" type="password" :placeholder="editingProviderId && configs[editingProviderId]?.hasApiKey ? 'Leave blank to keep existing key' : 'API Key or secret token'" />
         </div>
 
         <div class="form-group full-width">
@@ -306,7 +310,7 @@ async function handleFetchModels() {
         </div>
         <div class="provider-details">
           <div class="detail-item"><strong>Base URL:</strong> <code>{{ provider.baseUrl }}</code></div>
-          <div class="detail-item"><strong>API Key:</strong> <code>••••••••••••••••</code></div>
+          <div class="detail-item"><strong>API Key:</strong> <code>{{ provider.hasApiKey ? '••••••••••••••••' : 'Not set' }}</code></div>
         </div>
         <div class="provider-models">
           <span v-for="model in provider.models" :key="model" class="provider-model-pill">{{ model }}</span>

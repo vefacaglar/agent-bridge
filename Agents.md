@@ -176,9 +176,11 @@ startup cleanup for runs left in active states
 error persistence without discarding prior messages
 ```
 
-Provider secrets live in local configuration. Public provider lists expose only
-safe metadata; the local settings API can read and save full provider config for
-this local-first app.
+Provider settings live in local configuration outside the project by default.
+On macOS, provider secrets live in Keychain and the JSON config keeps only a
+secret reference. Public provider lists expose only safe metadata; the local
+settings API returns masked provider config and can preserve existing secrets
+while saving edits.
 
 ---
 
@@ -196,5 +198,5 @@ all filesystem access stays inside the selected workspace
 dangerous tools pause for approval and resume correctly
 messages, status changes, permissions, and plans stream live and persist
 runs can be reopened after restart
-provider secrets stay in local config and are only exposed through local settings
+provider secrets stay in local config and raw values are not exposed to the browser
 ```

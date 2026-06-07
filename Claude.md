@@ -129,15 +129,21 @@ presentational and communicate via props/emits.
 
 ## Provider Configuration
 
-Provider credentials are read from local, git-ignored config:
+Provider settings are read from local config outside the project by default. API
+keys are stored in macOS Keychain when available; the JSON config keeps only an
+`apiKeyRef`.
 
 ```txt
 providers.example.json   (template, committed)
-providers.local.json     (real keys, never committed)
+~/Library/Application Support/Locagens/providers.local.json   (provider config on macOS)
 ```
 
-Provider secrets live in `providers.local.json`. Public provider metadata must
-not include secrets.
+`LOCAGENS_PROVIDER_CONFIG_PATH` can override the local config path. A legacy
+project-level `providers.local.json` is still read as a fallback so existing
+setups can migrate by saving provider settings once.
+
+Provider secrets do not live in the JSON config on macOS. Public provider
+metadata must not include secrets.
 
 `GET /api/providers` returns only safe metadata:
 
@@ -148,10 +154,9 @@ id, displayName, type, models
 Never expose `apiKey`, authorization headers, or raw secrets through public
 provider metadata.
 
-The local settings API is the exception by design: `GET /api/providers/config`
-and `POST /api/providers/config` read and save full provider config for this
-local-first desktop app. Treat those routes as trusted local settings surfaces,
-not public provider metadata.
+The local settings API returns editable config, but `GET /api/providers/config`
+must not return raw API keys. It uses a preserve marker so the frontend can edit
+other provider fields without receiving or re-posting the existing secret.
 
 `providers.local.json` may also define an `agentPresets` block: named pairings
 with an **architect** model, a **coder** model, `maxSubAgents`, and optionally a

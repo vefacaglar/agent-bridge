@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import type { AppContext } from "../context.js";
+import { PRESERVE_API_KEY_VALUE } from "../providers/ProviderRegistry.js";
 
 function parseModelsResponse(data: any): string[] {
   if (!data) return [];
@@ -60,10 +61,11 @@ export function registerProviderRoutes(server: FastifyInstance, ctx: AppContext)
     }
   });
 
-  // Get full configurations including API keys.
+  // Get editable configurations. API keys are represented by a preserve marker,
+  // never returned as raw secrets.
   server.get("/api/providers/config", async () => {
     ctx.registry.reload();
-    return ctx.registry.getFullConfigs();
+    return ctx.registry.getEditableConfigs();
   });
 
   // Save new configurations.
@@ -116,7 +118,7 @@ export function registerProviderRoutes(server: FastifyInstance, ctx: AppContext)
 
     let resolvedType = type;
     let resolvedBaseUrl = baseUrl;
-    let resolvedApiKey = apiKey;
+    let resolvedApiKey = apiKey === PRESERVE_API_KEY_VALUE ? undefined : apiKey;
 
     if (providerId) {
       try {

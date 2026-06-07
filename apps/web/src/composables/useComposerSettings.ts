@@ -68,6 +68,12 @@ export function useComposerSettings(
     agentPresets.value.find(p => p.id === selectedPresetId.value) ?? null
   );
 
+  watch(agentPresets, () => {
+    if (selectedPresetId.value && !activePreset.value) {
+      selectedPresetId.value = '';
+    }
+  });
+
   // The main/architect model a run should use: the preset's architect when a
   // preset is active, otherwise the plain single-model selection.
   const effectiveModel = computed<{ providerId: string; model: string }>(() => {
@@ -96,9 +102,12 @@ export function useComposerSettings(
   /** Picks a sensible default model (preferring Anthropic) once providers load. */
   function ensureDefaultModel() {
     if (modelOptions.value.length === 0) return;
-    selectedModelCombined.value ||=
+    if (modelOptions.value.some(o => o.value === selectedModelCombined.value)) return;
+    selectedModelCombined.value =
       modelOptions.value.find(o => o.providerId === 'anthropic')?.value || modelOptions.value[0].value;
   }
+
+  watch(modelOptions, () => ensureDefaultModel());
 
   return {
     selectedModelCombined,
