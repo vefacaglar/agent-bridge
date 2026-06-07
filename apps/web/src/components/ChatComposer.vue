@@ -282,8 +282,15 @@ function adjustHeight() {
     el.style.height = '';
     return;
   }
+  const lineHeight = 24;
+  const maxHeight = 240;
+  // Base height from explicit newlines
   el.style.height = 'auto';
-  el.style.height = el.scrollHeight + 'px';
+  const newlineCount = el.value.split('\n').length;
+  const baseHeight = lineHeight * newlineCount;
+  // Use scrollHeight if content wraps (long single line) and stays under the cap
+  const targetHeight = Math.min(Math.max(baseHeight, el.scrollHeight), maxHeight);
+  el.style.height = targetHeight + 'px';
 }
 
 watch(() => props.taskInput, (val) => {
@@ -383,6 +390,7 @@ onBeforeUnmount(() => {
 
         <textarea
           ref="textarea"
+          rows="1"
           :value="taskInput"
           :placeholder="isRunning ? 'Queue a follow-up...' : 'Type a message...'"
           @input="emit('update:taskInput', ($event.target as HTMLTextAreaElement).value)"
