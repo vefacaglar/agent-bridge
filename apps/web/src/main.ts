@@ -7,6 +7,15 @@ import App from './App.vue'
 // traffic lights) without affecting the plain browser build.
 if (navigator.userAgent.includes('Electron') || (window as any).__LOCAGENS_DESKTOP__) {
   document.documentElement.classList.add('is-desktop')
+
+  // Double-clicking the draggable header bar zooms the window (macOS title-bar
+  // behavior), and again restores it. Ignore double-clicks on actual controls.
+  document.addEventListener('dblclick', (e) => {
+    const target = e.target as HTMLElement
+    if (!target.closest('.chat-header, .sidebar-header')) return
+    if (target.closest('button, a, input, textarea, select, [role="button"]')) return
+    ;(window as any).__LOCAGENS_DESKTOP__?.toggleMaximize?.()
+  })
 }
 
 createApp(App).mount('#app')

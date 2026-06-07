@@ -163,6 +163,13 @@ function submit() {
   width: 100%;
 }
 
+/* Left-align the Yes/No labels. The centering lives on ThemedButton's inner
+   .btn-content span, so we must pierce the child scope with :deep(). */
+.confirm-options .confirm-option-btn :deep(.btn-content) {
+  justify-content: flex-start;
+  text-align: left;
+}
+
 .composer-confirm-btn {
   width: 100%;
   text-align: left;

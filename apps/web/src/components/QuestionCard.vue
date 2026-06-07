@@ -216,8 +216,18 @@ function submit() {
   gap: 7px;
 }
 
-.question-option {
+.question-options .question-option {
   width: 100%;
+}
+
+/* The label/description live inside ThemedButton's centered .btn-content span,
+   so pierce the child scope with :deep() to stack them left-aligned. */
+.question-options .question-option :deep(.btn-content) {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  text-align: left;
+  white-space: normal;
 }
 
 .option-label {

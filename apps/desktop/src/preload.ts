@@ -11,4 +11,5 @@ if (arg) {
 
 contextBridge.exposeInMainWorld("__LOCAGENS_DESKTOP__", {
   restartBackend: () => ipcRenderer.invoke("locagens:restart-backend"),
+  toggleMaximize: () => ipcRenderer.invoke("locagens:toggle-maximize"),
 });

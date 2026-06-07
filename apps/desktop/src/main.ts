@@ -79,6 +79,16 @@ function createWindow(port: number): void {
   });
 }
 
+// Double-clicking the app's draggable header toggles the macOS "zoom" (fill the
+// screen's width/height, not native fullscreen). Deterministic regardless of the
+// system's title-bar double-click preference.
+ipcMain.handle("locagens:toggle-maximize", (event) => {
+  const target = BrowserWindow.fromWebContents(event.sender);
+  if (!target) return;
+  if (target.isMaximized()) target.unmaximize();
+  else target.maximize();
+});
+
 // Restart after the port changes in Settings. In prod, kill + re-fork the
 // backend on the new port and recreate the window (so preload re-injects the
 // new API base). In dev the backend is external, so we just recreate the
