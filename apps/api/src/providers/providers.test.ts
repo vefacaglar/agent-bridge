@@ -141,6 +141,31 @@ test("Provider Registry and Model Providers Unit Tests", async (t) => {
     );
   });
 
+  await t.test("OpenAICompatibleProvider - throws raw response on non-ok status", async () => {
+    const provider = new OpenAICompatibleProvider("http://localhost:9999", "api-key");
+    
+    globalThis.fetch = async () => {
+      return {
+        ok: false,
+        status: 529,
+        text: async () => JSON.stringify({
+          error: {
+            message: "Upstream model provider is temporarily unavailable. Please try again in a moment.",
+            type: "server_error"
+          }
+        })
+      } as any;
+    };
+
+    await assert.rejects(
+      provider.complete({
+        model: "my-model",
+        messages: [{ role: "user", content: "test" }]
+      }),
+      /OpenAI API returned status 529: \{"error":\{"message":"Upstream model provider is temporarily unavailable/
+    );
+  });
+
   await t.test("OpenAICompatibleProvider - triggers timeout error on abort", async () => {
     const provider = new OpenAICompatibleProvider("http://localhost:9999", "api-key");
     
@@ -251,6 +276,31 @@ test("Provider Registry and Model Providers Unit Tests", async (t) => {
         messages: [{ role: "user", content: "test" }]
       }),
       /Provider returned an empty response/
+    );
+  });
+
+  await t.test("AnthropicProvider - throws raw response on non-ok status", async () => {
+    const provider = new AnthropicProvider("http://localhost:9999", "ant-key");
+    
+    globalThis.fetch = async () => {
+      return {
+        ok: false,
+        status: 500,
+        text: async () => JSON.stringify({
+          error: {
+            message: "Overloaded",
+            type: "api_error"
+          }
+        })
+      } as any;
+    };
+
+    await assert.rejects(
+      provider.complete({
+        model: "claude-model",
+        messages: [{ role: "user", content: "test" }]
+      }),
+      /Anthropic API returned status 500: \{"error":\{"message":"Overloaded/
     );
   });
 

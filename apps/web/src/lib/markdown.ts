@@ -108,6 +108,37 @@ export function cleanMessageContent(content: string): string {
     .trim();
 }
 
+/** Parses and cleans up system error messages that might contain raw provider JSON */
+export function formatSystemErrorMessage(content: string): string {
+  if (!content) return '';
+  const jsonMatch = content.match(/(\{[\s\S]*\})/);
+  if (jsonMatch) {
+    const rawJson = jsonMatch[1];
+    try {
+      const parsed = JSON.parse(rawJson);
+      let cleanMsg = "";
+      if (parsed.error) {
+        if (typeof parsed.error === "object" && typeof parsed.error.message === "string") {
+          cleanMsg = parsed.error.message;
+        } else if (typeof parsed.error === "string") {
+          cleanMsg = parsed.error;
+        }
+      } else if (typeof parsed.message === "string") {
+        cleanMsg = parsed.message;
+      } else if (typeof parsed.msg === "string") {
+        cleanMsg = parsed.msg;
+      }
+      
+      if (cleanMsg) {
+        return content.replace(rawJson, cleanMsg);
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return content;
+}
+
 export interface PreScrollState {
   scrollTop: number;
   scrollHeight: number;

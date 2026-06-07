@@ -239,7 +239,6 @@ try {
       updateRun.run(r.id);
       insertMessage.run(`msg-err-restart-${r.id}-${Date.now()}`, r.id, new Date().toISOString());
     }
-    console.log(`[Database] Cleaned up ${stuckRuns.length} stuck runs from previous session and added system error messages.`);
   }
 } catch (err: any) {
   console.error("[Database] Failed to clean up stuck runs:", err.message);

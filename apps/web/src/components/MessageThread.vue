@@ -2,7 +2,7 @@
 import { ref, watch, nextTick, onUnmounted } from 'vue';
 import type { Run, Plan } from '@agent-bridge/shared';
 import type { AgentSummary, MessageGroup } from '../lib/messageGroups';
-import { renderMarkdown, cleanMessageContent, capturePreScrollStates, restorePreScrollStates } from '../lib/markdown';
+import { renderMarkdown, cleanMessageContent, formatSystemErrorMessage, capturePreScrollStates, restorePreScrollStates } from '../lib/markdown';
 import { formatTime } from '../lib/format';
 import ToolGroup from './ToolGroup.vue';
 import ReasoningPanel from './ReasoningPanel.vue';
@@ -433,7 +433,7 @@ const formattedElapsedTime = computed(() => {
             </svg>
           </div>
           <div class="error-text">
-            {{ group.message.content }}
+            {{ formatSystemErrorMessage(group.message.content) }}
           </div>
         </div>
       </article>
@@ -453,7 +453,7 @@ const formattedElapsedTime = computed(() => {
           </svg>
         </div>
         <div class="error-text">
-          {{ activeRun.errorMessage || 'Chat generation failed.' }}
+          {{ formatSystemErrorMessage(activeRun.errorMessage || 'Chat generation failed.') }}
         </div>
       </div>
     </article>
