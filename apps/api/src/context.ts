@@ -2,6 +2,7 @@ import path from "node:path";
 import { ProviderRegistry } from "./providers/ProviderRegistry.js";
 import { RunRepository, MessageRepository, ProjectRepository, PermissionRepository, PlanRepository, MemoryRepository } from "./database/repositories.js";
 import { Orchestrator } from "./orchestrator/Orchestrator.js";
+import { AppSettingsStore } from "./config/AppSettingsStore.js";
 
 /**
  * Shared application dependencies, instantiated once and passed to every
@@ -16,6 +17,7 @@ export interface AppContext {
   planRepo: PlanRepository;
   memoryRepo: MemoryRepository;
   orchestrator: Orchestrator;
+  settingsStore: AppSettingsStore;
   defaultProjectPath: string;
 }
 
@@ -28,6 +30,7 @@ export function createAppContext(): AppContext {
   const planRepo = new PlanRepository();
   const memoryRepo = new MemoryRepository();
   const orchestrator = new Orchestrator(runRepo, messageRepo, registry, planRepo, memoryRepo);
+  const settingsStore = new AppSettingsStore();
 
   return {
     registry,
@@ -38,6 +41,7 @@ export function createAppContext(): AppContext {
     planRepo,
     memoryRepo,
     orchestrator,
+    settingsStore,
     defaultProjectPath: process.cwd()
   };
 }

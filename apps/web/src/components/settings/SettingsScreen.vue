@@ -5,6 +5,7 @@ import PermissionsTab from './PermissionsTab.vue';
 import ProvidersTab from './ProvidersTab.vue';
 import AgentPresetsTab from './AgentPresetsTab.vue';
 import MemoryTab from './MemoryTab.vue';
+import ServerTab from './ServerTab.vue';
 
 const props = defineProps<{
   show: boolean;
@@ -36,7 +37,8 @@ const TABS = [
   { id: 'permissions', label: 'Permissions' },
   { id: 'memory', label: 'Memory' },
   { id: 'providers', label: 'Providers' },
-  { id: 'agents', label: 'Agents' }
+  { id: 'agents', label: 'Agents' },
+  { id: 'server', label: 'Server' }
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
 
@@ -173,6 +175,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
                 :presets="presets"
                 @saved="emit('presets-saved')"
               />
+              <ServerTab v-else-if="activeTab === 'server'" />
             </div>
           </section>
         </main>

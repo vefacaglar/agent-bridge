@@ -1,3 +1,9 @@
+/** Local application settings (not provider config). Held in settings.json. */
+export interface AppSettings {
+  /** TCP port the backend HTTP server listens on. */
+  port: number;
+}
+
 export type RunStatus =
   | "created"
   | "generating"

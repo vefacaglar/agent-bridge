@@ -118,12 +118,13 @@ function submitAdd() {
           <ThemedSelect v-model="newCategory" :options="categoryOptions" />
         </label>
       </div>
-      <textarea
+      <input
         v-model="newContent"
-        class="mem-textarea"
-        rows="3"
-        placeholder="A durable fact to remember (1–3 sentences)…"
-      ></textarea>
+        type="text"
+        class="mem-input"
+        placeholder="A durable fact to remember (e.g. 'Always use pnpm build')"
+        @keyup.enter="submitAdd"
+      />
       <div class="mem-add-actions">
         <ThemedButton variant="primary" :disabled="!newContent.trim()" @click="submitAdd">Save memory</ThemedButton>
       </div>
@@ -152,8 +153,8 @@ function submitAdd() {
                     @keyup.esc="cancelEdit"
                   />
                   <div class="mem-edit-actions">
-                    <ThemedButton variant="primary" size="sm" :disabled="!editDraft.trim()" @click="saveEdit(m.id)">Save</ThemedButton>
-                    <ThemedButton variant="secondary" size="sm" @click="cancelEdit">Cancel</ThemedButton>
+                    <button class="mem-action-text-btn save" :disabled="!editDraft.trim()" @click="saveEdit(m.id)">Save</button>
+                    <button class="mem-action-text-btn" @click="cancelEdit">Cancel</button>
                   </div>
                 </div>
               </template>
@@ -185,8 +186,8 @@ function submitAdd() {
                     @keyup.esc="cancelEdit"
                   />
                   <div class="mem-edit-actions">
-                    <ThemedButton variant="primary" size="sm" :disabled="!editDraft.trim()" @click="saveEdit(m.id)">Save</ThemedButton>
-                    <ThemedButton variant="secondary" size="sm" @click="cancelEdit">Cancel</ThemedButton>
+                    <button class="mem-action-text-btn save" :disabled="!editDraft.trim()" @click="saveEdit(m.id)">Save</button>
+                    <button class="mem-action-text-btn" @click="cancelEdit">Cancel</button>
                   </div>
                 </div>
               </template>
@@ -240,21 +241,20 @@ function submitAdd() {
   color: var(--muted);
 }
 
-.mem-textarea {
+.mem-input {
   width: 100%;
+  height: 36px;
   box-sizing: border-box;
   background: var(--control-bg);
   border: 1px solid var(--control-border);
   border-radius: 6px;
   color: var(--text);
-  padding: 8px 10px;
+  padding: 0 12px;
   font-size: 0.88rem;
   font-family: inherit;
-  line-height: 1.5;
-  resize: vertical;
 }
 
-.mem-textarea:focus {
+.mem-input:focus {
   border-color: var(--control-border-focus);
   outline: none;
 }
@@ -281,7 +281,7 @@ function submitAdd() {
   color: var(--text);
   font-size: 0.88rem;
   font-family: inherit;
-  height: 28px;
+  height: 32px;
   box-sizing: border-box;
   padding: 0 10px;
 }
@@ -411,6 +411,17 @@ function submitAdd() {
 .mem-action-text-btn:hover {
   color: var(--text);
   text-decoration: underline;
+}
+
+.mem-action-text-btn.save {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.mem-action-text-btn.save:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  text-decoration: none;
 }
 
 .mem-action-text-btn.delete {

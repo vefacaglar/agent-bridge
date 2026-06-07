@@ -1,6 +1,22 @@
-import type { ProviderMetadata, Run, RunMessage, Project, PermissionRule, Plan, AgentPreset, Memory, MemoryCategory, MemoryScope } from '@agent-bridge/shared';
+import type { ProviderMetadata, Run, RunMessage, Project, PermissionRule, Plan, AgentPreset, Memory, MemoryCategory, MemoryScope, AppSettings } from '@agent-bridge/shared';
 
-export const API_BASE = 'http://localhost:4321';
+/**
+ * Resolves the backend base URL. The config file (settings.json) is the single
+ * source of truth for the port; this picks it up in two ways:
+ *  1. Electron: the main process reads settings.json, starts the backend, and
+ *     injects `window.__AGENT_BRIDGE_API_BASE__` for the renderer.
+ *  2. Dev (Vite): vite.config reads the same file and injects VITE_API_BASE.
+ * The hardcoded localhost default is only a last resort.
+ */
+function resolveApiBase(): string {
+  const injected = (globalThis as any).__AGENT_BRIDGE_API_BASE__;
+  if (typeof injected === 'string' && injected) return injected;
+  const fromEnv = import.meta.env.VITE_API_BASE;
+  if (typeof fromEnv === 'string' && fromEnv) return fromEnv;
+  return 'http://localhost:4321';
+}
+
+export const API_BASE = resolveApiBase();
 
 export type PermissionDecision = 'allow_once' | 'allow_project' | 'allow_always' | 'deny';
 
@@ -49,6 +65,16 @@ async function getJson<T>(path: string): Promise<T | null> {
 }
 
 export const api = {
+  getSettings: () => getJson<AppSettings>('/api/settings'),
+  async saveSettings(settings: AppSettings): Promise<AppSettings & { restartRequired?: boolean }> {
+    const response = await fetch(`${API_BASE}/api/settings`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings)
+    });
+    if (!response.ok) throw new Error(await errorMessage(response, 'Failed to save settings.'));
+    return response.json() as Promise<AppSettings & { restartRequired?: boolean }>;
+  },
   getProviders: () => getJson<ProviderMetadata[]>('/api/providers'),
   getAgentPresets: () => getJson<AgentPreset[]>('/api/agent-presets'),
   async saveAgentPresets(presets: Record<string, any>): Promise<void> {

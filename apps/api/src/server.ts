@@ -14,7 +14,9 @@ async function start() {
   registerRoutes(server, ctx);
 
   try {
-    const port = Number(process.env.PORT) || 4321;
+    // The settings file (editable from the app's Settings screen) is the
+    // source of truth for the port; PORT env is only a fallback default.
+    const port = ctx.settingsStore.resolvePort();
     await server.listen({ port, host: "0.0.0.0" });
     console.log(`Server is running on http://localhost:${port}`);
   } catch (err) {
