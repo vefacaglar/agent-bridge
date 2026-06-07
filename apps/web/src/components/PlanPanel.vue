@@ -13,6 +13,7 @@ const props = defineProps<{
   changes?: WorkspaceChange[];
   agents?: AgentSummary[];
   showActions?: boolean;
+  isOpen?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -55,17 +56,31 @@ type PanelTab = StaticTab | `file:${string}`;
 const activeTab = ref<PanelTab>('plan');
 const openFileTabs = ref<string[]>([]);
 
-const changes = computed(() => props.changes ?? []);
-const agents = computed(() => props.agents ?? []);
-const doneCount = computed(() => props.plan?.tasks.filter(t => t.status === 'completed').length ?? 0);
-const totalCount = computed(() => props.plan?.tasks.length ?? 0);
+const plan = ref<Plan | null>(null);
+const changes = ref<WorkspaceChange[]>([]);
+const agents = ref<AgentSummary[]>([]);
+
+watch(
+  () => [props.plan, props.changes, props.agents, props.isOpen] as const,
+  ([newPlan, newChanges, newAgents, isOpen]) => {
+    if (isOpen || !plan.value) {
+      plan.value = newPlan;
+      changes.value = newChanges ?? [];
+      agents.value = newAgents ?? [];
+    }
+  },
+  { immediate: true }
+);
+
+const doneCount = computed(() => plan.value?.tasks.filter(t => t.status === 'completed').length ?? 0);
+const totalCount = computed(() => plan.value?.tasks.length ?? 0);
 const totalAdded = computed(() => changes.value.reduce((sum, c) => sum + c.added, 0));
 const totalDeleted = computed(() => changes.value.reduce((sum, c) => sum + c.deleted, 0));
 const runningAgentCount = computed(() => agents.value.filter(agent => agent.status === 'running').length);
 
 const tabs = computed(() => {
   const list: { id: PanelTab; label: string }[] = [];
-  if (props.plan) list.push({ id: 'plan', label: 'Plan' });
+  if (plan.value) list.push({ id: 'plan', label: 'Plan' });
   if (agents.value.length) list.push({ id: 'agents', label: 'Agents' });
   if (changes.value.length) list.push({ id: 'review', label: 'Review' });
   for (const id of openFileTabs.value) {
@@ -84,11 +99,11 @@ const activeChange = computed(() => {
 const activeDiffRows = computed(() => activeChange.value ? changeDiffRows(activeChange.value) : []);
 
 watch(
-  () => [props.plan?.id, agents.value.length, changes.value.length] as const,
+  () => [plan.value?.id, agents.value.length, changes.value.length] as const,
   () => {
     openFileTabs.value = openFileTabs.value.filter(id => changes.value.some(c => c.id === id));
     if (tabs.value.some(tab => tab.id === activeTab.value)) return;
-    activeTab.value = props.plan ? 'plan' : agents.value.length ? 'agents' : 'review';
+    activeTab.value = plan.value ? 'plan' : agents.value.length ? 'agents' : 'review';
   },
   { immediate: true }
 );
@@ -101,7 +116,7 @@ watch(
 );
 
 watch(
-  () => props.plan?.version,
+  () => plan.value?.version,
   (newVer, oldVer) => {
     if (newVer !== undefined && oldVer !== undefined && newVer !== oldVer) {
       activeTab.value = 'plan';
@@ -196,8 +211,7 @@ watch(
         el.scrollTop = el.scrollHeight;
       }
     });
-  },
-  { deep: true }
+  }
 );
 
 function isReasoningExpanded(childId: string, children: any[]): boolean {
@@ -290,7 +304,7 @@ defineExpose({
           </div>
         </div>
 
-        <div v-if="plan?.body" class="plan-panel-prose" v-html="renderMarkdown(plan.body)"></div>
+        <div v-if="plan?.body" class="plan-panel-prose" v-html="renderMarkdown(plan.body, 'plan-' + plan.id + '-' + plan.version)"></div>
 
         <ul v-if="plan && plan.tasks.length" class="plan-tasks">
           <li
@@ -326,24 +340,39 @@ defineExpose({
             :class="{ running: agent.status === 'running', expanded: expandedTranscripts[agent.id] }"
             :data-agent-row-id="agent.id"
           >
-            <div class="agent-row-main" @click="expandedTranscripts[agent.id] = !expandedTranscripts[agent.id]" style="cursor: pointer;">
-              <span class="agent-status-dot" :class="agent.status"></span>
-              <div class="agent-row-text">
-                <h3>{{ agent.title }}</h3>
-                <p>
-                  <span>{{ agent.roleLabel }}</span>
-                  <span v-if="agent.model">{{ agent.model }}</span>
-                </p>
+            <!-- Premium Header Row -->
+            <div class="agent-row-header" @click="expandedTranscripts[agent.id] = !expandedTranscripts[agent.id]">
+              <div class="agent-header-left">
+                <!-- Status Dot with Pulse -->
+                <div class="agent-status-indicator">
+                  <span class="agent-status-dot" :class="agent.status"></span>
+                  <span v-if="agent.status === 'running'" class="agent-status-pulse"></span>
+                </div>
+                
+                <div class="agent-info">
+                  <div class="agent-title-row">
+                    <h3 class="agent-title">{{ agent.title }}</h3>
+                    <span class="agent-role-badge" :class="agent.role">{{ agent.roleLabel }}</span>
+                  </div>
+                  <div class="agent-sub-info">
+                    <span v-if="agent.model" class="agent-model-name">
+                      <svg class="meta-icon" style="margin-right: 4px;" xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+                        <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+                        <line x1="6" y1="6" x2="6.01" y2="6"></line>
+                        <line x1="6" y1="18" x2="6.01" y2="18"></line>
+                      </svg>
+                      {{ agent.model }}
+                    </span>
+                  </div>
+                </div>
               </div>
-            </div>
-            <div class="agent-row-meta">
-              <span>{{ compactNumber(agent.tokenEstimate) }} tokens</span>
-              <span>{{ agent.toolUseCount }} tool {{ agent.toolUseCount === 1 ? 'use' : 'uses' }}</span>
-              <span>{{ agent.status === 'running' ? 'Running' : 'Done' }}</span>
+              
+              <!-- Chevron Expand Action -->
               <button 
                 type="button" 
-                class="agent-transcript-btn" 
-                @click="expandedTranscripts[agent.id] = !expandedTranscripts[agent.id]"
+                class="agent-expand-toggle-btn" 
+                @click.stop="expandedTranscripts[agent.id] = !expandedTranscripts[agent.id]"
                 :title="expandedTranscripts[agent.id] ? 'Hide transcript' : 'View transcript'"
               >
                 <svg 
@@ -364,6 +393,25 @@ defineExpose({
               </button>
             </div>
 
+            <!-- Structured Metadata Bar -->
+            <div class="agent-metadata-bar">
+              <div class="meta-item tokens">
+                <svg class="meta-icon" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path>
+                </svg>
+                <span>{{ compactNumber(agent.tokenEstimate) }} tokens</span>
+              </div>
+              <div class="meta-item tools">
+                <svg class="meta-icon" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+                </svg>
+                <span>{{ agent.toolUseCount }} tool {{ agent.toolUseCount === 1 ? 'use' : 'uses' }}</span>
+              </div>
+              <div class="meta-item status-badge" :class="agent.status">
+                <span>{{ agent.status === 'running' ? 'Running' : 'Done' }}</span>
+              </div>
+            </div>
+
             <!-- Inline Accordion Transcript -->
             <div v-if="expandedTranscripts[agent.id] && agent.children" class="agent-transcript-body">
               <template v-for="child in agent.children" :key="child.id">
@@ -377,6 +425,7 @@ defineExpose({
 
                 <ToolGroup
                   v-if="child.type === 'tool_group'"
+                  :id="child.message.id"
                   :thought="thoughtFor(child)"
                   :tool-calls="child.toolCalls"
                   :tool-responses="child.toolResponses"
@@ -701,103 +750,228 @@ defineExpose({
 .agent-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .agent-row {
-  padding: 14px;
+  padding: 16px;
   border: 1px solid var(--agent-row-border);
-  border-radius: 10px;
-  background: transparent;
-  box-shadow: none;
-  transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.015);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), 
+              background 0.2s cubic-bezier(0.4, 0, 0.2, 1), 
+              box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.15s ease;
 }
 
 .agent-row:hover {
-  border-color: var(--settings-card-border);
-  background: transparent;
-}
-
-/* An open card reads as a raised, distinct container so its transcript is
-   clearly "inside" it rather than spilling onto the flat panel. */
-.agent-row.expanded {
-  background: transparent;
-  border-color: var(--settings-sidebar-border);
+  border-color: var(--border);
+  background: rgba(255, 255, 255, 0.025);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+  transform: translateY(-1px);
 }
 
 .agent-row.running {
-  border-color: var(--agent-row-running-border);
+  border-color: rgba(123, 216, 143, 0.25);
+  background: rgba(123, 216, 143, 0.01);
 }
 
-.agent-row-main {
+.agent-row.expanded {
+  background: rgba(255, 255, 255, 0.02);
+  border-color: var(--border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.agent-row-header {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+  gap: 12px;
+}
+
+.agent-header-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
   min-width: 0;
+  flex: 1;
+}
+
+.agent-status-indicator {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 10px;
+  height: 10px;
+  margin-top: 5px;
+  flex-shrink: 0;
 }
 
 .agent-status-dot {
   width: 8px;
   height: 8px;
-  border-radius: 999px;
-  margin-top: 7px;
+  border-radius: 50%;
   background: var(--faint);
-  flex: 0 0 auto;
+  z-index: 2;
+  transition: all 0.3s ease;
 }
 
 .agent-status-dot.running {
-  background: var(--dialog-confirm-icon-color);
-  box-shadow: 0 0 0 4px var(--dialog-confirm-icon-bg);
+  background: var(--success);
 }
 
 .agent-status-dot.done {
-  background: var(--agent-status-done-bg);
-  box-shadow: 0 0 0 4px var(--agent-status-done-shadow);
+  background: var(--success);
 }
 
-.agent-row-text {
+.agent-status-pulse {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(123, 216, 143, 0.25);
+  animation: agent-pulse-ring 2s infinite ease-out;
+  z-index: 1;
+}
+
+@keyframes agent-pulse-ring {
+  0% {
+    transform: scale(0.3);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+
+.agent-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   min-width: 0;
+  flex: 1;
 }
 
-.agent-row-text h3 {
-  margin: 0;
-  color: var(--text);
-  font-size: 0.9rem;
-  font-weight: 650;
-  line-height: 1.35;
-  overflow-wrap: anywhere;
-}
-
-.agent-row-text p,
-.agent-row-meta {
-  margin: 4px 0 0;
-  color: var(--muted);
-  font-size: 0.76rem;
-}
-
-.agent-row-text p,
-.agent-row-meta {
+.agent-title-row {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
 }
 
-.agent-row-meta {
-  padding-left: 18px;
-}
-
-.agent-transcript-btn {
-  padding: 0;
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  font-size: 0.76rem;
-  transition: color 0.15s ease;
-}
-
-.agent-transcript-btn:hover {
+.agent-title {
+  margin: 0;
   color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.agent-role-badge {
+  font-size: 0.64rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 1px 6px;
+  border-radius: 5px;
+  flex-shrink: 0;
+}
+
+.agent-role-badge.coder {
+  background: rgba(160, 100, 240, 0.15);
+  color: #c090ff;
+  border: 1px solid rgba(160, 100, 240, 0.25);
+}
+
+.agent-role-badge.utility {
+  background: rgba(0, 180, 200, 0.15);
+  color: #50e4ff;
+  border: 1px solid rgba(0, 180, 200, 0.25);
+}
+
+.agent-sub-info {
+  display: flex;
+  align-items: center;
+  font-size: 0.74rem;
+  color: var(--faint);
+}
+
+.agent-model-name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.meta-icon {
+  color: var(--faint);
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.agent-expand-toggle-btn {
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  color: var(--muted);
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.agent-expand-toggle-btn:hover {
+  background: var(--control-bg-hover);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.agent-metadata-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border-soft);
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.meta-item.status-badge {
+  margin-left: auto;
+  font-size: 0.66rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.meta-item.status-badge.running {
+  background: rgba(123, 216, 143, 0.15);
+  color: var(--success);
+}
+
+.meta-item.status-badge.done {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--faint);
 }
 
 .change-row {
@@ -1121,23 +1295,63 @@ defineExpose({
   flex: 1 1 auto;
 }
 
-/* Minimal: the transcript just gets breathing room and a hairline separator —
-   no box, no inset, full width. Grouping comes from spacing, not chrome. */
+/* Timeline Transcript Design */
 .agent-transcript-body {
-  margin-top: 12px;
-  padding-top: 12px;
+  margin-top: 8px;
+  padding-top: 16px;
   border-top: 1px solid var(--border-soft);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
+  position: relative;
+  padding-left: 14px;
+}
+
+.agent-transcript-body::before {
+  content: '';
+  position: absolute;
+  top: 16px;
+  bottom: 16px;
+  left: 2px;
+  width: 1px;
+  background: var(--border-soft);
+}
+
+.agent-transcript-body :deep(.reasoning-terminal-container),
+.agent-transcript-body :deep(.tool-group-wrap),
+.agent-transcript-body :deep(.coder-text) {
+  position: relative;
+}
+
+.agent-transcript-body :deep(.reasoning-terminal-container)::before,
+.agent-transcript-body :deep(.tool-group-wrap)::before,
+.agent-transcript-body :deep(.coder-text)::before {
+  content: '';
+  position: absolute;
+  left: -17px;
+  top: 14px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--border-soft);
+  border: 2px solid var(--card-bg);
+  z-index: 2;
+}
+
+.agent-transcript-body :deep(.reasoning-terminal-container) {
+  margin: 4px 0 !important;
 }
 
 .agent-transcript-body :deep(.step-row) {
-  color: var(--muted);
+  padding: 6px 8px !important;
+  border-radius: 6px !important;
+  font-size: 0.8rem !important;
+  background: rgba(255, 255, 255, 0.005);
 }
 
 .agent-transcript-body :deep(.step-row:hover) {
   color: var(--text);
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .agent-transcript-body :deep(.coder-tool-model) {
@@ -1145,10 +1359,14 @@ defineExpose({
 }
 
 .coder-text {
-  color: var(--msg-thought-text);
-  line-height: 1.6;
-  font-size: 0.88rem;
-  margin: 8px 0;
+  color: var(--muted);
+  line-height: 1.55;
+  font-size: 0.84rem;
+  margin: 4px 0;
+  background: rgba(255, 255, 255, 0.005);
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-soft);
 }
 
 .chevron-icon {

@@ -5,6 +5,7 @@ import { ACTIVE_STATUSES } from '../lib/format';
 import { groupMessages, type MessageGroup } from '../lib/messageGroups';
 import { getConfirmationOptions } from '../lib/confirmation';
 import { useCustomDialog } from './useCustomDialog';
+import { clearMarkdownCache } from '../lib/markdown';
 
 interface ChatSessionOptions {
   providers: Ref<ProviderMetadata[]>;
@@ -110,6 +111,7 @@ export function useChatSession(options: ChatSessionOptions) {
   async function selectRun(run: Run) {
     eventSource?.close();
     eventSource = null;
+    clearMarkdownCache();
 
     activeRunId.value = run.id;
     localStorage.setItem('activeRunId', run.id);
@@ -135,6 +137,8 @@ export function useChatSession(options: ChatSessionOptions) {
     // stream here; selecting it again later reconnects and reloads its history.
     eventSource?.close();
     eventSource = null;
+    clearMarkdownCache();
+
     isRunning.value = false;
     activeRunId.value = null;
     localStorage.removeItem('activeRunId');

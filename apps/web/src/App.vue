@@ -478,6 +478,7 @@ onUnmounted(() => {
       ref="planPanelRef"
       v-if="hasSidePanelContent"
       :class="{ collapsed: !sidePanelOpen }"
+      :isOpen="sidePanelOpen"
       :plan="currentPlan"
       :changes="workspaceChanges"
       :agents="agentSummaries"
