@@ -144,12 +144,38 @@ async function openAgentTranscript(agentId: string) {
 // assistant produces a revised plan.
 const isPlanMode = computed(() => settings.currentMode.value === 'plan');
 const planKey = computed(() =>
-  currentPlan.value ? `${currentPlan.value.id}:${currentPlan.value.version}:${currentPlan.value.updatedAt}` : ''
+  currentPlan.value ? `${currentPlan.value.id}:${currentPlan.value.version}` : ''
 );
 const decidedPlanKey = ref('');
-const showPlanActions = computed(() =>
-  isPlanMode.value && !!currentPlan.value && decidedPlanKey.value !== planKey.value
-);
+
+const latestPlanProposalMessageIndex = computed(() => {
+  const list = groupedMessages.value;
+  if (!list) return -1;
+  for (let i = list.length - 1; i >= 0; i--) {
+    const group = list[i];
+    if (group.type === 'tool_group') {
+      const hasUpdatePlan = group.toolCalls.some(tc => tc.function?.name === 'update_plan');
+      if (hasUpdatePlan) return i;
+    }
+  }
+  return -1;
+});
+
+const showPlanActions = computed(() => {
+  if (!isPlanMode.value || !currentPlan.value) return false;
+
+  const planIndex = latestPlanProposalMessageIndex.value;
+  if (planIndex === -1) return false;
+
+  // If there is any user message after the latest plan proposal, the user has already interacted with it
+  for (let i = planIndex + 1; i < groupedMessages.value.length; i++) {
+    if (groupedMessages.value[i].type === 'user') {
+      return false;
+    }
+  }
+
+  return decidedPlanKey.value !== planKey.value;
+});
 
 watch(activeRunId, () => { decidedPlanKey.value = ''; });
 
