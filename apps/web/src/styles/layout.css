@@ -370,6 +370,7 @@
 
   .composer-wrap {
     padding: 10px 16px 14px;
+    margin-right: 0;
   }
 
   .composer-menu-row {

@@ -133,7 +133,7 @@ const agentSummaries = computed(() => collectAgentSummaries(groupedMessages.valu
 // as the assistant creates a plan, edits workspace files, or starts sub-agents.
 // Closing it collapses every panel tab until the user re-opens a thread link or
 // switches chats.
-const sidePanelCollapsed = ref(false);
+const sidePanelCollapsed = ref(localStorage.getItem('sidePanelCollapsed') === 'true');
 const hasSidePanelContent = computed(() =>
   !!currentPlan.value || workspaceChanges.value.length > 0 || agentSummaries.value.length > 0
 );
@@ -164,12 +164,19 @@ watch([hasSidePanelContent, sidePanelOpen], ([hasContent, isOpen]) => {
   }, SIDE_PANEL_TRANSITION_MS);
 }, { immediate: true });
 
-// Reset the collapsed state when switching chats so each run's panel shows, but keep it collapsed on mobile.
+// Watch and persist sidePanelCollapsed changes on desktop
+watch(sidePanelCollapsed, (val) => {
+  if (window.innerWidth > 760) {
+    localStorage.setItem('sidePanelCollapsed', val ? 'true' : 'false');
+  }
+});
+
+// Reset the collapsed state when switching chats using the stored preference, but keep it collapsed on mobile.
 watch(activeRunId, () => {
   if (window.innerWidth <= 760) {
     sidePanelCollapsed.value = true;
   } else {
-    sidePanelCollapsed.value = false;
+    sidePanelCollapsed.value = localStorage.getItem('sidePanelCollapsed') === 'true';
   }
 });
 
@@ -563,10 +570,16 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-/* Align the pinned task list with the composer below it (same inset). */
 .pinned-task-list-wrap {
   flex: 0 0 auto;
   padding: 0 24px;
+  margin-right: 8px;
+}
+
+@media (max-width: 760px) {
+  .pinned-task-list-wrap {
+    margin-right: 0;
+  }
 }
 
 .landing-center-wrap {
