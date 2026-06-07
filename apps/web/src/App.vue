@@ -148,6 +148,18 @@ async function openAgentTranscript(agentId: string) {
   planPanelRef.value?.expandAgentTranscript?.(agentId);
 }
 
+async function openPlan() {
+  sidePanelCollapsed.value = false;
+  await nextTick();
+  planPanelRef.value?.selectTab?.('plan');
+}
+
+async function openAgents() {
+  sidePanelCollapsed.value = false;
+  await nextTick();
+  planPanelRef.value?.selectTab?.('agents');
+}
+
 // --- Plan approval actions (Start / Revise / Reject) ----------------------
 // While in plan mode, the panel offers three choices once a plan is presented.
 // The decision is tracked per plan version so the buttons reappear if the
@@ -292,8 +304,8 @@ async function rejectPlan() {
             :plan="currentPlan"
             :plan-panel-open="sidePanelOpen"
             :agent-summaries="agentSummaries"
-            @open-plan="sidePanelCollapsed = false"
-            @open-agents="sidePanelCollapsed = false"
+            @open-plan="openPlan"
+            @open-agents="openAgents"
             @view-agent="openAgentTranscript"
           />
         </section>

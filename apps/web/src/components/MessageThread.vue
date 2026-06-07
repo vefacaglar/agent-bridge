@@ -22,7 +22,6 @@ const emit = defineEmits<{
   (e: 'view-agent', id: string): void;
 }>();
 
-// Progress summary shown on the in-thread plan link.
 const planDoneCount = computed(() => props.plan?.tasks.filter(t => t.status === 'completed').length ?? 0);
 
 const copiedMessageId = ref<string | null>(null);
@@ -258,28 +257,41 @@ const formattedElapsedTime = computed(() => {
       </div>
     </div>
 
-    <!-- In-thread link to the plan; opens the side panel when collapsed. -->
-    <button
-      v-if="plan && !planPanelOpen"
-      type="button"
-      class="plan-thread-link"
-      @click="emit('open-plan')"
-    >
-      <span class="plan-thread-link-label">Plan: {{ plan.title }}</span>
-      <span v-if="plan.tasks.length" class="plan-thread-link-count">{{ planDoneCount }} / {{ plan.tasks.length }}</span>
-      <span class="plan-thread-link-action">Open</span>
-    </button>
+    <!-- Inline Plan Link -->
+    <div v-if="plan" class="plan-accordion-row">
+      <header class="step-row" @click="emit('open-plan')">
+        <svg class="step-row-toggle" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m9 18 6-6-6-6"></path>
+        </svg>
+        <svg class="step-row-icon" style="color: var(--planner);" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+          <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+        </svg>
+        <span class="step-row-label">Plan: {{ plan.title }}</span>
+        <span v-if="plan.tasks.length" style="font-size: 0.72rem; color: var(--faint); font-family: monospace; margin-left: 6px; user-select: none;">
+          {{ planDoneCount }} / {{ plan.tasks.length }} tasks completed
+        </span>
+      </header>
+    </div>
 
-    <button
-      v-if="(agentSummaries?.length ?? 0) > 0 && !planPanelOpen"
-      type="button"
-      class="plan-thread-link"
-      @click="emit('open-agents')"
-    >
-      <span class="plan-thread-link-label">Background agents</span>
-      <span class="plan-thread-link-count">{{ agentSummaries?.filter(agent => agent.status === 'running').length ?? 0 }} running</span>
-      <span class="plan-thread-link-action">Open</span>
-    </button>
+    <!-- Inline Background Agents Link -->
+    <div v-if="(agentSummaries?.length ?? 0) > 0" class="agents-accordion-row">
+      <header class="step-row" @click="emit('open-agents')">
+        <svg class="step-row-toggle" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m9 18 6-6-6-6"></path>
+        </svg>
+        <svg class="step-row-icon" style="color: var(--executor);" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+          <circle cx="9" cy="7" r="4"></circle>
+          <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+          <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+        </svg>
+        <span class="step-row-label">Background Agents</span>
+        <span style="font-size: 0.72rem; color: var(--faint); font-family: monospace; margin-left: 6px; user-select: none;">
+          {{ agentSummaries?.filter(agent => agent.status === 'running').length ?? 0 }} running · {{ agentSummaries?.length }} total
+        </span>
+      </header>
+    </div>
 
     <template v-for="(group, idx) in groupedMessages" :key="group.id">
       <div v-if="group.type === 'user'" class="user-message-container">
@@ -428,7 +440,7 @@ const formattedElapsedTime = computed(() => {
 
       <div v-else-if="group.type === 'system'" class="system-error-accordion" :class="{ 'is-expanded': expandedErrors[group.id] }">
         <header class="step-row" @click="toggleError(group.id)">
-          <svg class="step-row-toggle" :class="{ rotated: expandedErrors[group.id] }" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <svg class="step-row-toggle" :class="{ rotated: expandedErrors[group.id] }" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="m6 9 6 6 6-6"></path>
           </svg>
           <svg class="step-row-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -461,7 +473,7 @@ const formattedElapsedTime = computed(() => {
 
     <div v-if="activeRun.status === 'failed' && !hasSystemErrorInHistory" class="system-error-accordion" :class="{ 'is-expanded': expandedErrors['trailing-error'] }">
       <header class="step-row" @click="toggleError('trailing-error')">
-        <svg class="step-row-toggle" :class="{ rotated: expandedErrors['trailing-error'] }" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <svg class="step-row-toggle" :class="{ rotated: expandedErrors['trailing-error'] }" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="m6 9 6 6 6-6"></path>
         </svg>
         <svg class="step-row-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -963,6 +975,8 @@ const formattedElapsedTime = computed(() => {
 .plan-thread-link,
 .coder-shortcut-row,
 .system-error-accordion,
+.plan-accordion-row,
+.agents-accordion-row,
 :deep(.tool-group-wrap),
 :deep(.reasoning-terminal-container) {
   animation: messageEnter 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -1007,6 +1021,12 @@ const formattedElapsedTime = computed(() => {
 
 .error-details .error-bubble {
   margin-top: 0;
+}
+
+.plan-accordion-row,
+.agents-accordion-row {
+  width: 100%;
+  margin: 6px 0;
 }
 
 </style>

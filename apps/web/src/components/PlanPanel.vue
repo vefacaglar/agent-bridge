@@ -212,8 +212,13 @@ function expandAgentTranscript(agentId: string) {
   });
 }
 
+function selectTab(tab: PanelTab) {
+  activeTab.value = tab;
+}
+
 defineExpose({
-  expandAgentTranscript
+  expandAgentTranscript,
+  selectTab
 });
 </script>
 
