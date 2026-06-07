@@ -4,6 +4,7 @@ import type { AgentPreset, ProviderMetadata, ReasoningEffort, ReasoningOption } 
 import { api } from '../../api/client';
 import { useCustomDialog } from '../../composables/useCustomDialog';
 import ThemedSelect from './ThemedSelect.vue';
+import ThemedButton from '../ThemedButton.vue';
 
 const props = defineProps<{
   providers: ProviderMetadata[];
@@ -259,7 +260,7 @@ async function handleDelete(preset: AgentPreset) {
           and renames. Selectable next to the model picker in the composer.
         </p>
       </div>
-      <button v-if="!isEditing" class="add-btn" @click="handleAdd">Add preset</button>
+      <ThemedButton v-if="!isEditing" variant="primary" size="sm" @click="handleAdd">Add preset</ThemedButton>
     </div>
 
     <!-- Editor -->
@@ -277,16 +278,16 @@ async function handleDelete(preset: AgentPreset) {
         <ThemedSelect v-model="formArchitect" :options="modelOptions" />
         <div v-if="architectReasoningOptions.length > 0" class="effort-row">
           <span class="effort-label">Reasoning</span>
-          <button
+          <ThemedButton
             v-for="option in architectReasoningOptions"
             :key="`architect-${option.id}`"
-            type="button"
-            class="effort-chip"
-            :class="{ active: formArchitectEffort === option.id }"
+            variant="chip"
+            size="sm"
+            :active="formArchitectEffort === option.id"
             @click="formArchitectEffort = option.id"
           >
             {{ option.label }}
-          </button>
+          </ThemedButton>
         </div>
       </div>
       <div class="form-row">
@@ -294,16 +295,16 @@ async function handleDelete(preset: AgentPreset) {
         <ThemedSelect v-model="formCoder" :options="modelOptions" />
         <div v-if="coderReasoningOptions.length > 0" class="effort-row">
           <span class="effort-label">Reasoning</span>
-          <button
+          <ThemedButton
             v-for="option in coderReasoningOptions"
             :key="`coder-${option.id}`"
-            type="button"
-            class="effort-chip"
-            :class="{ active: formCoderEffort === option.id }"
+            variant="chip"
+            size="sm"
+            :active="formCoderEffort === option.id"
             @click="formCoderEffort = option.id"
           >
             {{ option.label }}
-          </button>
+          </ThemedButton>
         </div>
       </div>
       <div class="form-row">
@@ -311,16 +312,16 @@ async function handleDelete(preset: AgentPreset) {
         <ThemedSelect v-model="formUtility" :options="utilityModelOptions" />
         <div v-if="utilityReasoningOptions.length > 0" class="effort-row">
           <span class="effort-label">Reasoning</span>
-          <button
+          <ThemedButton
             v-for="option in utilityReasoningOptions"
             :key="`utility-${option.id}`"
-            type="button"
-            class="effort-chip"
-            :class="{ active: formUtilityEffort === option.id }"
+            variant="chip"
+            size="sm"
+            :active="formUtilityEffort === option.id"
             @click="formUtilityEffort = option.id"
           >
             {{ option.label }}
-          </button>
+          </ThemedButton>
         </div>
       </div>
       <div class="form-row">
@@ -338,8 +339,8 @@ async function handleDelete(preset: AgentPreset) {
         </span>
       </label>
       <div class="editor-actions">
-        <button class="ghost-btn" @click="cancelEdit">Cancel</button>
-        <button class="add-btn" @click="handleSave">Save preset</button>
+        <ThemedButton variant="secondary" @click="cancelEdit">Cancel</ThemedButton>
+        <ThemedButton variant="primary" @click="handleSave">Save preset</ThemedButton>
       </div>
     </div>
 
@@ -354,8 +355,8 @@ async function handleDelete(preset: AgentPreset) {
           </span>
         </div>
         <div class="preset-actions">
-          <button class="ghost-btn" @click="handleEdit(preset)">Edit</button>
-          <button class="ghost-btn danger" @click="handleDelete(preset)">Delete</button>
+          <ThemedButton variant="secondary" size="sm" @click="handleEdit(preset)">Edit</ThemedButton>
+          <ThemedButton variant="danger" size="sm" @click="handleDelete(preset)">Delete</ThemedButton>
         </div>
       </div>
     </div>
@@ -363,39 +364,6 @@ async function handleDelete(preset: AgentPreset) {
 </template>
 
 <style scoped>
-.add-btn {
-  flex: 0 0 auto;
-  background: var(--text);
-  color: var(--bg);
-  border: 0;
-  border-radius: 8px;
-  padding: 8px 14px;
-  font-size: 0.82rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.ghost-btn {
-  background: transparent;
-  color: var(--muted);
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  padding: 6px 12px;
-  font-size: 0.8rem;
-  cursor: pointer;
-  transition: border-color 0.15s ease, color 0.15s ease;
-}
-
-.ghost-btn:hover {
-  color: var(--text);
-  border-color: var(--muted);
-}
-
-.ghost-btn.danger:hover {
-  color: var(--danger);
-  border-color: var(--danger);
-}
-
 .preset-editor {
   display: flex;
   flex-direction: column;
@@ -467,27 +435,6 @@ async function handleDelete(preset: AgentPreset) {
   margin-right: 2px;
   font-size: 0.74rem;
   color: var(--faint);
-}
-
-.effort-chip {
-  background: transparent;
-  color: var(--muted);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 4px 8px;
-  font-size: 0.74rem;
-  cursor: pointer;
-}
-
-.effort-chip:hover {
-  color: var(--text);
-  border-color: var(--muted);
-}
-
-.effort-chip.active {
-  color: var(--bg);
-  background: var(--text);
-  border-color: var(--text);
 }
 
 .editor-actions {

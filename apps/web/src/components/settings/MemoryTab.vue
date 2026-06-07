@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue';
 import type { Memory, MemoryCategory, MemoryScope } from '@agent-bridge/shared';
 import ThemedSelect from './ThemedSelect.vue';
+import ThemedButton from '../ThemedButton.vue';
 
 const props = defineProps<{
   memories: Memory[];
@@ -101,8 +102,8 @@ function submitAdd() {
         </p>
       </div>
       <div class="mem-head-actions">
-        <button class="ghost-button" @click="showAdd = !showAdd">{{ showAdd ? 'Cancel' : 'Add' }}</button>
-        <button v-if="memories.length > 0" class="ghost-button danger-text" @click="emit('clear-all')">Clear all</button>
+        <ThemedButton :variant="showAdd ? 'secondary' : 'primary'" size="sm" @click="showAdd = !showAdd">{{ showAdd ? 'Cancel' : 'Add memory' }}</ThemedButton>
+        <ThemedButton v-if="memories.length > 0" variant="danger" size="sm" @click="emit('clear-all')">Clear all</ThemedButton>
       </div>
     </header>
 
@@ -124,7 +125,7 @@ function submitAdd() {
         placeholder="A durable fact to remember (1–3 sentences)…"
       ></textarea>
       <div class="mem-add-actions">
-        <button class="ghost-button" :disabled="!newContent.trim()" @click="submitAdd">Save memory</button>
+        <ThemedButton variant="primary" :disabled="!newContent.trim()" @click="submitAdd">Save memory</ThemedButton>
       </div>
     </div>
 
@@ -144,15 +145,15 @@ function submitAdd() {
               <template v-if="editingId === m.id">
                 <textarea v-model="editDraft" class="mem-textarea" rows="3"></textarea>
                 <div class="mem-edit-actions">
-                  <button class="ghost-button" :disabled="!editDraft.trim()" @click="saveEdit(m.id)">Save</button>
-                  <button class="ghost-button muted" @click="cancelEdit">Cancel</button>
+                  <ThemedButton variant="primary" size="sm" :disabled="!editDraft.trim()" @click="saveEdit(m.id)">Save</ThemedButton>
+                  <ThemedButton variant="secondary" size="sm" @click="cancelEdit">Cancel</ThemedButton>
                 </div>
               </template>
               <span v-else class="mem-content">{{ m.content }}</span>
             </div>
             <div v-if="editingId !== m.id" class="mem-actions">
-              <button class="mem-btn" title="Edit" @click="startEdit(m)">Edit</button>
-              <button class="mem-btn danger" title="Delete" @click="emit('delete', m.id)">Delete</button>
+              <ThemedButton variant="secondary" size="sm" title="Edit" @click="startEdit(m)">Edit</ThemedButton>
+              <ThemedButton variant="danger" size="sm" title="Delete" @click="emit('delete', m.id)">Delete</ThemedButton>
             </div>
           </li>
         </ul>
@@ -169,15 +170,15 @@ function submitAdd() {
               <template v-if="editingId === m.id">
                 <textarea v-model="editDraft" class="mem-textarea" rows="3"></textarea>
                 <div class="mem-edit-actions">
-                  <button class="ghost-button" :disabled="!editDraft.trim()" @click="saveEdit(m.id)">Save</button>
-                  <button class="ghost-button muted" @click="cancelEdit">Cancel</button>
+                  <ThemedButton variant="primary" size="sm" :disabled="!editDraft.trim()" @click="saveEdit(m.id)">Save</ThemedButton>
+                  <ThemedButton variant="secondary" size="sm" @click="cancelEdit">Cancel</ThemedButton>
                 </div>
               </template>
               <span v-else class="mem-content">{{ m.content }}</span>
             </div>
             <div v-if="editingId !== m.id" class="mem-actions">
-              <button class="mem-btn" title="Edit" @click="startEdit(m)">Edit</button>
-              <button class="mem-btn danger" title="Delete" @click="emit('delete', m.id)">Delete</button>
+              <ThemedButton variant="secondary" size="sm" title="Edit" @click="startEdit(m)">Edit</ThemedButton>
+              <ThemedButton variant="danger" size="sm" title="Delete" @click="emit('delete', m.id)">Delete</ThemedButton>
             </div>
           </li>
         </ul>
@@ -259,7 +260,7 @@ function submitAdd() {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--muted);
-  font-weight: 600;
+  font-weight: 400;
 }
 
 .mem-group-path {
@@ -317,37 +318,5 @@ function submitAdd() {
   flex: 0 0 auto;
   display: flex;
   gap: 6px;
-}
-
-.mem-btn {
-  background: var(--surface-strong);
-  color: var(--muted);
-  border: 1px solid var(--border);
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 0.8rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.mem-btn:hover {
-  color: var(--text);
-  border-color: var(--muted);
-}
-
-.mem-btn.danger {
-  background: var(--danger-soft);
-  color: var(--danger);
-  border-color: var(--danger-border);
-}
-
-.mem-btn.danger:hover {
-  background: var(--danger-soft-strong);
-  border-color: var(--danger);
-}
-
-.danger-text {
-  color: var(--danger);
 }
 </style>

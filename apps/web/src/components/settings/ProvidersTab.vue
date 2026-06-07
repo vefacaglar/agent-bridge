@@ -4,6 +4,7 @@ import type { ProviderModelSettings, ReasoningEffort, ReasoningOption, Reasoning
 import { api } from '../../api/client';
 import { useCustomDialog } from '../../composables/useCustomDialog';
 import ThemedSelect from './ThemedSelect.vue';
+import ThemedButton from '../ThemedButton.vue';
 
 const props = defineProps<{
   providersConfig: Record<string, any>;
@@ -286,14 +287,14 @@ async function handleFetchModels() {
           Configure model providers and API keys. Secrets are stored in macOS Keychain when available.
         </p>
       </div>
-      <button 
+      <ThemedButton 
         v-if="!isEditing" 
-        class="primary-button" 
-        style="min-height: 32px; padding: 0 12px; font-size: 0.8rem;"
+        variant="primary" 
+        size="sm"
         @click="handleAddProvider"
       >
-        + Add Provider
-      </button>
+        Add Provider
+      </ThemedButton>
     </header>
 
     <div v-if="isLoading" class="settings-empty">
@@ -346,28 +347,28 @@ async function handleFetchModels() {
                 placeholder="e.g. gpt-4o or deepseek/deepseek-chat" 
               />
               <div class="reasoning-style-toggle">
-                <button
+                <ThemedButton
                   v-for="style in reasoningStyleChoices"
                   :key="style.id"
-                  type="button"
-                  class="style-chip"
-                  :class="{ active: row.reasoningStyle === style.id }"
+                  variant="chip"
+                  size="sm"
+                  :active="row.reasoningStyle === style.id"
                   @click="setReasoningStyle(row, style.id)"
                 >
                   {{ style.label }}
-                </button>
+                </ThemedButton>
               </div>
               <div class="reasoning-effort-checks">
-                <button
+                <ThemedButton
                   v-for="effort in reasoningEffortChoices"
                   :key="effort.id"
-                  type="button"
-                  class="effort-chip"
-                  :class="{ active: isReasoningEffortSelected(row, effort.id) }"
+                  variant="chip"
+                  size="sm"
+                  :active="isReasoningEffortSelected(row, effort.id)"
                   @click="toggleReasoningEffort(index, effort.id)"
                 >
                   {{ effort.label }}
-                </button>
+                </ThemedButton>
               </div>
               <div v-if="row.reasoningStyle === 'anthropic-budget' && row.reasoningOptions.length" class="budget-inputs">
                 <label v-for="option in row.reasoningOptions" :key="option.id" class="budget-input">
@@ -388,38 +389,39 @@ async function handleFetchModels() {
               </button>
             </div>
             <div style="display: flex; gap: 8px;">
-              <button 
-                type="button" 
-                class="ghost-button add-model-btn" 
+              <ThemedButton 
+                variant="secondary"
+                size="sm"
                 @click="addModelInput"
               >
-                + Add Model
-              </button>
-              <button 
+                Add Model
+              </ThemedButton>
+              <ThemedButton 
                 v-if="canFetchModels"
-                type="button" 
-                class="ghost-button fetch-models-btn" 
+                variant="secondary"
+                size="sm"
                 :disabled="isFetchingModels"
                 @click="handleFetchModels"
+                style="color: var(--success);"
               >
                 {{ isFetchingModels ? 'Fetching...' : '⚡ Fetch Models from API' }}
-              </button>
+              </ThemedButton>
             </div>
           </div>
         </div>
       </div>
 
       <div class="form-actions">
-        <button v-if="editingProviderId" class="danger-button delete-btn" @click="handleDeleteProvider">
+        <ThemedButton v-if="editingProviderId" variant="danger" class="delete-btn" @click="handleDeleteProvider">
           Delete Provider
-        </button>
-        <button class="ghost-button" @click="isEditing = false">Cancel</button>
-        <button class="primary-button" @click="handleSave">Save Configuration</button>
+        </ThemedButton>
+        <ThemedButton variant="secondary" @click="isEditing = false">Cancel</ThemedButton>
+        <ThemedButton variant="primary" @click="handleSave">Save Configuration</ThemedButton>
       </div>
     </div>
 
     <div v-else-if="Object.keys(configs).length === 0" class="settings-empty">
-      No providers configured. Click "+ Add Provider" to create one.
+      No providers configured. Click "Add Provider" to create one.
     </div>
 
     <ul v-else class="provider-list">
@@ -428,13 +430,14 @@ async function handleFetchModels() {
           <span class="provider-name">{{ provider.displayName }}</span>
           <span class="provider-type">{{ provider.type }}</span>
           <span class="provider-id-badge">ID: {{ id }}</span>
-          <button 
-            class="ghost-button edit-btn" 
-            style="margin-left: auto; min-height: 26px; padding: 0 10px; font-size: 0.75rem;"
+          <ThemedButton 
+            variant="secondary"
+            size="sm"
+            style="margin-left: auto;"
             @click="handleEditProvider(id)"
           >
             Edit
-          </button>
+          </ThemedButton>
         </div>
         <div class="provider-details">
           <div class="detail-item"><strong>Base URL:</strong> <code>{{ provider.baseUrl }}</code></div>
@@ -548,8 +551,8 @@ async function handleFetchModels() {
 .form-title {
   margin: 0 0 18px 0;
   font-size: 1rem;
-  font-weight: 600;
-  color: var(--text);
+  font-weight: 400;
+  color: var(--muted);
 }
 
 .form-grid {
@@ -639,45 +642,11 @@ async function handleFetchModels() {
   flex: 1 1 100%;
 }
 
-.style-chip {
-  min-height: 26px;
-  padding: 0 8px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.02);
-  color: var(--faint);
-  font-size: 0.72rem;
-  cursor: pointer;
-}
-
-.style-chip.active {
-  color: var(--text);
-  border-color: rgba(164, 164, 162, 0.28);
-  background: rgba(164, 164, 162, 0.1);
-}
-
 .reasoning-effort-checks {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
   max-width: 320px;
-}
-
-.effort-chip {
-  min-height: 26px;
-  padding: 0 8px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.02);
-  color: var(--faint);
-  font-size: 0.72rem;
-  cursor: pointer;
-}
-
-.effort-chip.active {
-  color: var(--text);
-  border-color: rgba(164, 164, 162, 0.28);
-  background: rgba(164, 164, 162, 0.1);
 }
 
 .budget-inputs {
@@ -723,35 +692,5 @@ async function handleFetchModels() {
   color: var(--danger);
   background: var(--danger-soft);
   border-color: var(--danger-border);
-}
-
-.add-model-btn {
-  align-self: flex-start;
-  min-height: 28px;
-  padding: 0 10px;
-  font-size: 0.75rem;
-  margin-top: 4px;
-}
-
-.fetch-models-btn {
-  align-self: flex-start;
-  min-height: 28px;
-  padding: 0 10px;
-  font-size: 0.75rem;
-  margin-top: 4px;
-  color: var(--success);
-  border-color: var(--success-border);
-  transition: all 0.2s ease;
-}
-
-.fetch-models-btn:hover:not(:disabled) {
-  background: var(--success-soft);
-  border-color: var(--success-border);
-  color: var(--success);
-}
-
-.fetch-models-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 </style>

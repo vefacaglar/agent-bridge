@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import type { UserQuestion } from '@agent-bridge/shared';
+import ThemedButton from './ThemedButton.vue';
 
 const props = defineProps<{
   // The pending question request ({ questions: UserQuestion[] }) or null.
@@ -95,17 +96,17 @@ function submit() {
           <span v-if="currentQuestion.multiSelect" class="question-multi">choose any</span>
         </div>
         <div class="question-options">
-          <button
+          <ThemedButton
             v-for="opt in currentQuestion.options"
             :key="opt.label"
-            type="button"
+            :variant="isSelected(currentIndex, opt.label) ? 'primary' : 'secondary'"
             class="question-option"
-            :class="{ selected: isSelected(currentIndex, opt.label) }"
+            style="display: flex; flex-direction: column; align-items: flex-start; text-align: left;"
             @click="toggle(currentIndex, opt.label)"
           >
-            <span class="option-label">{{ opt.label }}</span>
-            <span v-if="opt.description" class="option-desc">{{ opt.description }}</span>
-          </button>
+            <span class="option-label" style="display: block; font-weight: 600; width: 100%;">{{ opt.label }}</span>
+            <span v-if="opt.description" class="option-desc" style="display: block; font-size: 0.76rem; opacity: 0.8; width: 100%; margin-top: 2px;">{{ opt.description }}</span>
+          </ThemedButton>
         </div>
 
         <textarea
@@ -117,26 +118,23 @@ function submit() {
       </div>
 
       <div class="question-card-footer">
-        <button
+        <ThemedButton
           v-if="!isFirst"
-          type="button"
-          class="question-nav"
+          variant="secondary"
           @click="goPrev"
-        >Previous</button>
-        <button
+        >Previous</ThemedButton>
+        <ThemedButton
           v-if="!isLast"
-          type="button"
-          class="question-nav primary"
+          variant="primary"
           :disabled="!currentAnswered"
           @click="goNext"
-        >Next</button>
-        <button
+        >Next</ThemedButton>
+        <ThemedButton
           v-else
-          type="button"
-          class="question-submit"
+          variant="primary"
           :disabled="!canSubmit"
           @click="submit"
-        >Submit</button>
+        >Submit</ThemedButton>
       </div>
     </div>
   </transition>

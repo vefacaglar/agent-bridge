@@ -79,7 +79,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
       <div class="settings-card">
         <aside class="settings-sidebar" :class="{ collapsed: isSidebarCollapsed }">
           <div class="settings-sidebar-header">
-            <span class="settings-sidebar-label">Settings</span>
+            <span class="settings-sidebar-label" title="Settings">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="settings-sidebar-icon">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+              </svg>
+            </span>
             <button
               class="settings-sidebar-close-btn"
               @click="isSidebarCollapsed = true"
@@ -272,10 +277,22 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
 }
 
 .settings-sidebar-label {
-  font-size: 1.15rem;
-  font-weight: 700;
+  display: flex;
+  align-items: center;
   color: var(--text);
-  letter-spacing: -0.01em;
+}
+
+.settings-sidebar-icon {
+  width: 24px;
+  height: 24px;
+  color: var(--text);
+  opacity: 0.8;
+  transition: opacity 0.2s ease, transform 0.3s ease;
+}
+
+.settings-sidebar-label:hover .settings-sidebar-icon {
+  opacity: 1;
+  transform: rotate(25deg);
 }
 
 .settings-tabs-list {
@@ -289,7 +306,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
   width: 100%;
   padding: 10px 12px;
   font-size: 0.92rem;
-  font-weight: 550;
+  font-weight: 400;
   color: var(--muted);
   background: transparent;
   border: 1px solid transparent;
@@ -311,7 +328,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
   background: var(--sidebar-active);
   border-color: rgba(255, 255, 255, 0.06);
   color: var(--text);
-  font-weight: 600;
+  font-weight: 400;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   transform: translateX(2px);
 }
@@ -374,8 +391,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
   display: flex;
   align-items: center;
   font-size: 0.95rem;
-  font-weight: 500;
-  color: var(--text);
+  font-weight: 400;
+  color: var(--muted);
 }
 
 .breadcrumb-project {
@@ -392,7 +409,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
 }
 
 .breadcrumb-chat-title {
-  font-weight: 600;
+  font-weight: 400;
+  color: var(--muted);
 }
 
 
@@ -401,6 +419,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
   flex: 1;
   overflow-y: auto;
   padding: 24px;
+  scrollbar-gutter: stable;
 }
 
 .settings-container-wrap {
@@ -425,7 +444,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
 .settings-scroll-area :deep(.settings-section-title) {
   margin: 0 0 4px;
   font-size: 1.1rem;
-  color: var(--text);
+  font-weight: 400;
+  color: var(--muted);
 }
 
 .settings-scroll-area :deep(.settings-section-desc) {

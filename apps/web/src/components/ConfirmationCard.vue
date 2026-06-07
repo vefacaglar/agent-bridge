@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue';
 import type { MessageGroup } from '../lib/messageGroups';
 import { getConfirmations } from '../lib/confirmation';
+import ThemedButton from './ThemedButton.vue';
 
 const props = defineProps<{
   group: MessageGroup | null;
@@ -37,21 +38,6 @@ const commentPlaceholder = computed(() => {
   return isTurkish ? 'Özel notunuz (isteğe bağlı)...' : 'Your own comment (optional)...';
 });
 
-function isNoOption(opt: string): boolean {
-  const o = opt.toLowerCase();
-  return o === 'no' || o === 'hayır' || o === 'cancel' || o === 'iptal' || o === 'reject' || o === 'reddet';
-}
-
-function isYesOption(opt: string, idx: number, total: number): boolean {
-  const o = opt.toLowerCase();
-  if (o === 'yes' || o === 'evet' || o === 'confirm' || o === 'onayla' || o === 'approve' || o === 'ok' || o === 'tamam') {
-    return true;
-  }
-  if (idx === total - 1 && !isNoOption(opt)) {
-    return true;
-  }
-  return false;
-}
 
 function handleOptionSelect(opt: string) {
   selections.value[currentIndex.value] = opt;
@@ -97,19 +83,15 @@ function submit() {
         <span v-if="confirmations.length > 1" class="confirm-step">{{ currentIndex + 1 }} / {{ confirmations.length }}</span>
       </div>
       <div class="confirm-options">
-        <button
-          v-for="(opt, idx) in currentQuestion.options"
+        <ThemedButton
+          v-for="opt in currentQuestion.options"
           :key="opt"
-          class="composer-confirm-btn"
-          :class="{
-            selected: selections[currentIndex] === opt,
-            no: isNoOption(opt),
-            yes: isYesOption(opt, idx, currentQuestion.options.length)
-          }"
+          :variant="selections[currentIndex] === opt ? 'primary' : 'secondary'"
+          class="confirm-option-btn"
           @click="handleOptionSelect(opt)"
         >
           {{ opt }}
-        </button>
+        </ThemedButton>
       </div>
       <textarea
         v-model="notes[currentIndex]"
@@ -119,32 +101,29 @@ function submit() {
       ></textarea>
       
       <div v-if="confirmations.length > 1" class="confirm-card-footer">
-        <button
+        <ThemedButton
           v-if="!isFirst"
-          type="button"
-          class="confirm-nav-btn secondary"
+          variant="secondary"
           @click="goPrev"
         >
           Previous
-        </button>
-        <button
+        </ThemedButton>
+        <ThemedButton
           v-if="!isLast"
-          type="button"
-          class="confirm-nav-btn primary"
+          variant="primary"
           :disabled="!selections[currentIndex]"
           @click="goNext"
         >
           Next
-        </button>
-        <button
+        </ThemedButton>
+        <ThemedButton
           v-else
-          type="button"
-          class="confirm-nav-btn primary"
+          variant="primary"
           :disabled="!selections[currentIndex]"
           @click="submit"
         >
           Submit
-        </button>
+        </ThemedButton>
       </div>
     </div>
   </transition>

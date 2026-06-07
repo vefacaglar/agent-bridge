@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import ThemedButton from './ThemedButton.vue';
+
 defineProps<{
   show: boolean;
   isMac: boolean;
@@ -21,14 +23,14 @@ const emit = defineEmits<{
     <div class="modal-card">
       <header class="modal-header">
         <h3>Add Project Folder</h3>
-        <button class="close-modal-btn" @click="emit('close')">Close</button>
+        <ThemedButton size="sm" @click="emit('close')">Close</ThemedButton>
       </header>
 
       <main class="modal-body">
         <div v-if="isMac" class="form-group">
-          <button class="primary-button browse-btn" @click="emit('browse')">
+          <ThemedButton variant="primary" class="browse-btn" @click="emit('browse')">
             Select Folder (macOS Finder)
-          </button>
+          </ThemedButton>
           <div class="separator-text">or enter path manually</div>
         </div>
 
@@ -56,10 +58,10 @@ const emit = defineEmits<{
       </main>
 
       <footer class="modal-footer">
-        <button class="ghost-button" @click="emit('close')">Cancel</button>
-        <button class="primary-button" :disabled="!path.trim() || isSubmitting" @click="emit('submit')">
+        <ThemedButton variant="secondary" @click="emit('close')">Cancel</ThemedButton>
+        <ThemedButton variant="primary" :disabled="!path.trim() || isSubmitting" @click="emit('submit')">
           {{ isSubmitting ? 'Adding...' : 'Add Project' }}
-        </button>
+        </ThemedButton>
       </footer>
     </div>
   </div>
