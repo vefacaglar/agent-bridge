@@ -739,7 +739,7 @@ const formattedElapsedTime = computed(() => {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  max-width: min(680px, 82%);
+  max-width: min(850px, 85%);
   align-self: flex-end;
 }
 

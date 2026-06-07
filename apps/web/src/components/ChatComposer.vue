@@ -541,7 +541,7 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .composer-container {
-  width: min(800px, 100%);
+  width: min(1000px, 100%);
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -653,8 +653,10 @@ onBeforeUnmount(() => {
 .composer-input-box textarea {
   display: block;
   width: 100%;
-  min-height: 48px;
-  max-height: 180px;
+  height: 24px;
+  min-height: 24px;
+  max-height: 240px; /* 10 lines * 24px line-height */
+  line-height: 24px;
   resize: none;
   overflow-y: auto;
   border: 0;
@@ -662,14 +664,13 @@ onBeforeUnmount(() => {
   background: transparent;
   color: var(--text);
   font-size: 0.96rem;
-  line-height: 1.5;
   padding: 0;
   margin: 0;
 }
 
 .composer-send-btn {
   position: absolute;
-  bottom: 11px;
+  bottom: 9px;
   right: 11px;
   display: flex;
   align-items: center;
