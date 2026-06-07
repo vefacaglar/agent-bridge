@@ -1,7 +1,7 @@
 import fs from "fs";
 import os from "node:os";
 import path from "path";
-import type { ProviderMetadata, AgentPreset } from "@agent-bridge/shared";
+import type { ProviderMetadata, AgentPreset, ModelReasoningSettings, ReasoningEffort, ReasoningOption, ReasoningStyle, ResolvedReasoningConfig } from "@agent-bridge/shared";
 import type { ModelProvider } from "./ModelProvider.js";
 import { ProviderFactory } from "./ProviderFactory.js";
 import { MacOSKeychainProviderSecretStore, type ProviderSecretStore } from "./ProviderSecretStore.js";
@@ -12,6 +12,12 @@ interface ProviderConfigBlock {
   baseUrl: string;
   apiKey: string;
   models: string[];
+  modelSettings?: Record<string, ModelSettingsBlock>;
+}
+
+interface ModelSettingsBlock {
+  reasoning?: ModelReasoningSettings;
+  reasoningEfforts?: ReasoningEffort[];
 }
 
 interface PersistedProviderConfigBlock extends Omit<ProviderConfigBlock, "apiKey"> {
@@ -20,6 +26,8 @@ interface PersistedProviderConfigBlock extends Omit<ProviderConfigBlock, "apiKey
 }
 
 export const PRESERVE_API_KEY_VALUE = "__LOCAGENS_PRESERVE_API_KEY__";
+const REASONING_EFFORTS = new Set<ReasoningEffort>(["default", "none", "minimal", "low", "medium", "high", "xhigh", "max"]);
+const REASONING_STYLES = new Set<ReasoningStyle>(["openai-chat", "anthropic-budget"]);
 
 export interface EditableProviderConfigBlock extends Omit<ProviderConfigBlock, "apiKey"> {
   apiKey: typeof PRESERVE_API_KEY_VALUE | "";
@@ -28,10 +36,10 @@ export interface EditableProviderConfigBlock extends Omit<ProviderConfigBlock, "
 
 interface AgentPresetBlock {
   displayName: string;
-  architect: { providerId: string; model: string };
-  coder: { providerId: string; model: string };
+  architect: { providerId: string; model: string; reasoningEffort?: ReasoningEffort };
+  coder: { providerId: string; model: string; reasoningEffort?: ReasoningEffort };
   maxSubAgents?: number;
-  utility?: { providerId: string; model: string };
+  utility?: { providerId: string; model: string; reasoningEffort?: ReasoningEffort };
   fallback?: boolean;
 }
 
@@ -127,8 +135,26 @@ export class ProviderRegistry {
       id,
       displayName: block.displayName,
       type: block.type,
-      models: block.models
+      models: block.models,
+      modelSettings: this.safeModelSettings(block)
     }));
+  }
+
+  getSupportedReasoningEfforts(providerId: string, model: string): ReasoningEffort[] {
+    return this.normalizedReasoningSettings(providerId, model)?.options?.map(option => option.id) ?? [];
+  }
+
+  resolveReasoning(providerId: string, model: string, effort: ReasoningEffort | undefined): ResolvedReasoningConfig | undefined {
+    if (!effort || effort === "default") return undefined;
+    const reasoning = this.normalizedReasoningSettings(providerId, model);
+    const option = reasoning?.options?.find(o => o.id === effort);
+    if (!reasoning?.style || !option) return undefined;
+    if (reasoning.style === "anthropic-budget" && !option.budgetTokens) return undefined;
+    return {
+      style: reasoning.style,
+      value: option.value || option.id,
+      budgetTokens: option.budgetTokens
+    };
   }
 
   private loadExampleAgentPresets(wsRoot: string): Record<string, AgentPresetBlock> {
@@ -151,14 +177,31 @@ export class ProviderRegistry {
     return Object.entries(this.agentPresets).map(([id, block]) => ({
       id,
       displayName: block.displayName || id,
-      architect: { providerId: block.architect.providerId, model: block.architect.model },
-      coder: { providerId: block.coder.providerId, model: block.coder.model },
+      architect: {
+        providerId: block.architect.providerId,
+        model: block.architect.model,
+        reasoningEffort: this.safePresetReasoningEffort(block.architect.providerId, block.architect.model, block.architect.reasoningEffort)
+      },
+      coder: {
+        providerId: block.coder.providerId,
+        model: block.coder.model,
+        reasoningEffort: this.safePresetReasoningEffort(block.coder.providerId, block.coder.model, block.coder.reasoningEffort)
+      },
       maxSubAgents: Math.min(3, Math.max(1, block.maxSubAgents ?? 3)),
       utility: block.utility
-        ? { providerId: block.utility.providerId, model: block.utility.model }
+        ? {
+            providerId: block.utility.providerId,
+            model: block.utility.model,
+            reasoningEffort: this.safePresetReasoningEffort(block.utility.providerId, block.utility.model, block.utility.reasoningEffort)
+          }
         : undefined,
       fallback: !!block.fallback
     }));
+  }
+
+  private safePresetReasoningEffort(providerId: string, model: string, effort: ReasoningEffort | undefined): ReasoningEffort | undefined {
+    if (!effort || effort === "default") return undefined;
+    return this.getSupportedReasoningEfforts(providerId, model).includes(effort) ? effort : undefined;
   }
 
   getAgentPreset(id: string): AgentPreset | undefined {
@@ -200,7 +243,8 @@ export class ProviderRegistry {
           baseUrl: block.baseUrl,
           apiKey: block.apiKey ? PRESERVE_API_KEY_VALUE : "",
           hasApiKey: !!block.apiKey,
-          models: block.models
+          models: block.models,
+          modelSettings: this.safeModelSettings(block)
         }
       ])
     );
@@ -221,7 +265,8 @@ export class ProviderRegistry {
           displayName: block.displayName,
           baseUrl: block.baseUrl,
           apiKey: block.apiKeyRef ? this.secretStore.get(block.apiKeyRef) : block.apiKey || "",
-          models: block.models
+          models: block.models,
+          modelSettings: this.safeModelSettings(block)
         }
       ])
     );
@@ -243,11 +288,60 @@ export class ProviderRegistry {
             displayName: block.displayName,
             baseUrl: block.baseUrl,
             apiKey: nextApiKey,
-            models: block.models
+            models: block.models,
+            modelSettings: this.safeModelSettings(block)
           }
         ];
       })
     );
+  }
+
+  private normalizedReasoningSettings(providerId: string, model: string): ModelReasoningSettings | undefined {
+    const block = this.configs[providerId];
+    if (!block) return undefined;
+    const settings = this.safeModelSettings(block)[model]?.reasoning;
+    return settings?.options?.length ? settings : undefined;
+  }
+
+  private safeModelSettings(block: Pick<ProviderConfigBlock, "type" | "models" | "modelSettings">): Record<string, ModelSettingsBlock> {
+    const modelSet = new Set(block.models);
+    const entries = Object.entries(block.modelSettings || {})
+      .filter(([model]) => modelSet.has(model))
+      .map(([model, settings]) => {
+        const reasoning = this.safeReasoningSettings(block.type, settings);
+        return [model, reasoning ? { reasoning, reasoningEfforts: reasoning.options?.map(option => option.id) } : {}] as const;
+      })
+      .filter(([, settings]) => (settings.reasoning?.options?.length ?? 0) > 0);
+    return Object.fromEntries(entries);
+  }
+
+  private safeReasoningSettings(providerType: ProviderConfigBlock["type"], settings: ModelSettingsBlock): ModelReasoningSettings | undefined {
+    const styleCandidate = settings.reasoning?.style;
+    const style = REASONING_STYLES.has(styleCandidate as ReasoningStyle)
+      ? styleCandidate as ReasoningStyle
+      : providerType === "anthropic" ? "anthropic-budget" : "openai-chat";
+    const rawOptions: ReasoningOption[] = settings.reasoning?.options?.length
+      ? settings.reasoning.options
+      : (settings.reasoning?.reasoningEfforts || settings.reasoningEfforts || []).map(id => ({ id }));
+    const options = rawOptions
+      .map(option => this.safeReasoningOption(style, option))
+      .filter((option): option is ReasoningOption => !!option);
+    return options.length > 0 ? { style, options } : undefined;
+  }
+
+  private safeReasoningOption(style: ReasoningStyle, option: ReasoningOption): ReasoningOption | undefined {
+    if (!REASONING_EFFORTS.has(option.id) || option.id === "default") return undefined;
+    const clean: ReasoningOption = {
+      id: option.id,
+      label: option.label,
+      value: option.value || option.id
+    };
+    if (style === "anthropic-budget") {
+      const budgetTokens = Number(option.budgetTokens);
+      if (!Number.isFinite(budgetTokens) || budgetTokens < 1024) return undefined;
+      clean.budgetTokens = Math.floor(budgetTokens);
+    }
+    return clean;
   }
 
   /** Writes the current providers + agentPresets back to providers.local.json. */
@@ -269,7 +363,8 @@ export class ProviderRegistry {
           type: block.type,
           displayName: block.displayName,
           baseUrl: block.baseUrl,
-          models: block.models
+          models: block.models,
+          modelSettings: this.safeModelSettings(block)
         };
         if (block.apiKey && this.secretStore.supportsSecurePersistence) {
           persisted.apiKeyRef = this.secretStore.set(id, block.apiKey);

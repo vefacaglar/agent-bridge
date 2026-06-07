@@ -120,6 +120,10 @@ export class OpenAICompatibleProvider implements ModelProvider {
       max_tokens: request.maxTokens ?? DEFAULT_MAX_TOKENS
     };
 
+    if (request.reasoning?.style === "openai-chat" && request.reasoning.value) {
+      body.reasoning_effort = request.reasoning.value;
+    }
+
     if (request.tools && request.tools.length > 0) {
       body.tools = request.tools;
     }

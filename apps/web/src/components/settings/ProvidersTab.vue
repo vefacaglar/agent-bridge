@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
+import type { ProviderModelSettings, ReasoningEffort, ReasoningOption, ReasoningStyle } from '@agent-bridge/shared';
 import { api } from '../../api/client';
 import { useCustomDialog } from '../../composables/useCustomDialog';
 
@@ -18,7 +19,36 @@ const formType = ref<'openai-compatible' | 'anthropic'>('openai-compatible');
 const formDisplayName = ref('');
 const formBaseUrl = ref('');
 const formApiKey = ref('');
-const formModelsList = ref<string[]>([]);
+const formModelRows = ref<ModelRow[]>([]);
+
+const reasoningEffortChoices: { id: ReasoningEffort; label: string }[] = [
+  { id: 'none', label: 'None' },
+  { id: 'minimal', label: 'Minimal' },
+  { id: 'low', label: 'Low' },
+  { id: 'medium', label: 'Medium' },
+  { id: 'high', label: 'High' },
+  { id: 'xhigh', label: 'XHigh' },
+  { id: 'max', label: 'Max' }
+];
+
+const reasoningStyleChoices: { id: ReasoningStyle; label: string }[] = [
+  { id: 'openai-chat', label: 'OpenAI-compatible reasoning_effort' },
+  { id: 'anthropic-budget', label: 'Anthropic thinking budget' }
+];
+
+type ModelRow = {
+  name: string;
+  reasoningStyle: ReasoningStyle;
+  reasoningOptions: ReasoningOption[];
+};
+
+function defaultReasoningStyle(): ReasoningStyle {
+  return formType.value === 'anthropic' ? 'anthropic-budget' : 'openai-chat';
+}
+
+function emptyModelRow(name = ''): ModelRow {
+  return { name, reasoningStyle: defaultReasoningStyle(), reasoningOptions: [] };
+}
 
 async function fetchConfigs() {
   isLoading.value = true;
@@ -45,7 +75,7 @@ function handleAddProvider() {
   formDisplayName.value = '';
   formBaseUrl.value = '';
   formApiKey.value = '';
-  formModelsList.value = [''];
+  formModelRows.value = [emptyModelRow()];
   isEditing.value = true;
 }
 
@@ -59,16 +89,75 @@ function handleEditProvider(id: string) {
   formDisplayName.value = block.displayName;
   formBaseUrl.value = block.baseUrl;
   formApiKey.value = block.apiKey === PRESERVE_API_KEY_VALUE ? '' : block.apiKey || '';
-  formModelsList.value = block.models ? [...block.models] : [''];
+  formModelRows.value = block.models && block.models.length > 0
+    ? block.models.map((model: string) => modelRowFromSettings(model, block.modelSettings?.[model]))
+    : [emptyModelRow()];
   isEditing.value = true;
 }
 
 function addModelInput() {
-  formModelsList.value.push('');
+  formModelRows.value.push(emptyModelRow());
 }
 
 function removeModelInput(index: number) {
-  formModelsList.value.splice(index, 1);
+  formModelRows.value.splice(index, 1);
+}
+
+function toggleReasoningEffort(index: number, effort: ReasoningEffort) {
+  const row = formModelRows.value[index];
+  if (!row) return;
+  row.reasoningOptions = row.reasoningOptions.some(x => x.id === effort)
+    ? row.reasoningOptions.filter(x => x.id !== effort)
+    : [...row.reasoningOptions, defaultReasoningOption(row.reasoningStyle, effort)];
+}
+
+function setReasoningStyle(row: ModelRow, style: ReasoningStyle) {
+  row.reasoningStyle = style;
+  row.reasoningOptions = row.reasoningOptions.map(option => ({
+    ...option,
+    ...(style === 'anthropic-budget'
+      ? { budgetTokens: option.budgetTokens || defaultBudgetTokens(option.id) }
+      : { budgetTokens: undefined })
+  }));
+}
+
+function isReasoningEffortSelected(row: ModelRow, effort: ReasoningEffort): boolean {
+  return row.reasoningOptions.some(option => option.id === effort);
+}
+
+function modelRowFromSettings(name: string, settings?: ProviderModelSettings): ModelRow {
+  const reasoning = settings?.reasoning || settings;
+  const style = reasoning?.style || defaultReasoningStyle();
+  const options = reasoning?.options?.length
+    ? reasoning.options.map(option => ({ ...option }))
+    : (reasoning?.reasoningEfforts || []).map(id => defaultReasoningOption(style, id));
+  return { name, reasoningStyle: style, reasoningOptions: options };
+}
+
+function defaultReasoningOption(style: ReasoningStyle, id: ReasoningEffort): ReasoningOption {
+  return {
+    id,
+    label: reasoningEffortChoices.find(effort => effort.id === id)?.label || id,
+    value: id,
+    ...(style === 'anthropic-budget' ? { budgetTokens: defaultBudgetTokens(id) } : {})
+  };
+}
+
+function defaultBudgetTokens(id: ReasoningEffort): number {
+  if (id === 'low' || id === 'minimal') return 1024;
+  if (id === 'medium') return 4096;
+  if (id === 'high') return 10000;
+  if (id === 'xhigh') return 32000;
+  if (id === 'max') return 64000;
+  return 1024;
+}
+
+function reasoningSummary(settings?: ProviderModelSettings): string {
+  const reasoning = settings?.reasoning || settings;
+  const options = reasoning?.options?.length
+    ? reasoning.options
+    : (reasoning?.reasoningEfforts || []).map(id => defaultReasoningOption(reasoning?.style || defaultReasoningStyle(), id));
+  return options.map(option => option.label || option.id).join(', ');
 }
 
 async function handleDeleteProvider() {
@@ -103,9 +192,19 @@ async function handleSave() {
     return;
   }
 
-  const modelsArray = formModelsList.value
-    .map(m => m.trim())
-    .filter(Boolean);
+  const modelRows = formModelRows.value
+    .map(row => ({
+      name: row.name.trim(),
+      reasoningStyle: row.reasoningStyle,
+      reasoningOptions: row.reasoningOptions
+    }))
+    .filter(row => row.name);
+  const modelsArray = modelRows
+    .map(row => row.name)
+    .filter((model, index, arr) => arr.indexOf(model) === index);
+  const modelSettings = Object.fromEntries(modelRows
+    .filter(row => row.reasoningOptions.length > 0)
+    .map(row => [row.name, { reasoning: { style: row.reasoningStyle, options: row.reasoningOptions } }]));
 
   const currentBlock = editingProviderId.value ? configs.value[editingProviderId.value] : null;
   const trimmedApiKey = formApiKey.value.trim();
@@ -114,7 +213,8 @@ async function handleSave() {
     displayName: formDisplayName.value.trim(),
     baseUrl: formBaseUrl.value.trim(),
     apiKey: trimmedApiKey || (currentBlock?.hasApiKey ? PRESERVE_API_KEY_VALUE : ''),
-    models: modelsArray
+    models: modelsArray,
+    modelSettings
   };
 
   const newConfigs = { ...configs.value };
@@ -162,7 +262,7 @@ async function handleFetchModels() {
     });
 
     if (res.success && res.models && res.models.length > 0) {
-      formModelsList.value = res.models;
+      formModelRows.value = res.models.map(model => emptyModelRow(model));
     } else if (res.error) {
       await showAlert(`Failed to fetch models: ${res.error}`);
     } else {
@@ -241,12 +341,42 @@ async function handleFetchModels() {
         <div class="form-group full-width">
           <label>Available Models</label>
           <div class="models-edit-list">
-            <div v-for="(_, index) in formModelsList" :key="index" class="model-input-row">
+            <div v-for="(row, index) in formModelRows" :key="index" class="model-input-row">
               <input 
-                v-model="formModelsList[index]" 
+                v-model="row.name" 
                 type="text" 
                 placeholder="e.g. gpt-4o or deepseek/deepseek-chat" 
               />
+              <div class="reasoning-style-toggle">
+                <button
+                  v-for="style in reasoningStyleChoices"
+                  :key="style.id"
+                  type="button"
+                  class="style-chip"
+                  :class="{ active: row.reasoningStyle === style.id }"
+                  @click="setReasoningStyle(row, style.id)"
+                >
+                  {{ style.label }}
+                </button>
+              </div>
+              <div class="reasoning-effort-checks">
+                <button
+                  v-for="effort in reasoningEffortChoices"
+                  :key="effort.id"
+                  type="button"
+                  class="effort-chip"
+                  :class="{ active: isReasoningEffortSelected(row, effort.id) }"
+                  @click="toggleReasoningEffort(index, effort.id)"
+                >
+                  {{ effort.label }}
+                </button>
+              </div>
+              <div v-if="row.reasoningStyle === 'anthropic-budget' && row.reasoningOptions.length" class="budget-inputs">
+                <label v-for="option in row.reasoningOptions" :key="option.id" class="budget-input">
+                  <span>{{ option.label || option.id }}</span>
+                  <input v-model.number="option.budgetTokens" type="number" min="1024" step="1024" />
+                </label>
+              </div>
               <button 
                 type="button" 
                 class="danger-button delete-model-btn" 
@@ -313,7 +443,12 @@ async function handleFetchModels() {
           <div class="detail-item"><strong>API Key:</strong> <code>{{ provider.hasApiKey ? '••••••••••••••••' : 'Not set' }}</code></div>
         </div>
         <div class="provider-models">
-          <span v-for="model in provider.models" :key="model" class="provider-model-pill">{{ model }}</span>
+          <span v-for="model in provider.models" :key="model" class="provider-model-pill">
+            {{ model }}
+            <template v-if="reasoningSummary(provider.modelSettings?.[model])">
+              · effort: {{ reasoningSummary(provider.modelSettings?.[model]) }}
+            </template>
+          </span>
         </div>
       </li>
     </ul>
@@ -493,10 +628,83 @@ async function handleFetchModels() {
   display: flex;
   gap: 8px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .model-input-row input {
   flex: 1;
+  min-width: 180px;
+}
+
+.reasoning-style-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  flex: 1 1 100%;
+}
+
+.style-chip {
+  min-height: 26px;
+  padding: 0 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--faint);
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.style-chip.active {
+  color: var(--text);
+  border-color: rgba(164, 164, 162, 0.28);
+  background: rgba(164, 164, 162, 0.1);
+}
+
+.reasoning-effort-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: 320px;
+}
+
+.effort-chip {
+  min-height: 26px;
+  padding: 0 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--faint);
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.effort-chip.active {
+  color: var(--text);
+  border-color: rgba(164, 164, 162, 0.28);
+  background: rgba(164, 164, 162, 0.1);
+}
+
+.budget-inputs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1 1 100%;
+  padding-left: 2px;
+}
+
+.budget-input {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--faint);
+  font-size: 0.72rem;
+}
+
+.budget-input input {
+  width: 96px;
+  min-width: 96px;
+  padding: 5px 7px;
+  font-size: 0.75rem;
 }
 
 .delete-model-btn {

@@ -1,5 +1,5 @@
 import { computed, ref, watch, type Ref } from 'vue';
-import type { ProviderMetadata, AgentPreset } from '@agent-bridge/shared';
+import type { ProviderMetadata, AgentPreset, ReasoningOption, ProviderModelSettings } from '@agent-bridge/shared';
 import { splitCombined } from '../lib/format';
 
 // Four modes are exposed: Chat (lightweight conversation — no proactive
@@ -20,7 +20,22 @@ export interface ModelOption {
   value: string;
   label: string;
   providerId: string;
+  model: string;
+  reasoningOptions: ReasoningOption[];
 }
+
+export const REASONING_EFFORTS = [
+  { id: 'default', label: 'Default' },
+  { id: 'none', label: 'None' },
+  { id: 'minimal', label: 'Minimal' },
+  { id: 'low', label: 'Low' },
+  { id: 'medium', label: 'Medium' },
+  { id: 'high', label: 'High' },
+  { id: 'xhigh', label: 'XHigh' },
+  { id: 'max', label: 'Max' }
+] as const;
+
+const REASONING_EFFORT_IDS = new Set(REASONING_EFFORTS.map(x => x.id));
 
 /**
  * Owns the composer's persisted settings: selected model, operational mode
@@ -31,6 +46,10 @@ export function useComposerSettings(
   agentPresets: Ref<AgentPreset[]>
 ) {
   const selectedModelCombined = ref(localStorage.getItem('bm_selected_model') || '');
+  const storedReasoningEffort = localStorage.getItem('bm_reasoning_effort') || 'default';
+  const selectedReasoningEffort = ref(
+    REASONING_EFFORT_IDS.has(storedReasoningEffort as any) ? storedReasoningEffort : 'default'
+  );
   // The optional dual-model preset selected next to the model picker. Empty string
   // (or an id no longer present) means single-model mode — the default.
   const selectedPresetId = ref(localStorage.getItem('bm_selected_preset') || '');
@@ -46,6 +65,7 @@ export function useComposerSettings(
   const bypassPermissions = ref(localStorage.getItem('bm_bypass_permissions') === 'true');
 
   watch(selectedModelCombined, (v) => { if (v) localStorage.setItem('bm_selected_model', v); });
+  watch(selectedReasoningEffort, (v) => localStorage.setItem('bm_reasoning_effort', v || 'default'));
   watch(currentMode, (v) => localStorage.setItem('bm_current_mode', v));
   watch(bypassPermissions, (v) => localStorage.setItem('bm_bypass_permissions', String(v)));
 
@@ -56,7 +76,9 @@ export function useComposerSettings(
         options.push({
           value: `${provider.id}:${model}`,
           label: `${provider.displayName} / ${model}`,
-          providerId: provider.id
+          providerId: provider.id,
+          model,
+          reasoningOptions: normalizedReasoningOptions(provider.modelSettings?.[model])
         });
       }
     }
@@ -89,17 +111,43 @@ export function useComposerSettings(
     return splitCombined(selectedModelCombined.value);
   });
 
+  const activeReasoningOptions = computed<ReasoningOption[]>(() => {
+    const effective = effectiveModel.value;
+    const provider = providers.value.find(p => p.id === effective.providerId);
+    return normalizedReasoningOptions(provider?.modelSettings?.[effective.model]);
+  });
+
+  const reasoningEffortOptions = computed(() => [
+    REASONING_EFFORTS[0],
+    ...activeReasoningOptions.value.map(option => ({
+      id: option.id,
+      label: option.label || REASONING_EFFORTS.find(x => x.id === option.id)?.label || option.id
+    }))
+  ]);
+
+  watch(activeReasoningOptions, (options) => {
+    if (selectedReasoningEffort.value !== 'default' && !options.some(option => option.id === selectedReasoningEffort.value)) {
+      selectedReasoningEffort.value = 'default';
+    }
+  });
+
   // Dual-model fields to attach to a run; empty object in single-model mode.
-  const agentRunFields = computed<{ coderProviderId?: string; coderModel?: string; utilityProviderId?: string; utilityModel?: string; agentPreset?: string }>(() => {
+  const agentRunFields = computed<{ coderProviderId?: string; coderModel?: string; coderReasoningEffort?: string; utilityProviderId?: string; utilityModel?: string; utilityReasoningEffort?: string; agentPreset?: string }>(() => {
     if (!activePreset.value) return { agentPreset: '' };
     return {
       agentPreset: activePreset.value.id,
       coderProviderId: activePreset.value.coder.providerId,
       coderModel: activePreset.value.coder.model,
+      coderReasoningEffort: activePreset.value.coder.reasoningEffort,
       utilityProviderId: activePreset.value.utility?.providerId,
-      utilityModel: activePreset.value.utility?.model
+      utilityModel: activePreset.value.utility?.model,
+      utilityReasoningEffort: activePreset.value.utility?.reasoningEffort
     };
   });
+
+  const effectiveReasoningEffort = computed(() =>
+    activePreset.value?.architect.reasoningEffort || selectedReasoningEffort.value
+  );
 
   function getModeLabel(modeId: string): string {
     return MODES_LIST.find(m => m.id === modeId)?.label ?? 'Chat';
@@ -117,9 +165,12 @@ export function useComposerSettings(
 
   return {
     selectedModelCombined,
+    selectedReasoningEffort,
+    reasoningEffortOptions,
     selectedPresetId,
     activePreset,
     effectiveModel,
+    effectiveReasoningEffort,
     agentRunFields,
     currentMode,
     bypassPermissions,
@@ -128,4 +179,11 @@ export function useComposerSettings(
     getModeLabel,
     ensureDefaultModel
   };
+}
+
+function normalizedReasoningOptions(settings: ProviderModelSettings | undefined): ReasoningOption[] {
+  if (!settings) return [];
+  if (settings.reasoning?.options?.length) return settings.reasoning.options;
+  if (settings.options?.length) return settings.options;
+  return (settings.reasoningEfforts || []).map(id => ({ id }));
 }

@@ -10,14 +10,18 @@ interface ChatSessionOptions {
   providers: Ref<ProviderMetadata[]>;
   runs: Ref<Run[]>;
   selectedModelCombined: Ref<string>;
+  selectedReasoningEffort: Ref<string>;
+  effectiveReasoningEffort: ComputedRef<string | undefined>;
   // The effective main/architect model (preset architect or single-model pick)
   // and the optional dual-model fields, both derived in useComposerSettings.
   effectiveModel: ComputedRef<{ providerId: string; model: string }>;
   agentRunFields: ComputedRef<{
     coderProviderId?: string;
     coderModel?: string;
+    coderReasoningEffort?: string;
     utilityProviderId?: string;
     utilityModel?: string;
+    utilityReasoningEffort?: string;
     agentPreset?: string;
   }>;
   currentMode: Ref<string>;
@@ -267,6 +271,7 @@ export function useChatSession(options: ChatSessionOptions) {
           task: currentTask,
           providerId,
           model,
+          reasoningEffort: options.effectiveReasoningEffort.value,
           mode: options.currentMode.value,
           bypassPermissions: options.bypassPermissions.value,
           ...agentFields
@@ -292,6 +297,7 @@ export function useChatSession(options: ChatSessionOptions) {
           projectName: options.activeProject.value?.name,
           providerId,
           model,
+          reasoningEffort: options.effectiveReasoningEffort.value,
           mode: options.currentMode.value,
           bypassPermissions: options.bypassPermissions.value,
           ...agentFields

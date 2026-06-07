@@ -112,6 +112,21 @@ for (const col of ["coder_provider_id", "coder_model", "agent_preset", "utility_
   }
 }
 
+for (const col of ["coder_reasoning_effort", "utility_reasoning_effort"]) {
+  try {
+    db.exec(`ALTER TABLE runs ADD COLUMN ${col} TEXT`);
+  } catch (e) {
+    // Ignored if the column already exists
+  }
+}
+
+// Migration: Add optional reasoning-effort selection to runs.
+try {
+  db.exec("ALTER TABLE runs ADD COLUMN reasoning_effort TEXT");
+} catch (e) {
+  // Ignored if the column already exists
+}
+
 // Create Messages Table
 db.exec(`
   CREATE TABLE IF NOT EXISTS messages (

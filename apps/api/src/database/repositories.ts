@@ -14,11 +14,14 @@ function mapRowToRun(row: any): Run {
     providerId: row.provider_id,
     providerDisplayName: row.provider_display_name,
     model: row.model,
+    reasoningEffort: row.reasoning_effort || undefined,
     mode: row.mode || "accept_edits",
     coderProviderId: row.coder_provider_id || undefined,
     coderModel: row.coder_model || undefined,
+    coderReasoningEffort: row.coder_reasoning_effort || undefined,
     utilityProviderId: row.utility_provider_id || undefined,
     utilityModel: row.utility_model || undefined,
+    utilityReasoningEffort: row.utility_reasoning_effort || undefined,
     agentPreset: row.agent_preset || undefined,
     errorMessage: row.error_message || undefined,
     createdAt: row.created_at,
@@ -50,11 +53,11 @@ export class RunRepository {
     const stmt = db.prepare(`
       INSERT INTO runs (
         id, title, task, project_path, project_name, status,
-        provider_id, provider_display_name, model, mode,
-        coder_provider_id, coder_model, agent_preset,
-        utility_provider_id, utility_model,
+        provider_id, provider_display_name, model, reasoning_effort, mode,
+        coder_provider_id, coder_model, coder_reasoning_effort, agent_preset,
+        utility_provider_id, utility_model, utility_reasoning_effort,
         error_message, created_at, updated_at, last_active_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     runQueuedWrite(() => stmt.run(
@@ -67,12 +70,15 @@ export class RunRepository {
       run.providerId,
       run.providerDisplayName,
       run.model,
+      run.reasoningEffort || null,
       run.mode || "accept_edits",
       run.coderProviderId || null,
       run.coderModel || null,
+      run.coderReasoningEffort || null,
       run.agentPreset || null,
       run.utilityProviderId || null,
       run.utilityModel || null,
+      run.utilityReasoningEffort || null,
       run.errorMessage || null,
       run.createdAt,
       run.updatedAt,
@@ -105,11 +111,14 @@ export class RunRepository {
       providerId: "provider_id",
       providerDisplayName: "provider_display_name",
       model: "model",
+      reasoningEffort: "reasoning_effort",
       mode: "mode",
       coderProviderId: "coder_provider_id",
       coderModel: "coder_model",
+      coderReasoningEffort: "coder_reasoning_effort",
       utilityProviderId: "utility_provider_id",
       utilityModel: "utility_model",
+      utilityReasoningEffort: "utility_reasoning_effort",
       agentPreset: "agent_preset",
       errorMessage: "error_message",
       createdAt: "created_at",

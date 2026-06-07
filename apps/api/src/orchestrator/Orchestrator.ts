@@ -1,4 +1,4 @@
-import type { Run, RunStatus, RunMessage, ChatMessage, PlanTask, UserQuestion } from "@agent-bridge/shared";
+import type { Run, RunStatus, RunMessage, ChatMessage, PlanTask, UserQuestion, ReasoningEffort } from "@agent-bridge/shared";
 import type { ModelProvider } from "../providers/ModelProvider.js";
 import { RunRepository, MessageRepository, PlanRepository, MemoryRepository } from "../database/repositories.js";
 import { ProviderRegistry } from "../providers/ProviderRegistry.js";
@@ -21,6 +21,7 @@ interface SubAgentTier {
   providerId: string;
   providerDisplayName: string;
   model: string;
+  reasoningEffort?: ReasoningEffort;
   tools: any[];
   agentRole: RunMessage["agentRole"];
   systemPrompt: string;
@@ -274,7 +275,8 @@ export class Orchestrator {
       snapshot: {
         providerId: run.providerId,
         providerDisplayName: run.providerDisplayName,
-        model: run.model
+        model: run.model,
+        reasoningEffort: run.reasoningEffort
       }
     });
 
@@ -462,6 +464,7 @@ export class Orchestrator {
         providerId: run.providerId,
         providerDisplayName: run.providerDisplayName,
         model: run.model,
+        reasoningEffort: run.reasoningEffort,
         systemPrompt,
         tools,
         agentRole: delegation ? "planner" : undefined
@@ -511,6 +514,7 @@ export class Orchestrator {
       providerId: string;
       providerDisplayName: string;
       model: string;
+      reasoningEffort?: ReasoningEffort;
       systemPrompt: string;
       tools: any[];
       agentRole?: RunMessage["agentRole"];
@@ -538,6 +542,8 @@ export class Orchestrator {
 
       const response = await provider.complete({
         model: opts.model,
+        reasoningEffort: opts.reasoningEffort,
+        reasoning: this.registry.resolveReasoning(opts.providerId, opts.model, opts.reasoningEffort),
         systemPrompt: opts.systemPrompt,
         messages: currentMessages,
         tools: opts.tools
@@ -676,6 +682,7 @@ export class Orchestrator {
           providerId: tier.providerId,
           providerDisplayName: tier.providerDisplayName,
           model: tier.model,
+          reasoningEffort: tier.reasoningEffort,
           systemPrompt: tier.systemPrompt,
           tools: tier.tools,
           agentRole: tier.agentRole,
@@ -702,6 +709,7 @@ export class Orchestrator {
       providerId: run.providerId,
       providerDisplayName: run.providerDisplayName,
       model: run.model,
+      reasoningEffort: run.reasoningEffort,
       tools: [...WORKSPACE_TOOLS],
       agentRole: "coder",
       systemPrompt: buildCoderSystemPrompt(run.projectName, run.projectPath, task.title),
@@ -759,6 +767,7 @@ export class Orchestrator {
           providerId: run.coderProviderId!,
           providerDisplayName: coderDisplayName,
           model: run.coderModel!,
+          reasoningEffort: run.coderReasoningEffort,
           tools: [...WORKSPACE_TOOLS],
           agentRole: "coder",
           systemPrompt: buildCoderSystemPrompt(run.projectName, run.projectPath, task.title),
@@ -833,6 +842,7 @@ export class Orchestrator {
           providerId: run.utilityProviderId!,
           providerDisplayName: utilityDisplayName,
           model: run.utilityModel!,
+          reasoningEffort: run.utilityReasoningEffort,
           tools: [...UTILITY_TOOLS],
           agentRole: "utility",
           systemPrompt: buildUtilitySystemPrompt(run.projectName, run.projectPath, task.title),
@@ -848,6 +858,7 @@ export class Orchestrator {
             providerId: run.coderProviderId,
             providerDisplayName: coderDisplayName,
             model: run.coderModel,
+            reasoningEffort: run.coderReasoningEffort,
             tools: [...WORKSPACE_TOOLS],
             agentRole: "coder",
             systemPrompt: buildCoderSystemPrompt(run.projectName, run.projectPath, task.title),

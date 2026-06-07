@@ -24,12 +24,41 @@ export interface ChatMessage {
   toolCalls?: ToolCall[];
 }
 
+export type ReasoningEffort = "default" | "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+export type ReasoningStyle = "openai-chat" | "anthropic-budget";
+
+export interface ReasoningOption {
+  id: ReasoningEffort;
+  label?: string;
+  value?: string;
+  budgetTokens?: number;
+}
+
+export interface ModelReasoningSettings {
+  style?: ReasoningStyle;
+  options?: ReasoningOption[];
+  // Backward-compatible shorthand from older configs.
+  reasoningEfforts?: ReasoningEffort[];
+}
+
+export interface ProviderModelSettings extends ModelReasoningSettings {
+  reasoning?: ModelReasoningSettings;
+}
+
+export interface ResolvedReasoningConfig {
+  style: ReasoningStyle;
+  value?: string;
+  budgetTokens?: number;
+}
+
 export interface CompletionRequest {
   model: string;
   systemPrompt?: string;
   messages: ChatMessage[];
   temperature?: number;
   maxTokens?: number;
+  reasoningEffort?: ReasoningEffort;
+  reasoning?: ResolvedReasoningConfig;
   tools?: any[];
 }
 
@@ -54,6 +83,7 @@ export interface RunModelSnapshot {
   providerId: string;
   providerDisplayName: string;
   model: string;
+  reasoningEffort?: ReasoningEffort;
 }
 
 export interface RunMessage {
@@ -87,15 +117,18 @@ export interface Run {
   providerId: string;
   providerDisplayName: string;
   model: string;
+  reasoningEffort?: ReasoningEffort;
   mode?: string;
   // Dual-model ("architect + coder") runs: the architect uses providerId/model
   // above and delegates code-writing to the coder model below via delegate_tasks.
   // All three are empty for ordinary single-model runs.
   coderProviderId?: string;
   coderModel?: string;
+  coderReasoningEffort?: ReasoningEffort;
   // Optional lightweight "utility" tier (set from the preset's utility endpoint).
   utilityProviderId?: string;
   utilityModel?: string;
+  utilityReasoningEffort?: ReasoningEffort;
   agentPreset?: string;
   errorMessage?: string;
   createdAt: string;
@@ -107,6 +140,7 @@ export interface Run {
 export interface AgentPresetEndpoint {
   providerId: string;
   model: string;
+  reasoningEffort?: ReasoningEffort;
 }
 
 // A saved "architect + coder" pairing (e.g. "opusplan"). Stored server-side in
@@ -240,6 +274,7 @@ export interface ProviderMetadata {
   displayName: string;
   type: "openai-compatible" | "anthropic";
   models: string[];
+  modelSettings?: Record<string, ProviderModelSettings>;
 }
 
 export interface Project {
@@ -281,4 +316,3 @@ export interface Memory {
   createdAt: string;
   updatedAt: string;
 }
-

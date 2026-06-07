@@ -9,8 +9,10 @@ export type PermissionDecision = 'allow_once' | 'allow_project' | 'allow_always'
 export interface AgentRunFields {
   coderProviderId?: string;
   coderModel?: string;
+  coderReasoningEffort?: string;
   utilityProviderId?: string;
   utilityModel?: string;
+  utilityReasoningEffort?: string;
   agentPreset?: string;
 }
 
@@ -20,6 +22,7 @@ export interface CreateRunPayload extends AgentRunFields {
   projectName?: string;
   providerId: string;
   model: string;
+  reasoningEffort?: string;
   mode: string;
   bypassPermissions: boolean;
 }
@@ -28,6 +31,7 @@ export interface ContinueRunPayload extends AgentRunFields {
   task: string;
   providerId: string;
   model: string;
+  reasoningEffort?: string;
   mode: string;
   bypassPermissions: boolean;
 }

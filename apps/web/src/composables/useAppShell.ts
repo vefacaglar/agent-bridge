@@ -32,6 +32,8 @@ export function useAppShell() {
     providers,
     runs,
     selectedModelCombined: settings.selectedModelCombined,
+    selectedReasoningEffort: settings.selectedReasoningEffort,
+    effectiveReasoningEffort: settings.effectiveReasoningEffort,
     effectiveModel: settings.effectiveModel,
     agentRunFields: settings.agentRunFields,
     currentMode: settings.currentMode,

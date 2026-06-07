@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
-import type { AgentPreset, ProviderMetadata } from '@agent-bridge/shared';
+import { ref, onMounted, computed, watch } from 'vue';
+import type { AgentPreset, ProviderMetadata, ReasoningEffort, ReasoningOption } from '@agent-bridge/shared';
 import { api } from '../../api/client';
 import { useCustomDialog } from '../../composables/useCustomDialog';
 
@@ -22,9 +22,12 @@ const editingOriginalId = ref<string | null>(null);
 const formId = ref('');
 const formDisplayName = ref('');
 const formArchitect = ref('');
+const formArchitectEffort = ref('');
 const formCoder = ref('');
+const formCoderEffort = ref('');
 // Empty string => no utility tier (the "None" option).
 const formUtility = ref('');
+const formUtilityEffort = ref('');
 const formMaxSubAgents = ref(3);
 const formFallback = ref(false);
 
@@ -49,6 +52,61 @@ function splitCombined(value: string): { providerId: string; model: string } {
   return { providerId: value.slice(0, idx), model: value.slice(idx + 1) };
 }
 
+function normalizedReasoningOptions(value: string): ReasoningOption[] {
+  if (!value) return [];
+  const { providerId, model } = splitCombined(value);
+  const provider = props.providers.find(p => p.id === providerId);
+  const settings = provider?.modelSettings?.[model];
+  const reasoning = settings?.reasoning ?? settings;
+  const rawOptions = reasoning?.options?.length
+    ? reasoning.options
+    : reasoning?.reasoningEfforts?.map(id => ({ id }));
+  return (rawOptions ?? []).filter((option): option is ReasoningOption => !!option?.id && option.id !== 'default');
+}
+
+function reasoningOptionsFor(value: string): { id: string; label: string }[] {
+  const options = normalizedReasoningOptions(value);
+  if (options.length === 0) return [];
+  return [
+    { id: '', label: 'Default' },
+    ...options.map(option => ({ id: option.id, label: option.label ?? effortLabel(option.id) }))
+  ];
+}
+
+function effortLabel(effort: ReasoningEffort | string | undefined): string {
+  switch (effort) {
+    case 'none': return 'None';
+    case 'minimal': return 'Minimal';
+    case 'low': return 'Low';
+    case 'medium': return 'Medium';
+    case 'high': return 'High';
+    case 'xhigh': return 'XHigh';
+    case 'max': return 'Max';
+    default: return 'Default';
+  }
+}
+
+function safeEffort(value: string, combinedValue: string): ReasoningEffort | undefined {
+  if (!value) return undefined;
+  return normalizedReasoningOptions(combinedValue).some(option => option.id === value) ? value as ReasoningEffort : undefined;
+}
+
+const architectReasoningOptions = computed(() => reasoningOptionsFor(formArchitect.value));
+const coderReasoningOptions = computed(() => reasoningOptionsFor(formCoder.value));
+const utilityReasoningOptions = computed(() => reasoningOptionsFor(formUtility.value));
+
+watch(formArchitect, () => {
+  if (!safeEffort(formArchitectEffort.value, formArchitect.value)) formArchitectEffort.value = '';
+});
+
+watch(formCoder, () => {
+  if (!safeEffort(formCoderEffort.value, formCoder.value)) formCoderEffort.value = '';
+});
+
+watch(formUtility, () => {
+  if (!safeEffort(formUtilityEffort.value, formUtility.value)) formUtilityEffort.value = '';
+});
+
 async function fetchPresets() {
   presets.value = (await api.getAgentPresets()) ?? [];
 }
@@ -60,8 +118,11 @@ function handleAdd() {
   formId.value = '';
   formDisplayName.value = '';
   formArchitect.value = modelOptions.value[0]?.value ?? '';
+  formArchitectEffort.value = '';
   formCoder.value = modelOptions.value[0]?.value ?? '';
+  formCoderEffort.value = '';
   formUtility.value = '';
+  formUtilityEffort.value = '';
   formMaxSubAgents.value = 3;
   formFallback.value = false;
   isEditing.value = true;
@@ -72,8 +133,11 @@ function handleEdit(preset: AgentPreset) {
   formId.value = preset.id;
   formDisplayName.value = preset.displayName;
   formArchitect.value = combined(preset.architect.providerId, preset.architect.model);
+  formArchitectEffort.value = preset.architect.reasoningEffort ?? '';
   formCoder.value = combined(preset.coder.providerId, preset.coder.model);
+  formCoderEffort.value = preset.coder.reasoningEffort ?? '';
   formUtility.value = preset.utility ? combined(preset.utility.providerId, preset.utility.model) : '';
+  formUtilityEffort.value = preset.utility?.reasoningEffort ?? '';
   formMaxSubAgents.value = preset.maxSubAgents;
   formFallback.value = !!preset.fallback;
   isEditing.value = true;
@@ -88,12 +152,29 @@ function cancelEdit() {
 function toBlocks(list: AgentPreset[]): Record<string, any> {
   const blocks: Record<string, any> = {};
   for (const p of list) {
+    const architect = {
+      providerId: p.architect.providerId,
+      model: p.architect.model,
+      ...(p.architect.reasoningEffort ? { reasoningEffort: p.architect.reasoningEffort } : {})
+    };
+    const coder = {
+      providerId: p.coder.providerId,
+      model: p.coder.model,
+      ...(p.coder.reasoningEffort ? { reasoningEffort: p.coder.reasoningEffort } : {})
+    };
+    const utility = p.utility
+      ? {
+          providerId: p.utility.providerId,
+          model: p.utility.model,
+          ...(p.utility.reasoningEffort ? { reasoningEffort: p.utility.reasoningEffort } : {})
+        }
+      : undefined;
     blocks[p.id] = {
       displayName: p.displayName,
-      architect: { providerId: p.architect.providerId, model: p.architect.model },
-      coder: { providerId: p.coder.providerId, model: p.coder.model },
+      architect,
+      coder,
       maxSubAgents: p.maxSubAgents,
-      ...(p.utility ? { utility: { providerId: p.utility.providerId, model: p.utility.model } } : {}),
+      ...(utility ? { utility } : {}),
       ...(p.fallback ? { fallback: true } : {})
     };
   }
@@ -118,14 +199,18 @@ async function handleSave() {
   }
 
   const architect = splitCombined(formArchitect.value);
+  const architectReasoningEffort = safeEffort(formArchitectEffort.value, formArchitect.value);
   const coder = splitCombined(formCoder.value);
+  const coderReasoningEffort = safeEffort(formCoderEffort.value, formCoder.value);
+  const utility = formUtility.value ? splitCombined(formUtility.value) : undefined;
+  const utilityReasoningEffort = safeEffort(formUtilityEffort.value, formUtility.value);
   const next: AgentPreset = {
     id,
     displayName: formDisplayName.value.trim() || id,
-    architect,
-    coder,
+    architect: { ...architect, ...(architectReasoningEffort ? { reasoningEffort: architectReasoningEffort } : {}) },
+    coder: { ...coder, ...(coderReasoningEffort ? { reasoningEffort: coderReasoningEffort } : {}) },
     maxSubAgents: Math.min(3, Math.max(1, Number(formMaxSubAgents.value) || 1)),
-    utility: formUtility.value ? splitCombined(formUtility.value) : undefined,
+    utility: utility ? { ...utility, ...(utilityReasoningEffort ? { reasoningEffort: utilityReasoningEffort } : {}) } : undefined,
     fallback: formFallback.value
   };
 
@@ -183,12 +268,38 @@ async function handleDelete(preset: AgentPreset) {
         <select v-model="formArchitect">
           <option v-for="o in modelOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
         </select>
+        <div v-if="architectReasoningOptions.length > 0" class="effort-row">
+          <span class="effort-label">Reasoning</span>
+          <button
+            v-for="option in architectReasoningOptions"
+            :key="`architect-${option.id}`"
+            type="button"
+            class="effort-chip"
+            :class="{ active: formArchitectEffort === option.id }"
+            @click="formArchitectEffort = option.id"
+          >
+            {{ option.label }}
+          </button>
+        </div>
       </div>
       <div class="form-row">
         <label>Coder model</label>
         <select v-model="formCoder">
           <option v-for="o in modelOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
         </select>
+        <div v-if="coderReasoningOptions.length > 0" class="effort-row">
+          <span class="effort-label">Reasoning</span>
+          <button
+            v-for="option in coderReasoningOptions"
+            :key="`coder-${option.id}`"
+            type="button"
+            class="effort-chip"
+            :class="{ active: formCoderEffort === option.id }"
+            @click="formCoderEffort = option.id"
+          >
+            {{ option.label }}
+          </button>
+        </div>
       </div>
       <div class="form-row">
         <label>Utility model <span class="form-hint">(optional — cheap lookups & renames)</span></label>
@@ -196,6 +307,19 @@ async function handleDelete(preset: AgentPreset) {
           <option value="">None</option>
           <option v-for="o in modelOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
         </select>
+        <div v-if="utilityReasoningOptions.length > 0" class="effort-row">
+          <span class="effort-label">Reasoning</span>
+          <button
+            v-for="option in utilityReasoningOptions"
+            :key="`utility-${option.id}`"
+            type="button"
+            class="effort-chip"
+            :class="{ active: formUtilityEffort === option.id }"
+            @click="formUtilityEffort = option.id"
+          >
+            {{ option.label }}
+          </button>
+        </div>
       </div>
       <div class="form-row">
         <label>Max sub-agents</label>
@@ -228,7 +352,7 @@ async function handleDelete(preset: AgentPreset) {
         <div class="preset-info">
           <span class="preset-name">{{ preset.displayName }}</span>
           <span class="preset-flow">
-            {{ preset.architect.model }} → {{ preset.coder.model }}<template v-if="preset.utility"> · utility: {{ preset.utility.model }}</template> · up to {{ preset.maxSubAgents }} sub-agent{{ preset.maxSubAgents === 1 ? '' : 's' }}<template v-if="preset.fallback"> · fallback on</template>
+            {{ preset.architect.model }}<template v-if="preset.architect.reasoningEffort"> ({{ effortLabel(preset.architect.reasoningEffort) }})</template> → {{ preset.coder.model }}<template v-if="preset.coder.reasoningEffort"> ({{ effortLabel(preset.coder.reasoningEffort) }})</template><template v-if="preset.utility"> · utility: {{ preset.utility.model }}<template v-if="preset.utility.reasoningEffort"> ({{ effortLabel(preset.utility.reasoningEffort) }})</template></template> · up to {{ preset.maxSubAgents }} sub-agent{{ preset.maxSubAgents === 1 ? '' : 's' }}<template v-if="preset.fallback"> · fallback on</template>
           </span>
         </div>
         <div class="preset-actions">
@@ -326,6 +450,41 @@ async function handleDelete(preset: AgentPreset) {
 
 .form-row input:disabled {
   opacity: 0.6;
+}
+
+.effort-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.effort-label {
+  margin-right: 2px;
+  font-size: 0.74rem;
+  color: var(--faint);
+}
+
+.effort-chip {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 0.74rem;
+  cursor: pointer;
+}
+
+.effort-chip:hover {
+  color: var(--text);
+  border-color: var(--muted);
+}
+
+.effort-chip.active {
+  color: var(--bg);
+  background: var(--text);
+  border-color: var(--text);
 }
 
 .editor-actions {

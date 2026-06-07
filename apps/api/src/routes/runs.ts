@@ -1,26 +1,38 @@
 import type { FastifyInstance } from "fastify";
-import type { Run, RunStatus } from "@agent-bridge/shared";
+import type { ReasoningEffort, Run, RunStatus } from "@agent-bridge/shared";
 import { type AppContext, normalizeProject } from "../context.js";
 import { eventBus } from "../orchestrator/eventBus.js";
 import { permissionKey, commandEscapesWorkspace } from "../orchestrator/workspaceTools.js";
 
 const PERMISSION_DECISIONS = ["allow_once", "allow_project", "allow_always", "deny"] as const;
 type PermissionDecision = (typeof PERMISSION_DECISIONS)[number];
+const REASONING_EFFORTS = new Set<ReasoningEffort>(["default", "none", "minimal", "low", "medium", "high", "xhigh", "max"]);
+
+function normalizeReasoningEffort(ctx: AppContext, providerId: string | undefined, model: string | undefined, value: unknown): ReasoningEffort | undefined {
+  if (!providerId || !model) return undefined;
+  const supported = ctx.registry.getSupportedReasoningEfforts(providerId, model);
+  return typeof value === "string" && REASONING_EFFORTS.has(value as ReasoningEffort) && value !== "default" && supported.includes(value as ReasoningEffort)
+    ? value as ReasoningEffort
+    : undefined;
+}
 
 export function registerRunRoutes(server: FastifyInstance, ctx: AppContext) {
   // Create and trigger a new orchestration run.
   server.post("/api/runs", async (request, reply) => {
-    const { task, projectPath, projectName, providerId, model, mode, coderProviderId, coderModel, utilityProviderId, utilityModel, agentPreset } = request.body as {
+    const { task, projectPath, projectName, providerId, model, reasoningEffort, mode, coderProviderId, coderModel, coderReasoningEffort, utilityProviderId, utilityModel, utilityReasoningEffort, agentPreset } = request.body as {
       task: string;
       projectPath?: string;
       projectName?: string;
       providerId: string;
       model: string;
+      reasoningEffort?: string;
       mode?: string;
       coderProviderId?: string;
       coderModel?: string;
+      coderReasoningEffort?: string;
       utilityProviderId?: string;
       utilityModel?: string;
+      utilityReasoningEffort?: string;
       agentPreset?: string;
     };
 
@@ -47,11 +59,14 @@ export function registerRunRoutes(server: FastifyInstance, ctx: AppContext) {
       providerId,
       providerDisplayName,
       model,
+      reasoningEffort: normalizeReasoningEffort(ctx, providerId, model, reasoningEffort),
       mode: mode || "accept_edits",
       coderProviderId: coderProviderId || undefined,
       coderModel: coderModel || undefined,
+      coderReasoningEffort: normalizeReasoningEffort(ctx, coderProviderId, coderModel, coderReasoningEffort),
       utilityProviderId: utilityProviderId || undefined,
       utilityModel: utilityModel || undefined,
+      utilityReasoningEffort: normalizeReasoningEffort(ctx, utilityProviderId, utilityModel, utilityReasoningEffort),
       agentPreset: agentPreset || undefined,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -85,15 +100,18 @@ export function registerRunRoutes(server: FastifyInstance, ctx: AppContext) {
   // Continue a run with follow-up instructions in the same thread.
   server.post("/api/runs/:id/continue", async (request, reply) => {
     const { id } = request.params as { id: string };
-    const { task, providerId, model, mode, coderProviderId, coderModel, utilityProviderId, utilityModel, agentPreset } = request.body as {
+    const { task, providerId, model, reasoningEffort, mode, coderProviderId, coderModel, coderReasoningEffort, utilityProviderId, utilityModel, utilityReasoningEffort, agentPreset } = request.body as {
       task: string;
       providerId?: string;
       model?: string;
+      reasoningEffort?: string;
       mode?: string;
       coderProviderId?: string;
       coderModel?: string;
+      coderReasoningEffort?: string;
       utilityProviderId?: string;
       utilityModel?: string;
+      utilityReasoningEffort?: string;
       agentPreset?: string;
     };
 
@@ -116,6 +134,9 @@ export function registerRunRoutes(server: FastifyInstance, ctx: AppContext) {
       updates.providerDisplayName = providerMeta ? providerMeta.displayName : providerId;
       updates.model = model;
     }
+    if ("reasoningEffort" in (request.body as Record<string, unknown>)) {
+      updates.reasoningEffort = normalizeReasoningEffort(ctx, providerId || run.providerId, model || run.model, reasoningEffort);
+    }
     if (mode) {
       updates.mode = mode;
     }
@@ -126,14 +147,18 @@ export function registerRunRoutes(server: FastifyInstance, ctx: AppContext) {
       "agentPreset" in body ||
       "coderModel" in body ||
       "coderProviderId" in body ||
+      "coderReasoningEffort" in body ||
       "utilityModel" in body ||
-      "utilityProviderId" in body
+      "utilityProviderId" in body ||
+      "utilityReasoningEffort" in body
     ) {
       updates.agentPreset = agentPreset || undefined;
       updates.coderProviderId = coderProviderId || undefined;
       updates.coderModel = coderModel || undefined;
+      updates.coderReasoningEffort = normalizeReasoningEffort(ctx, coderProviderId, coderModel, coderReasoningEffort);
       updates.utilityProviderId = utilityProviderId || undefined;
       updates.utilityModel = utilityModel || undefined;
+      updates.utilityReasoningEffort = normalizeReasoningEffort(ctx, utilityProviderId, utilityModel, utilityReasoningEffort);
     }
     if (Object.keys(updates).length > 0) {
       ctx.runRepo.update(id, updates);

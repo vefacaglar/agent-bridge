@@ -18,6 +18,8 @@ const props = defineProps<{
   currentMode: ChatMode;
   bypassPermissions: boolean;
   selectedModel: string;
+  selectedReasoningEffort: string;
+  reasoningEffortOptions: { id: string; label: string }[];
   modelOptions: ModelOption[];
   activeModelDisplayName: string;
   agentPresets?: AgentPreset[];
@@ -38,6 +40,7 @@ const emit = defineEmits<{
   (e: 'update:currentMode', value: ChatMode): void;
   (e: 'update:bypassPermissions', value: boolean): void;
   (e: 'update:selectedModel', value: string): void;
+  (e: 'update:selectedReasoningEffort', value: string): void;
   (e: 'update:selectedPresetId', value: string): void;
   (e: 'send'): void;
   (e: 'queue'): void;
@@ -208,6 +211,7 @@ function handleQueue() {
 
 const showModeMenu = ref(false);
 const showModelMenu = ref(false);
+const showReasoningMenu = ref(false);
 
 function getModeLabel(modeId: string): string {
   return MODES_LIST.find(m => m.id === modeId)?.label ?? 'Chat';
@@ -221,6 +225,16 @@ function selectMode(modeId: ChatMode) {
 function selectModel(value: string) {
   emit('update:selectedModel', value);
   showModelMenu.value = false;
+}
+
+const activeReasoningLabel = computed(() =>
+  props.reasoningEffortOptions.find(x => x.id === props.selectedReasoningEffort)?.label ?? 'Default'
+);
+const hasReasoningEffortOptions = computed(() => props.reasoningEffortOptions.length > 1);
+
+function selectReasoningEffort(value: string) {
+  emit('update:selectedReasoningEffort', value);
+  showReasoningMenu.value = false;
 }
 
 // Optional dual-model agent presets (architect + coder). Only shown when at
@@ -284,6 +298,7 @@ function handleDocumentClick(e: MouseEvent) {
   const target = e.target as HTMLElement;
   if (!target.closest('.mode-selector-wrap')) showModeMenu.value = false;
   if (!target.closest('.model-dropdown-wrap')) showModelMenu.value = false;
+  if (!target.closest('.reasoning-dropdown-wrap')) showReasoningMenu.value = false;
   if (!target.closest('.preset-dropdown-wrap')) showPresetMenu.value = false;
   if (!target.closest('.project-dropdown-wrap')) showProjectMenu.value = false;
 }
@@ -532,8 +547,27 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <span class="status-divider">/</span>
-          <span class="parameter-pill">Medium</span>
+          <span v-if="hasReasoningEffortOptions" class="status-divider">/</span>
+          <div v-if="hasReasoningEffortOptions" class="reasoning-dropdown-wrap model-dropdown-wrap">
+            <button
+              class="model-select-display-btn parameter-pill"
+              title="Reasoning effort"
+              @click.stop="showReasoningMenu = !showReasoningMenu"
+            >
+              {{ activeReasoningLabel }}
+            </button>
+            <div v-if="showReasoningMenu" class="model-dropdown-list reasoning-dropdown-list">
+              <div
+                v-for="option in reasoningEffortOptions"
+                :key="option.id"
+                class="model-dropdown-item"
+                :class="{ active: selectedReasoningEffort === option.id }"
+                @click.stop="selectReasoningEffort(option.id)"
+              >
+                <span class="model-name-text">{{ option.label }}</span>
+              </div>
+            </div>
+          </div>
           <span class="status-indicator-ring" :class="{ active: isRunning }">
             <span class="ring-dot"></span>
           </span>
@@ -1023,6 +1057,10 @@ onBeforeUnmount(() => {
   border-radius: 7px;
   background: rgba(255, 255, 255, 0.025);
   border: 1px solid transparent;
+}
+
+.reasoning-dropdown-list {
+  min-width: 140px;
 }
 
 .status-indicator-ring {

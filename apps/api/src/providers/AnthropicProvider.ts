@@ -159,6 +159,11 @@ export class AnthropicProvider implements ModelProvider {
       temperature: request.temperature ?? 0.7
     };
 
+    if (request.reasoning?.style === "anthropic-budget" && request.reasoning.budgetTokens) {
+      body.thinking = { type: "enabled", budget_tokens: request.reasoning.budgetTokens };
+      body.temperature = 1;
+    }
+
     if (request.systemPrompt) {
       // Send the system prompt as a cacheable block. This breakpoint caches the
       // stable prefix (tools come before system in the cache, so they are
