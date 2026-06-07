@@ -22,17 +22,20 @@ const selected = ref(0);
 const preview = computed<PermissionPreview | null>(() => props.request?.preview ?? null);
 const toolName = computed<string>(() => props.request?.toolCall?.function?.name ?? 'tool');
 
-// For run_command, a grant is scoped to the exact command, so the "don't ask
-// again" options mean "for this exact command" — relabel them to make that clear.
+// For run_command, a grant matches by prefix: approving this command also covers
+// any command that starts with it (e.g. "go build ./x/" -> "go build ./x/...").
+// Relabel the "don't ask again" options to make that scope clear.
 const options = computed(() => {
   if (toolName.value === 'run_command') {
     return PERMISSION_OPTIONS.map((o) => {
-      if (o.decision === 'allow_project') return { ...o, label: "Yes, and allow this exact command in this project" };
-      if (o.decision === 'allow_always') return { ...o, label: 'Yes, and allow this exact command globally' };
+      if (o.decision === 'allow_project') return { ...o, label: 'Yes, and allow commands starting with this in this project' };
+      if (o.decision === 'allow_always') return { ...o, label: 'Yes, and allow commands starting with this globally' };
       return o;
     });
   }
   if (toolName.value === 'fetch_url') {
+    // fetch_url grants are scoped to the host, so a new host still asks while an
+    // approved host runs silently — relabel the "don't ask again" options.
     return PERMISSION_OPTIONS.map((o) => {
       if (o.decision === 'allow_project') return { ...o, label: 'Yes, and allow this host in this project' };
       if (o.decision === 'allow_always') return { ...o, label: 'Yes, and allow this host globally' };

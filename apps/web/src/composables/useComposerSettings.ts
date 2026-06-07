@@ -2,15 +2,18 @@ import { computed, ref, watch, type Ref } from 'vue';
 import type { ProviderMetadata, AgentPreset } from '@agent-bridge/shared';
 import { splitCombined } from '../lib/format';
 
-// Three modes are exposed: Chat (lightweight conversation — no proactive
+// Four modes are exposed: Chat (lightweight conversation — no proactive
 // workspace scanning, minimal context), Build (applies edits directly; the
-// backend's 'accept_edits' mode) and Plan (planning via the plan panel).
-export type ChatMode = 'chat' | 'accept_edits' | 'plan';
+// backend's 'accept_edits' mode), Plan (planning via the plan panel) and
+// Full Access (autonomous — runs every tool, including commands, with NO
+// approval prompts; still confined to the project folder).
+export type ChatMode = 'chat' | 'accept_edits' | 'plan' | 'full_access';
 
 export const MODES_LIST = [
   { id: 'chat', label: 'Chat', shortcut: '1' },
   { id: 'accept_edits', label: 'Build', shortcut: '2' },
-  { id: 'plan', label: 'Plan', shortcut: '3' }
+  { id: 'plan', label: 'Plan', shortcut: '3' },
+  { id: 'full_access', label: 'Full Access', shortcut: '4' }
 ] as const;
 
 export interface ModelOption {
@@ -35,7 +38,10 @@ export function useComposerSettings(
   // Keep a persisted Plan/Build choice; migrate anything else (or first run) to Chat.
   const storedMode = localStorage.getItem('bm_current_mode');
   const currentMode = ref<ChatMode>(
-    storedMode === 'plan' ? 'plan' : storedMode === 'accept_edits' ? 'accept_edits' : 'chat'
+    storedMode === 'plan' ? 'plan'
+      : storedMode === 'accept_edits' ? 'accept_edits'
+      : storedMode === 'full_access' ? 'full_access'
+      : 'chat'
   );
   const bypassPermissions = ref(localStorage.getItem('bm_bypass_permissions') === 'true');
 

@@ -289,7 +289,8 @@ function handleKeyDown(e: KeyboardEvent) {
   const modeKeys: Record<string, ChatMode> = {
     '1': 'chat',
     '2': 'accept_edits',
-    '3': 'plan'
+    '3': 'plan',
+    '4': 'full_access'
   };
   if (modeKeys[e.key]) {
     e.preventDefault();
@@ -388,7 +389,11 @@ onBeforeUnmount(() => {
       <div class="composer-menu-row" style="position: relative; z-index: 2;">
         <div class="composer-menu-left">
           <div class="mode-selector-wrap">
-            <button class="mode-pill-btn" @click.stop="showModeMenu = !showModeMenu">
+            <button
+              class="mode-pill-btn"
+              :class="{ 'mode-pill-danger': currentMode === 'full_access' }"
+              @click.stop="showModeMenu = !showModeMenu"
+            >
               <span class="mode-pill-text">{{ getModeLabel(currentMode) }}</span>
             </button>
 
@@ -400,7 +405,7 @@ onBeforeUnmount(() => {
                 <li
                   v-for="modeItem in MODES_LIST"
                   :key="modeItem.id"
-                  :class="{ active: currentMode === modeItem.id }"
+                  :class="{ active: currentMode === modeItem.id, 'mode-item-danger': modeItem.id === 'full_access' }"
                   @click.stop="selectMode(modeItem.id)"
                 >
                   <span class="mode-item-name">{{ modeItem.label }}</span>
@@ -756,6 +761,18 @@ onBeforeUnmount(() => {
   background: rgba(255, 255, 255, 0.045);
 }
 
+/* Full Access is a no-confirmation mode — flag it red wherever it surfaces. */
+.mode-pill-btn.mode-pill-danger {
+  color: var(--danger);
+  border-color: var(--danger-border);
+  background: var(--danger-soft);
+}
+
+.mode-pill-btn.mode-pill-danger:hover {
+  color: var(--danger);
+  background: var(--danger-soft-strong);
+}
+
 .mode-pill-text {
   font-weight: 500;
 }
@@ -825,6 +842,14 @@ onBeforeUnmount(() => {
 .mode-popup-list li.active {
   color: var(--text);
   background: #1e1e21;
+}
+
+.mode-popup-list li.mode-item-danger .mode-item-name {
+  color: var(--danger);
+}
+
+.mode-popup-list li.mode-item-danger.active {
+  background: var(--danger-soft);
 }
 
 .mode-item-name {

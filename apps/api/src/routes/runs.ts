@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import type { Run, RunStatus } from "@agent-bridge/shared";
 import { type AppContext, normalizeProject } from "../context.js";
 import { eventBus } from "../orchestrator/eventBus.js";
-import { permissionKey } from "../orchestrator/workspaceTools.js";
+import { permissionKey, commandEscapesWorkspace } from "../orchestrator/workspaceTools.js";
 
 const PERMISSION_DECISIONS = ["allow_once", "allow_project", "allow_always", "deny"] as const;
 type PermissionDecision = (typeof PERMISSION_DECISIONS)[number];
@@ -176,17 +176,33 @@ export function registerRunRoutes(server: FastifyInstance, ctx: AppContext) {
       return { error: `Run with id "${id}" not found` };
     }
 
-    // Persist the grant scoped to the exact tool/command being approved, so it
-    // never leaks to a different command or tool. run_command grants are keyed
-    // to the exact command string.
+    // Persist the grant scoped to the tool/command being approved, so it never
+    // leaks to a different tool. run_command grants are keyed to the command
+    // string and matched by prefix, so they cover the whole command family.
     const pending = ctx.orchestrator.getPendingPermission(id);
     try {
-      if (pending?.toolCall && (decision === "allow_project" || decision === "allow_always")) {
+      if (pending?.toolCall && decision !== "deny") {
         const { tool, command } = permissionKey(pending.toolCall);
-        if (decision === "allow_project" && run.projectPath) {
-          ctx.permissionRepo.allowProject(run.projectPath, tool, command);
+        // Never remember a grant for a run_command that escapes the workspace
+        // (cd .., absolute/home paths) — those keep prompting on every call.
+        // fetch_url IS persistable, scoped per host (command holds the host).
+        const neverPersist = tool === "run_command" && commandEscapesWorkspace(command);
+
+        // In Full Access mode, ANY approved (persistable) run_command is saved —
+        // even a plain "Yes"/allow_once — so the command family is never asked
+        // again. The first run of a command is still gated.
+        const fullAccessAutoGrant =
+          !neverPersist && run.mode === "full_access" && tool === "run_command" && !!command;
+
+        if (neverPersist) {
+          // no-op: keep asking every time
         } else if (decision === "allow_always") {
           ctx.permissionRepo.allowGlobal(tool, command);
+        } else if (decision === "allow_project" && run.projectPath) {
+          ctx.permissionRepo.allowProject(run.projectPath, tool, command);
+        } else if (fullAccessAutoGrant) {
+          if (run.projectPath) ctx.permissionRepo.allowProject(run.projectPath, tool, command);
+          else ctx.permissionRepo.allowGlobal(tool, command);
         }
       }
     } catch (err: any) {

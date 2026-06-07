@@ -505,6 +505,28 @@ export function permissionKey(toolCall: ToolCall): { tool: string; command: stri
   return { tool, command: "" };
 }
 
+/**
+ * Heuristic: does this shell command try to leave the project workspace? Such
+ * commands (changing into a parent/absolute/home directory, or traversing with
+ * "..") ALWAYS require an approval prompt — even in Full Access, and even when a
+ * standing grant would otherwise cover the command family. Returning true forces
+ * a prompt and prevents the command from being silently granted/auto-granted.
+ *
+ * Care: Go-style "./pkg/..." wildcards are NOT parent traversal — the dots are
+ * bounded so "..." does not trip the "../" check.
+ */
+export function commandEscapesWorkspace(command: string): boolean {
+  if (!command) return false;
+  // Parent-directory traversal as a real path segment: "..", "../x", "/.." — but
+  // not "..." (the next char after ".." must be a separator/quote or end).
+  if (/(^|[\s/'"=:(])\.\.([/\s'"]|$)/.test(command)) return true;
+  // Home-directory references: "~", "~/...".
+  if (/(^|[\s'"=:(])~($|[/\s'"])/.test(command)) return true;
+  // Changing directory to an absolute, home, or parent location.
+  if (/\b(cd|pushd|chdir)\s+['"]?(\/|~|\.\.)/.test(command)) return true;
+  return false;
+}
+
 /** Resolves a workspace-relative path to an absolute one, refusing to escape. */
 function resolveInside(baseDir: string, relativePath: string): string {
   const absolutePath = path.resolve(baseDir, relativePath);

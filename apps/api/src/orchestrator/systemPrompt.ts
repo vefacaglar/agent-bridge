@@ -103,6 +103,13 @@ GLOBAL RULES:
   } else if (mode === "ask_permissions") {
     prompt += `\n\nCURRENT OPERATIONAL MODE: ASK PERMISSIONS MODE
 - Call the matching tool for inspection or changes. Do not ask for permission in plain text; the app intercepts tool calls and shows approvals.`;
+  } else if (mode === "full_access") {
+    prompt += `\n\nCURRENT OPERATIONAL MODE: FULL ACCESS MODE
+- You are implementing autonomously. Directly create/edit/delete files with workspace tools; ordinary in-workspace file edits need NO approval.
+- run_command and fetch_url STILL require user approval (they can reach outside the project folder), unless a standing grant already covers them. Use them when needed; the user will be prompted.
+- Do NOT call update_plan here — write any plan as plain text in your reply (or a <task_list> for complex work), then implement.
+- All file access is confined to the project workspace; you cannot operate outside the project folder.
+- Stay within the user's intent: do not take destructive or irreversible actions beyond the requested task.`;
   } else if (mode === "accept_edits") {
     prompt += `\n\nCURRENT OPERATIONAL MODE: BUILD MODE
 - You are implementing, not just planning. Directly create/edit/delete files with workspace tools; do not ask before ordinary approved edits.

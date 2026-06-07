@@ -6,7 +6,7 @@ import { eventBus } from "./eventBus.js";
 import { appendFileSync } from "node:fs";
 import { db } from "../database/db.js";
 import { buildSystemPrompt, buildCoderSystemPrompt, buildUtilitySystemPrompt, formatMemoryContext } from "./systemPrompt.js";
-import { WORKSPACE_TOOLS, UPDATE_PLAN_TOOL, DELEGATE_TASKS_TOOL, DELEGATE_UTILITY_TOOL, UTILITY_TOOLS, SET_TITLE_TOOL, ASK_QUESTION_TOOL, REMEMBER_TOOL, executeWorkspaceToolAsync, buildPermissionPreview, DANGEROUS_TOOLS, READONLY_TOOLS, MODIFYING_TOOLS, permissionKey } from "./workspaceTools.js";
+import { WORKSPACE_TOOLS, UPDATE_PLAN_TOOL, DELEGATE_TASKS_TOOL, DELEGATE_UTILITY_TOOL, UTILITY_TOOLS, SET_TITLE_TOOL, ASK_QUESTION_TOOL, REMEMBER_TOOL, executeWorkspaceToolAsync, buildPermissionPreview, DANGEROUS_TOOLS, READONLY_TOOLS, MODIFYING_TOOLS, permissionKey, commandEscapesWorkspace } from "./workspaceTools.js";
 
 type PermissionDecision = "allow_once" | "allow_project" | "allow_always" | "deny";
 
@@ -106,13 +106,26 @@ export class Orchestrator {
   }
 
   /**
-   * Whether a standing grant covers this exact tool call. Grants are scoped per
-   * tool, and for run_command per exact command string, so an approval never
-   * leaks to a different command or tool.
+   * Whether a standing grant covers this tool call. Grants are scoped per tool.
+   * For run_command the match is by PREFIX: approving "go build ./internal/config/"
+   * also covers "go build ./internal/config/..." (the new command starts with the
+   * granted one). This lets one approval cover closely-related invocations without
+   * re-prompting. Other tools (e.g. fetch_url host) still match exactly.
    */
   private checkPermission(run: Run, toolCall: any): boolean {
     try {
       const { tool, command } = permissionKey(toolCall);
+
+      if (tool === "run_command") {
+        // Commands that navigate outside the workspace always ask, regardless of
+        // any grant — so a folder-escaping command can never run silently.
+        if (commandEscapesWorkspace(command)) return false;
+        return this.hasRunCommandPrefixGrant(run, command);
+      }
+
+      // fetch_url falls through to the exact match below: grants are scoped per
+      // host (a new host still asks; an approved host runs silently).
+
       const globalPerm = db
         .prepare("SELECT 1 FROM permissions WHERE scope = 'global' AND tool = ? AND command = ? AND status = 'allowed'")
         .get(tool, command);
@@ -126,6 +139,30 @@ export class Orchestrator {
       }
     } catch (err) {
       console.error("[Orchestrator] Error checking permissions:", err);
+    }
+    return false;
+  }
+
+  /**
+   * A run_command grant covers the current command when the command starts with
+   * a granted command string. Empty grants are ignored so a blank grant can never
+   * match everything.
+   */
+  private hasRunCommandPrefixGrant(run: Run, command: string): boolean {
+    if (!command) return false;
+    const covers = (rows: { command: string }[]) =>
+      rows.some(r => r.command && command.startsWith(r.command));
+
+    const globalGrants = db
+      .prepare("SELECT command FROM permissions WHERE scope = 'global' AND tool = 'run_command' AND status = 'allowed'")
+      .all() as { command: string }[];
+    if (covers(globalGrants)) return true;
+
+    if (run.projectPath) {
+      const projectGrants = db
+        .prepare("SELECT command FROM permissions WHERE scope = 'project' AND project_path = ? AND tool = 'run_command' AND status = 'allowed'")
+        .all(run.projectPath) as { command: string }[];
+      if (covers(projectGrants)) return true;
     }
     return false;
   }
@@ -889,7 +926,7 @@ export class Orchestrator {
     // fetch_url — even if the user approves. The model must switch to Build mode
     // before anything changes. We block here regardless of any permission grant.
     const toolName = toolCall.function?.name;
-    const isBuildMode = run.mode === "accept_edits" || run.mode === "auto" || run.mode === "ask_permissions";
+    const isBuildMode = run.mode === "accept_edits" || run.mode === "auto" || run.mode === "ask_permissions" || run.mode === "full_access";
     if (!isBuildMode && MODIFYING_TOOLS.has(toolName)) {
       return JSON.stringify({
         success: false,
@@ -905,8 +942,12 @@ export class Orchestrator {
     }
 
     const isDangerous = DANGEROUS_TOOLS.has(toolCall.function?.name);
-    // run_command is always gated; other tools only in ask_permissions mode.
-    // Either way a matching per-tool/per-command grant lets it run silently.
+    // run_command / fetch_url ALWAYS require approval — even in Full Access mode.
+    // These are the only tools that can reach outside the project folder (a shell
+    // command or a network request), so they stay gated regardless of mode; a
+    // matching standing grant still lets them run silently. Full Access only drops
+    // prompts for ordinary in-workspace file edits, NOT for commands/network.
+    // Other tools gate only in ask_permissions mode.
     const mustGate = isDangerous || run.mode === "ask_permissions";
     const needsPermission = mustGate && !this.checkPermission(run, toolCall);
 
