@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import type { Memory, MemoryCategory, MemoryScope } from '@agent-bridge/shared';
+import ThemedSelect from './ThemedSelect.vue';
 
 const props = defineProps<{
   memories: Memory[];
@@ -63,6 +64,15 @@ const newCategory = ref<MemoryCategory>('user');
 const newContent = ref('');
 
 const canAddProject = computed(() => !!props.activeProjectPath);
+const scopeOptions = computed(() => [
+  { value: 'global', label: 'Global (all projects)' },
+  {
+    value: 'project',
+    label: `Project${canAddProject.value ? ` - ${props.activeProjectName}` : ' (select a project first)'}`,
+    disabled: !canAddProject.value
+  }
+]);
+const categoryOptions = computed(() => CATEGORIES.map(category => ({ value: category, label: category })));
 
 function submitAdd() {
   const content = newContent.value.trim();
@@ -100,18 +110,11 @@ function submitAdd() {
       <div class="mem-add-row">
         <label class="mem-field">
           <span class="mem-field-label">Scope</span>
-          <select v-model="newScope" class="mem-select">
-            <option value="global">Global (all projects)</option>
-            <option value="project" :disabled="!canAddProject">
-              Project{{ canAddProject ? ` — ${activeProjectName}` : ' (select a project first)' }}
-            </option>
-          </select>
+          <ThemedSelect v-model="newScope" :options="scopeOptions" />
         </label>
         <label class="mem-field">
           <span class="mem-field-label">Category</span>
-          <select v-model="newCategory" class="mem-select">
-            <option v-for="c in CATEGORIES" :key="c" :value="c">{{ c }}</option>
-          </select>
+          <ThemedSelect v-model="newCategory" :options="categoryOptions" />
         </label>
       </div>
       <textarea
@@ -220,20 +223,11 @@ function submitAdd() {
   color: var(--muted);
 }
 
-.mem-select {
-  background: var(--surface-strong);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text);
-  padding: 7px 8px;
-  font-size: 0.85rem;
-}
-
 .mem-textarea {
   width: 100%;
   box-sizing: border-box;
-  background: var(--surface-strong);
-  border: 1px solid var(--border);
+  background: var(--control-bg);
+  border: 1px solid var(--control-border);
   border-radius: 6px;
   color: var(--text);
   padding: 8px 10px;
@@ -241,6 +235,11 @@ function submitAdd() {
   font-family: inherit;
   line-height: 1.5;
   resize: vertical;
+}
+
+.mem-textarea:focus {
+  border-color: var(--control-border-focus);
+  outline: none;
 }
 
 .mem-add-actions,

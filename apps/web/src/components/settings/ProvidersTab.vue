@@ -3,6 +3,7 @@ import { ref, onMounted, computed } from 'vue';
 import type { ProviderModelSettings, ReasoningEffort, ReasoningOption, ReasoningStyle } from '@agent-bridge/shared';
 import { api } from '../../api/client';
 import { useCustomDialog } from '../../composables/useCustomDialog';
+import ThemedSelect from './ThemedSelect.vue';
 
 const { showAlert, showConfirm } = useCustomDialog();
 
@@ -20,6 +21,10 @@ const formDisplayName = ref('');
 const formBaseUrl = ref('');
 const formApiKey = ref('');
 const formModelRows = ref<ModelRow[]>([]);
+const providerTypeOptions = [
+  { value: 'openai-compatible', label: 'OpenAI Compatible' },
+  { value: 'anthropic', label: 'Anthropic' }
+];
 
 const reasoningEffortChoices: { id: ReasoningEffort; label: string }[] = [
   { id: 'none', label: 'None' },
@@ -322,10 +327,7 @@ async function handleFetchModels() {
 
         <div class="form-group">
           <label>Provider Type</label>
-          <select v-model="formType">
-            <option value="openai-compatible">OpenAI Compatible</option>
-            <option value="anthropic">Anthropic</option>
-          </select>
+          <ThemedSelect v-model="formType" :options="providerTypeOptions" />
         </div>
 
         <div class="form-group">
@@ -577,10 +579,9 @@ async function handleFetchModels() {
   color: var(--muted);
 }
 
-.form-group input,
-.form-group select {
-  background: #111111;
-  border: 1px solid var(--border);
+.form-group input {
+  background: var(--control-bg);
+  border: 1px solid var(--control-border);
   border-radius: 6px;
   padding: 8px 12px;
   color: var(--text);
@@ -589,13 +590,12 @@ async function handleFetchModels() {
   transition: border-color 0.2s ease;
 }
 
-.form-group input:focus,
-.form-group select:focus {
-  border-color: #555;
+.form-group input:focus {
+  border-color: var(--control-border-focus);
 }
 
 .form-group input:disabled {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--control-bg);
   color: var(--faint);
   cursor: not-allowed;
 }

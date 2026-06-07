@@ -587,8 +587,8 @@ onBeforeUnmount(() => {
 
 .composer-input-box {
   position: relative;
-  background: #242423;
-  border: 1px solid rgba(255, 255, 255, 0.11);
+  background: var(--control-bg);
+  border: 1px solid var(--control-border);
   border-radius: 14px;
   padding: 13px 88px 13px 16px;
   box-shadow:
@@ -598,7 +598,7 @@ onBeforeUnmount(() => {
 }
 
 .composer-input-box:focus-within {
-  border-color: rgba(164, 164, 162, 0.26);
+  border-color: var(--control-border-focus);
   box-shadow:
     0 20px 55px rgba(0, 0, 0, 0.38),
     0 0 0 1px rgba(164, 164, 162, 0.05),

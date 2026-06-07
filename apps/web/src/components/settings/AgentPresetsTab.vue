@@ -3,6 +3,7 @@ import { ref, onMounted, computed, watch } from 'vue';
 import type { AgentPreset, ProviderMetadata, ReasoningEffort, ReasoningOption } from '@agent-bridge/shared';
 import { api } from '../../api/client';
 import { useCustomDialog } from '../../composables/useCustomDialog';
+import ThemedSelect from './ThemedSelect.vue';
 
 const props = defineProps<{
   providers: ProviderMetadata[];
@@ -41,6 +42,15 @@ const modelOptions = computed(() => {
   }
   return out;
 });
+const utilityModelOptions = computed(() => [
+  { value: '', label: 'None' },
+  ...modelOptions.value
+]);
+const maxSubAgentOptions = [
+  { value: 1, label: '1' },
+  { value: 2, label: '2' },
+  { value: 3, label: '3' }
+];
 
 function combined(providerId: string, model: string): string {
   return `${providerId}:${model}`;
@@ -265,9 +275,7 @@ async function handleDelete(preset: AgentPreset) {
       </div>
       <div class="form-row">
         <label>Architect model</label>
-        <select v-model="formArchitect">
-          <option v-for="o in modelOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
-        </select>
+        <ThemedSelect v-model="formArchitect" :options="modelOptions" />
         <div v-if="architectReasoningOptions.length > 0" class="effort-row">
           <span class="effort-label">Reasoning</span>
           <button
@@ -284,9 +292,7 @@ async function handleDelete(preset: AgentPreset) {
       </div>
       <div class="form-row">
         <label>Coder model</label>
-        <select v-model="formCoder">
-          <option v-for="o in modelOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
-        </select>
+        <ThemedSelect v-model="formCoder" :options="modelOptions" />
         <div v-if="coderReasoningOptions.length > 0" class="effort-row">
           <span class="effort-label">Reasoning</span>
           <button
@@ -303,10 +309,7 @@ async function handleDelete(preset: AgentPreset) {
       </div>
       <div class="form-row">
         <label>Utility model <span class="form-hint">(optional — cheap lookups & renames)</span></label>
-        <select v-model="formUtility">
-          <option value="">None</option>
-          <option v-for="o in modelOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
-        </select>
+        <ThemedSelect v-model="formUtility" :options="utilityModelOptions" />
         <div v-if="utilityReasoningOptions.length > 0" class="effort-row">
           <span class="effort-label">Reasoning</span>
           <button
@@ -323,11 +326,7 @@ async function handleDelete(preset: AgentPreset) {
       </div>
       <div class="form-row">
         <label>Max sub-agents</label>
-        <select v-model.number="formMaxSubAgents">
-          <option :value="1">1</option>
-          <option :value="2">2</option>
-          <option :value="3">3</option>
-        </select>
+        <ThemedSelect v-model="formMaxSubAgents" :options="maxSubAgentOptions" />
       </div>
       <label class="form-toggle">
         <input type="checkbox" v-model="formFallback" />
@@ -436,12 +435,12 @@ async function handleDelete(preset: AgentPreset) {
 .form-toggle input {
   margin-top: 2px;
   flex: 0 0 auto;
+  accent-color: var(--control-accent);
 }
 
-.form-row input,
-.form-row select {
-  background: var(--bg);
-  border: 1px solid var(--border);
+.form-row input {
+  background: var(--control-bg);
+  border: 1px solid var(--control-border);
   border-radius: 8px;
   padding: 9px 11px;
   color: var(--text);
@@ -450,6 +449,11 @@ async function handleDelete(preset: AgentPreset) {
 
 .form-row input:disabled {
   opacity: 0.6;
+}
+
+.form-row input:focus {
+  border-color: var(--control-border-focus);
+  outline: none;
 }
 
 .effort-row {
