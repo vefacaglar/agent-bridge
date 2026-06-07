@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "LOCAGENS_SETTINGS_PATH=../../.locagens-dev/settings.json vite",
     "build": "vue-tsc -b && vite build",
     "preview": "vite preview"
   },

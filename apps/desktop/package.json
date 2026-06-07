@@ -1,0 +1,42 @@
+{
+  "name": "@agent-bridge/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./dist/main.js",
+  "scripts": {
+    "build:main": "tsc -p tsconfig.json",
+    "start": "pnpm run build:main && electron .",
+    "dist": "pnpm run build:main && electron-builder"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.19",
+    "electron": "^42.3.3",
+    "electron-builder": "^26.15.0",
+    "typescript": "^5.4.5"
+  },
+  "build": {
+    "appId": "com.locagens.app",
+    "productName": "Locagens",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../web/dist",
+        "to": "web"
+      },
+      {
+        "from": "../api/dist/server.bundle.cjs",
+        "to": "api/server.bundle.cjs"
+      }
+    ],
+    "mac": {
+      "target": "dmg",
+      "icon": "build/icon.png",
+      "category": "public.app-category.developer-tools"
+    }
+  }
+}

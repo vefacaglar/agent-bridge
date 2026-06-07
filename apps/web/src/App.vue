@@ -632,6 +632,9 @@ onUnmounted(() => {
 .thread-title {
   flex: 1;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .project-breadcrumb {

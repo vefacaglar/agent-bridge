@@ -4,12 +4,12 @@ import type { ProviderMetadata, Run, RunMessage, Project, PermissionRule, Plan, 
  * Resolves the backend base URL. The config file (settings.json) is the single
  * source of truth for the port; this picks it up in two ways:
  *  1. Electron: the main process reads settings.json, starts the backend, and
- *     injects `window.__AGENT_BRIDGE_API_BASE__` for the renderer.
+ *     injects `window.__LOCAGENS_API_BASE__` for the renderer.
  *  2. Dev (Vite): vite.config reads the same file and injects VITE_API_BASE.
  * The hardcoded localhost default is only a last resort.
  */
 function resolveApiBase(): string {
-  const injected = (globalThis as any).__AGENT_BRIDGE_API_BASE__;
+  const injected = (globalThis as any).__LOCAGENS_API_BASE__;
   if (typeof injected === 'string' && injected) return injected;
   const fromEnv = import.meta.env.VITE_API_BASE;
   if (typeof fromEnv === 'string' && fromEnv) return fromEnv;

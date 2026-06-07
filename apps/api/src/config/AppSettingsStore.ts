@@ -25,8 +25,8 @@ export class AppSettingsStore {
   }
 
   static defaultPath(): string {
-    if (process.env.AGENT_BRIDGE_SETTINGS_PATH) {
-      return process.env.AGENT_BRIDGE_SETTINGS_PATH;
+    if (process.env.LOCAGENS_SETTINGS_PATH) {
+      return process.env.LOCAGENS_SETTINGS_PATH;
     }
 
     const appDirName = "Locagens";
@@ -52,17 +52,20 @@ export class AppSettingsStore {
    * built-in default.
    */
   resolvePort(): number {
-    const fromFile = this.read().port;
-    if (fromFile) return fromFile;
-    return AppSettingsStore.normalizePort(process.env.PORT) ?? DEFAULT_PORT;
+    return this.readPortFromFile() ?? AppSettingsStore.normalizePort(process.env.PORT) ?? DEFAULT_PORT;
   }
 
   read(): AppSettings {
+    return { port: this.readPortFromFile() ?? DEFAULT_PORT };
+  }
+
+  /** The port stored in the config file, or undefined when absent/invalid. */
+  private readPortFromFile(): number | undefined {
     try {
       const parsed = JSON.parse(fs.readFileSync(this.filePath, "utf-8")) as Partial<AppSettings>;
-      return { port: AppSettingsStore.normalizePort(parsed?.port) ?? DEFAULT_PORT };
+      return AppSettingsStore.normalizePort(parsed?.port);
     } catch {
-      return { port: DEFAULT_PORT };
+      return undefined;
     }
   }
 

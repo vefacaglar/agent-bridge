@@ -2,6 +2,13 @@ import { createApp } from 'vue'
 import './style.css'
 import App from './App.vue'
 
+// Tag the root when running inside the Electron desktop shell so the app can
+// adapt its chrome (make header bars draggable, leave room for the macOS
+// traffic lights) without affecting the plain browser build.
+if (navigator.userAgent.includes('Electron') || (window as any).__LOCAGENS_DESKTOP__) {
+  document.documentElement.classList.add('is-desktop')
+}
+
 createApp(App).mount('#app')
 
 // Global scrollbar visibility handler during active scrolling

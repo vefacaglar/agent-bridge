@@ -17,9 +17,12 @@ function findWorkspaceRoot(): string {
 const wsRoot = findWorkspaceRoot();
 const defaultProjectName = "Locagens";
 const isTest = process.env.NODE_ENV === "test";
-const dbPath = isTest ? ":memory:" : (process.env.AGENT_BRIDGE_DB_PATH || path.join(wsRoot, "locagens.db"));
+const dbPath = isTest ? ":memory:" : (process.env.LOCAGENS_DB_PATH || path.join(wsRoot, "locagens.db"));
 
 console.log(`[Database] Connecting to SQLite database at: ${dbPath}`);
+if (dbPath !== ":memory:") {
+  fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+}
 export const db = new DatabaseSync(dbPath);
 
 try {

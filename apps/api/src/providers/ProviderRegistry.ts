@@ -79,9 +79,6 @@ export class ProviderRegistry {
     if (process.env.LOCAGENS_PROVIDER_CONFIG_PATH) {
       return process.env.LOCAGENS_PROVIDER_CONFIG_PATH;
     }
-    if (process.env.AGENT_BRIDGE_PROVIDER_CONFIG_PATH) {
-      return process.env.AGENT_BRIDGE_PROVIDER_CONFIG_PATH;
-    }
 
     const appDirName = "Locagens";
     if (process.platform === "darwin") {

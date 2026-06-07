@@ -418,3 +418,29 @@
     z-index: 1000;
   }
 }
+
+/* --- Electron desktop window chrome ---------------------------------------
+   The desktop shell hides the native title bar (titleBarStyle: hiddenInset),
+   so the app's own header bars double as the draggable region. Interactive
+   controls inside them opt back out of dragging. These rules are scoped to
+   .is-desktop and have no effect in the plain browser build. */
+.is-desktop .sidebar-header,
+.is-desktop .chat-header {
+  -webkit-app-region: drag;
+}
+
+.is-desktop .sidebar-header button,
+.is-desktop .sidebar-header a,
+.is-desktop .sidebar-header input,
+.is-desktop .chat-header button,
+.is-desktop .chat-header a,
+.is-desktop .chat-header input {
+  -webkit-app-region: no-drag;
+}
+
+/* With the sidebar collapsed the chat header reaches the window's left edge,
+   where the macOS traffic lights sit. Indent the title group so the expand
+   button and breadcrumb clear them. */
+.is-desktop .app-shell.sidebar-collapsed .thread-title {
+  padding-left: 72px;
+}

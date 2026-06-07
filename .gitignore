@@ -45,6 +45,14 @@ vite.config.*.mtime-*
 
 providers.local.json
 providers.*.local.json
+
+# electron desktop
+
+.locagens-dev/
+apps/desktop/release/
+# packaging assets must be tracked despite the global build/ ignore above
+!apps/desktop/build/
+!apps/desktop/build/**
 *.local.json
 !providers.example.json
 

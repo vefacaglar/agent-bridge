@@ -10,7 +10,9 @@
     "dev:api": "pnpm --filter @agent-bridge/api dev",
     "dev:web": "pnpm --filter @agent-bridge/web dev",
     "dev": "pnpm --recursive --parallel dev",
+    "dev:desktop": "pnpm --filter @agent-bridge/desktop start",
     "build": "pnpm --recursive build",
+    "dist": "pnpm --filter @agent-bridge/shared build && pnpm --filter @agent-bridge/web build && pnpm --filter @agent-bridge/api run build:bundle && pnpm --filter @agent-bridge/desktop run dist",
     "clean": "pnpm --recursive exec rm -rf dist node_modules"
   },
   "devDependencies": {

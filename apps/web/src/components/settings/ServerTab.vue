@@ -37,9 +37,17 @@ async function save() {
   savedRestartRequired.value = false;
   try {
     const result = await api.saveSettings({ port: port.value });
+    const changed = result.port !== initialPort.value;
     port.value = result.port;
-    savedRestartRequired.value = result.port !== initialPort.value;
     initialPort.value = result.port;
+    // In the desktop app the main process can restart the backend on the new
+    // port and reload the window; in a plain browser the user restarts manually.
+    const desktop = (window as any).__LOCAGENS_DESKTOP__;
+    if (changed && desktop?.restartBackend) {
+      await desktop.restartBackend();
+      return; // window reloads
+    }
+    savedRestartRequired.value = changed;
   } catch (err: any) {
     error.value = err?.message || 'Failed to save settings.';
   } finally {

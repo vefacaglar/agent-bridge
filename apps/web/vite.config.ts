@@ -8,7 +8,7 @@ import path from 'node:path'
 // edits). Read it here so the dev frontend connects to the configured port
 // without a hardcoded value. Mirrors AppSettingsStore on the backend.
 function resolveSettingsPath(): string {
-  if (process.env.AGENT_BRIDGE_SETTINGS_PATH) return process.env.AGENT_BRIDGE_SETTINGS_PATH
+  if (process.env.LOCAGENS_SETTINGS_PATH) return process.env.LOCAGENS_SETTINGS_PATH
   const appDirName = 'Locagens'
   if (process.platform === 'darwin') {
     return path.join(os.homedir(), 'Library', 'Application Support', appDirName, 'settings.json')
@@ -33,6 +33,11 @@ function resolveBackendPort(): number {
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [vue()],
+  server: {
+    // Fixed port so the Electron dev window can rely on it (no fallback to 5174).
+    port: 5173,
+    strictPort: true,
+  },
   define: {
     'import.meta.env.VITE_API_BASE': JSON.stringify(`http://localhost:${resolveBackendPort()}`),
   },
