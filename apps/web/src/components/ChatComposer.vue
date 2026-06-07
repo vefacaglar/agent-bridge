@@ -945,19 +945,6 @@ onBeforeUnmount(() => {
   gap: 3px;
 }
 
-.model-dropdown-list::-webkit-scrollbar {
-  width: 6px;
-}
-
-.model-dropdown-list::-webkit-scrollbar-thumb {
-  background: #2d2d30;
-  border-radius: 3px;
-}
-
-.model-dropdown-list::-webkit-scrollbar-thumb:hover {
-  background: #3f3f45;
-}
-
 .model-dropdown-item {
   display: flex;
   align-items: center;
