@@ -650,8 +650,15 @@ function formatToolResult(name: string, contentJson: string): string {
                   class="code-block-copy-btn" 
                   :class="{ copied: copiedParameters[idx] }" 
                   @click.stop="copyParameters(idx, formatToolParams(tc.function?.name, tc.function?.arguments))"
+                  title="Copy parameters"
                 >
-                  {{ copiedParameters[idx] ? 'Copied!' : 'Copy' }}
+                  <svg v-if="copiedParameters[idx]" class="check-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                  <svg v-else class="copy-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                  </svg>
                 </button>
               </div>
               <pre class="faint-code"><code>{{ formatToolParams(tc.function?.name, tc.function?.arguments) }}</code></pre>
@@ -709,8 +716,15 @@ function formatToolResult(name: string, contentJson: string): string {
                   class="code-block-copy-btn" 
                   :class="{ copied: copiedResults[idx] }" 
                   @click.stop="copyResult(idx, formatSingleBoxContent(tc.function?.name, tc.function?.arguments, toolResponses[idx]))"
+                  title="Copy results"
                 >
-                  {{ copiedResults[idx] ? 'Copied!' : 'Copy' }}
+                  <svg v-if="copiedResults[idx]" class="check-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                  <svg v-else class="copy-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                  </svg>
                 </button>
               </div>
               <pre class="faint-code"><code>{{ formatSingleBoxContent(tc.function?.name, tc.function?.arguments, toolResponses[idx]) }}</code></pre>

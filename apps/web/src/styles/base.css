@@ -1,6 +1,6 @@
 *, *::before, *::after {
   box-sizing: border-box;
-  border-radius: 4px !important;
+  border-radius: 8px !important;
 }
 
 /* Scrollbar variable setup & transition on scrollable containers to avoid global style recalculation storms */

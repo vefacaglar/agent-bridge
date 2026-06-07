@@ -60,10 +60,18 @@ marked.use({
             <button class="code-block-copy-btn" onclick="
               const codeText = this.closest('.code-block-wrapper').querySelector('code').innerText;
               navigator.clipboard.writeText(codeText);
-              this.innerText = 'Copied!';
               this.classList.add('copied');
-              setTimeout(() => { this.innerText = 'Copy'; this.classList.remove('copied'); }, 2000);
-            ">Copy</button>
+              this.querySelector('.copy-icon').style.display = 'none';
+              this.querySelector('.check-icon').style.display = 'inline-block';
+              setTimeout(() => {
+                this.classList.remove('copied');
+                this.querySelector('.copy-icon').style.display = 'inline-block';
+                this.querySelector('.check-icon').style.display = 'none';
+              }, 2000);
+            " title="Copy code">
+              <svg class="copy-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+              <svg class="check-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display: none;"><polyline points="20 6 9 17 4 12"/></svg>
+            </button>
           </div>
           <pre id="${blockId}"><code class="hljs language-${displayLang}">${highlightedCode}</code></pre>
         </div>

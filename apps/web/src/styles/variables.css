@@ -56,7 +56,7 @@
   --success-soft: rgba(123, 216, 143, 0.12);
   --success-border: rgba(123, 216, 143, 0.3);
 
-  --radius: 4px;
+  --radius: 8px;
 
   /* Shared top-bar geometry so the three columns' header rows line up:
      side cards float with --shell-inset top margin, the middle column adds

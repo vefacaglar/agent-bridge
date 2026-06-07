@@ -200,9 +200,11 @@
   color: var(--faint);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 4px 10px;
-  font-size: 0.78rem;
-  font-weight: 500;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -214,7 +216,7 @@
 }
 
 .code-block-copy-btn.copied {
-  color: var(--msg-success-stroke);
-  background: var(--markdown-copy-copied-bg);
-  border-color: var(--markdown-copy-copied-border);
+  color: var(--text);
+  background: var(--control-bg-hover);
+  border-color: var(--control-border-focus);
 }

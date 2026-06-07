@@ -10,6 +10,46 @@ export function formatTime(value: string): string {
   return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
+export function formatRelativeTime(value: string | Date | number, nowInput?: number): string {
+  const date = new Date(value);
+  const now = nowInput ? new Date(nowInput) : new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+
+  if (diffSec < 0) return 'now';
+  if (diffSec < 60) return `${diffSec}s ago`;
+
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) {
+    const s = diffSec % 60;
+    return s > 0 ? `${diffMin}m ${s}s ago` : `${diffMin}m ago`;
+  }
+
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) {
+    const m = diffMin % 60;
+    return m > 0 ? `${diffHr}h ${m}m ago` : `${diffHr}h ago`;
+  }
+
+  const diffDays = Math.floor(diffHr / 24);
+  if (diffDays < 7) {
+    return `${diffDays}d ago`;
+  }
+
+  const diffWeeks = Math.floor(diffDays / 7);
+  if (diffDays < 30) {
+    return `${diffWeeks}w ago`;
+  }
+
+  const diffMonths = Math.floor(diffDays / 30.436);
+  if (diffDays < 365) {
+    return `${diffMonths}m ago`;
+  }
+
+  const diffYears = Math.floor(diffDays / 365.25);
+  return `${diffYears}y ago`;
+}
+
 const STATUS_LABELS: Record<RunStatus, string> = {
   created: 'queued',
   generating: 'generating',
