@@ -255,6 +255,8 @@ test("Orchestrator Integration Tests", async (t) => {
     const prompt = buildSystemPrompt("Test Project", "/tmp/test-project", "chat", true);
 
     assert.ok(prompt.includes("CURRENT OPERATIONAL MODE: CHAT MODE"));
+    assert.ok(prompt.includes("Do not claim you can run commands"));
+    assert.ok(prompt.includes("sub-agents"));
     assert.ok(prompt.includes("Do not use emojis"));
     assert.ok(prompt.includes("Do not use bold text except for real section headings"));
     assert.ok(!prompt.includes("INITIAL PROJECT GUIDANCE"));
@@ -288,6 +290,8 @@ test("Orchestrator Integration Tests", async (t) => {
     assert.ok(plan.includes("Do not use bold text except for real section headings"));
     assert.ok(build.includes("implementation must stay strictly within it"));
     assert.ok(architect.includes("To change files, call delegate_tasks"));
+    assert.ok(architect.includes("Never delegate shell/delete/write work to utility"));
+    assert.ok(utility.includes("You cannot run commands, delete files, edit files"));
   });
 
   await t.test("Tool schemas - stay compact", () => {

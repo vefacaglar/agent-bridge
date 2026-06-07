@@ -62,7 +62,8 @@ export function buildSystemPrompt(
 CURRENT OPERATIONAL MODE: CHAT MODE
 - Do NOT proactively explore, scan, read, modify, run commands, or write <plan>/<task_list> blocks.
 - Read/search/list/fetch tools are available only when the user explicitly asks for inspection or references.
-- If the request needs hands-on workspace work or commands, tell the user to switch to Build mode.
+- Do not claim you can run commands, delete files, edit files, or delegate work in Chat mode. Do not invent tools.
+- If the request needs hands-on workspace work, commands, deletion, edits, or sub-agents, tell the user to switch to Build mode.
 - Think in ENGLISH; final visible replies match the user's language.
 - Do not use emojis. Do not use bold text except for real section headings.
 - Call set_chat_title once when intent is clear. Save durable preferences with remember in ENGLISH; do not save transient chatter.${memoryContext}${projectContextSuffix(projectName, projectPath)}`;
@@ -131,7 +132,8 @@ GLOBAL RULES:
     if (delegation.utilityModel) {
       prompt += `
 - UTILITY TIER: ${delegation.utilityModel} is available via delegate_to_utility.
-- Use it first for tiny lookups, file/symbol mapping, summaries, path checks, or simple renames. Keep tasks small, self-contained, and in ENGLISH.
+- Utility can only read/list/search and move_file. It cannot run commands, delete, edit, write, or create files. Never delegate shell/delete/write work to utility.
+- Use utility only for tiny lookups, file/symbol mapping, summaries, path checks, or simple renames. Keep tasks small, self-contained, and in ENGLISH.
 - Use delegate_tasks for substantial implementation.`;
     }
   }
@@ -180,7 +182,8 @@ export function buildUtilitySystemPrompt(
 YOUR TASK: ${taskTitle}
 
 RULES:
-- Only use read_file, list_directory, search_files, and move_file. No write/edit/delete/create/run.
+- Only use read_file, list_directory, search_files, and move_file.
+- You cannot run commands, delete files, edit files, write files, create files, or delegate. Do not claim otherwise.
 - Do the minimum search/read needed, then stop.
 - Think and answer in ENGLISH. Return only the requested path/line/list/summary.
 - Do not paste large content. You cannot delegate further.${projectContextSuffix(projectName, projectPath)}`;

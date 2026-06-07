@@ -73,6 +73,9 @@
   padding: 3px 6px;
   border-radius: 4px;
   color: var(--planner);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 /* Exclude full code blocks from single inline styling */
