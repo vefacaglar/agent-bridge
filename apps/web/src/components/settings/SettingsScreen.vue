@@ -51,18 +51,18 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
 
 <template>
   <transition name="settings-fade">
-    <div v-if="show" class="settings-screen">
-      <div class="app-shell">
-        <aside class="sidebar">
-          <div class="sidebar-header">
-            <span class="sidebar-label">Settings</span>
+    <div v-if="show" class="settings-overlay" @click.self="emit('close')">
+      <div class="settings-card">
+        <aside class="settings-sidebar">
+          <div class="settings-sidebar-header">
+            <span class="settings-sidebar-label">Settings</span>
           </div>
 
-          <div class="sidebar-block" style="flex: 1; display: flex; flex-direction: column; gap: 6px;">
+          <div class="settings-tabs-list">
             <button
               v-for="tab in TABS"
               :key="tab.id"
-              class="nav-action"
+              class="settings-tab-btn"
               :class="{ active: activeTab === tab.id }"
               @click="activeTab = tab.id"
             >
@@ -70,30 +70,32 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
             </button>
           </div>
 
-          <button class="nav-action muted" style="margin-top: auto; display: flex; align-items: center; gap: 8px;" @click="emit('close')">
+          <button class="settings-close-btn" @click="emit('close')">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="m15 18-6-6 6-6"/>
             </svg>
-            Back to Chat
+            Close Settings
           </button>
         </aside>
 
-        <main class="chat-shell">
-          <header class="chat-header">
-            <div class="chat-header-inner">
-              <div class="thread-title">
-                <div class="project-breadcrumb">
-                  <span class="breadcrumb-project">Settings</span>
-                  <span class="breadcrumb-separator">/</span>
-                  <span class="breadcrumb-chat-title">{{ TABS.find(t => t.id === activeTab)?.label }}</span>
-                </div>
+        <main class="settings-main">
+          <header class="settings-main-header">
+            <div class="settings-main-header-inner">
+              <div class="settings-breadcrumb">
+                <span class="breadcrumb-project">Settings</span>
+                <span class="breadcrumb-separator">/</span>
+                <span class="breadcrumb-chat-title">{{ TABS.find(t => t.id === activeTab)?.label }}</span>
               </div>
-              <div class="header-actions">
-              </div>
+              <button class="settings-top-close-btn" @click="emit('close')" title="Close Settings">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
             </div>
           </header>
 
-          <section class="messages-scroll">
+          <section class="settings-scroll-area">
             <div class="settings-container-wrap">
               <PermissionsTab
                 v-if="activeTab === 'permissions'"
@@ -128,49 +130,207 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
 </template>
 
 <style scoped>
-.settings-screen {
+.settings-overlay {
   position: fixed;
-  inset: 0;
-  z-index: 2000;
-  background: var(--bg);
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2500;
+  background: rgba(8, 8, 8, 0.7);
+  backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.settings-card {
+  width: min(980px, 100%);
+  height: min(680px, 90vh);
+  background: #141414;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  box-shadow: 
+    0 30px 70px rgba(0, 0, 0, 0.6),
+    0 0 1px rgba(255, 255, 255, 0.1) inset;
+  display: flex;
+  overflow: hidden;
+}
+
+.settings-sidebar {
+  width: 220px;
+  background: #0e0e0e;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 20px;
   display: flex;
   flex-direction: column;
+  flex-shrink: 0;
 }
 
-.settings-screen .nav-action.active {
-  background: var(--sidebar-active);
+.settings-sidebar-header {
+  margin-bottom: 24px;
+  padding-left: 6px;
+}
+
+.settings-sidebar-label {
+  font-size: 1.15rem;
+  font-weight: 700;
   color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.settings-tabs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.settings-tab-btn {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 0.92rem;
+  font-weight: 550;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.settings-tab-btn:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+}
+
+.settings-tab-btn.active {
+  background: var(--sidebar-active);
+  border-color: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  transform: translateX(2px);
+}
+
+.settings-close-btn {
+  width: 100%;
+  margin-top: auto;
+  padding: 10px 12px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--faint);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.settings-close-btn:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.settings-close-btn svg {
+  transition: transform 0.2s ease;
+}
+
+.settings-close-btn:hover svg {
+  transform: translateX(-3px);
+}
+
+.settings-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: #121212;
+}
+
+.settings-main-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 0 24px;
+}
+
+.settings-main-header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 58px;
+}
+
+.settings-breadcrumb {
+  display: flex;
+  align-items: center;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.breadcrumb-project {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.breadcrumb-separator {
+  margin: 0 8px;
+  color: var(--faint);
+  user-select: none;
+}
+
+.breadcrumb-chat-title {
   font-weight: 600;
 }
 
-.sidebar-header {
-  display: flex;
-  justify-content: flex-start;
-  align-items: center;
-  height: var(--top-bar-h);
-  flex: 0 0 auto;
-  padding: 0;
+.settings-top-close-btn {
   background: transparent;
   border: none;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-.sidebar-label {
-  font-size: 1.05rem;
-  font-weight: 600;
+.settings-top-close-btn:hover {
   color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.settings-scroll-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
 }
 
 .settings-container-wrap {
-  width: min(800px, 100%);
+  width: 100%;
+  max-width: 800px;
   margin: 0 auto;
 }
 
 /* Shared panel style overrides for tab components */
-.messages-scroll :deep(.settings-tab-panel) {
+.settings-scroll-area :deep(.settings-tab-panel) {
   width: 100%;
 }
 
-.messages-scroll :deep(.settings-section-head) {
+.settings-scroll-area :deep(.settings-section-head) {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -178,13 +338,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
   margin-bottom: 18px;
 }
 
-.messages-scroll :deep(.settings-section-title) {
+.settings-scroll-area :deep(.settings-section-title) {
   margin: 0 0 4px;
   font-size: 1.1rem;
   color: var(--text);
 }
 
-.messages-scroll :deep(.settings-section-desc) {
+.settings-scroll-area :deep(.settings-section-desc) {
   margin: 0;
   font-size: 0.82rem;
   color: var(--muted);
@@ -192,14 +352,14 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
   max-width: 460px;
 }
 
-.messages-scroll :deep(.settings-section-desc code) {
+.settings-scroll-area :deep(.settings-section-desc code) {
   font-family: monospace;
   background: var(--surface-strong);
   padding: 1px 5px;
   border-radius: 4px;
 }
 
-.messages-scroll :deep(.settings-empty) {
+.settings-scroll-area :deep(.settings-empty) {
   padding: 40px 12px;
   text-align: center;
   color: var(--faint);
@@ -207,76 +367,48 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
   font-style: italic;
 }
 
-.messages-scroll :deep(.settings-section-title) {
+.settings-scroll-area :deep(.settings-section-title) {
   display: none;
 }
 
-.chat-header {
-  display: block;
-  padding: 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.chat-header-inner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 58px;
-  width: 100%;
-  padding: 0 24px;
-  box-sizing: border-box;
-}
-
-.thread-title {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 10px;
-}
-
-.project-breadcrumb {
-  display: flex;
-  align-items: center;
-  font-size: 0.95rem;
-  font-weight: 500;
-  color: var(--text);
-  min-width: 0;
-  flex: 1;
-}
-
-.breadcrumb-project {
-  color: var(--muted);
-  font-weight: 400;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 180px;
-  flex-shrink: 0;
-}
-
-.breadcrumb-separator {
-  margin: 0 8px;
-  color: var(--faint);
-  user-select: none;
-  flex-shrink: 0;
-}
-
-.breadcrumb-chat-title {
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1;
-  min-width: 0;
-}
-
+/* Transitions */
 .settings-fade-enter-active,
 .settings-fade-leave-active {
-  transition: opacity 0.2s ease;
+  transition: opacity 0.25s ease;
 }
 
 .settings-fade-enter-from,
 .settings-fade-leave-to {
   opacity: 0;
+}
+
+.settings-fade-enter-active .settings-card {
+  animation: scaleUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.settings-fade-leave-active .settings-card {
+  animation: scaleDown 0.2s ease-in forwards;
+}
+
+@keyframes scaleUp {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes scaleDown {
+  from {
+    transform: scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: scale(0.95);
+    opacity: 0;
+  }
 }
 </style>
