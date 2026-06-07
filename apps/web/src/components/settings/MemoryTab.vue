@@ -152,8 +152,8 @@ function submitAdd() {
               <span v-else class="mem-content">{{ m.content }}</span>
             </div>
             <div v-if="editingId !== m.id" class="mem-actions">
-              <ThemedButton variant="secondary" size="sm" title="Edit" @click="startEdit(m)">Edit</ThemedButton>
-              <ThemedButton variant="danger" size="sm" title="Delete" @click="emit('delete', m.id)">Delete</ThemedButton>
+              <button class="mem-action-text-btn" title="Edit" @click="startEdit(m)">Edit</button>
+              <button class="mem-action-text-btn delete" title="Delete" @click="emit('delete', m.id)">Delete</button>
             </div>
           </li>
         </ul>
@@ -177,8 +177,8 @@ function submitAdd() {
               <span v-else class="mem-content">{{ m.content }}</span>
             </div>
             <div v-if="editingId !== m.id" class="mem-actions">
-              <ThemedButton variant="secondary" size="sm" title="Edit" @click="startEdit(m)">Edit</ThemedButton>
-              <ThemedButton variant="danger" size="sm" title="Delete" @click="emit('delete', m.id)">Delete</ThemedButton>
+              <button class="mem-action-text-btn" title="Edit" @click="startEdit(m)">Edit</button>
+              <button class="mem-action-text-btn delete" title="Delete" @click="emit('delete', m.id)">Delete</button>
             </div>
           </li>
         </ul>
@@ -276,17 +276,20 @@ function submitAdd() {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 0;
 }
 
 .mem-item {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  padding: 12px 14px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  gap: 12px;
+  padding: 10px 0;
+  background: transparent;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.mem-item:last-child {
+  border-bottom: none;
 }
 
 .mem-category {
@@ -317,6 +320,43 @@ function submitAdd() {
 .mem-actions {
   flex: 0 0 auto;
   display: flex;
-  gap: 6px;
+  gap: 12px;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.mem-item:hover .mem-actions {
+  opacity: 1;
+}
+
+@media (max-width: 768px) {
+  .mem-actions {
+    opacity: 1;
+  }
+}
+
+.mem-action-text-btn {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.mem-action-text-btn:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+.mem-action-text-btn.delete {
+  color: rgba(255, 107, 107, 0.7);
+}
+
+.mem-action-text-btn.delete:hover {
+  color: #ff6b6b;
 }
 </style>
