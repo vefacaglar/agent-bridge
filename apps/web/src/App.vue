@@ -340,7 +340,7 @@ onUnmounted(() => {
     />
 
     <main class="chat-shell" :class="{ 'landing-mode': !activeRun }">
-      <header v-if="activeRun" class="chat-header">
+      <header class="chat-header">
         <div class="chat-header-inner">
           <div class="thread-title">
             <button v-if="isSidebarCollapsed" class="panel-toggle-btn expand-sidebar-btn" @click="toggleSidebar" title="Expand Sidebar">
@@ -350,7 +350,7 @@ onUnmounted(() => {
               </svg>
             </button>
             
-            <div class="project-breadcrumb">
+            <div v-if="activeRun" class="project-breadcrumb">
               <svg class="folder-icon open-folder" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="m6 14 1.45-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.55 6a2 2 0 0 1-1.94 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2A2 2 0 0 0 12.07 6H20a2 2 0 0 1 2 2v2"/>
               </svg>

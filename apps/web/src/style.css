@@ -65,11 +65,18 @@
   transition: --scrollbar-color 0.05s ease;
 }
 
-body {
+html,
+body,
+#app {
   margin: 0;
-  min-width: 900px;
-  min-height: 100vh;
+  padding: 0;
+  height: 100%;
+  width: 100%;
   overflow: hidden;
+}
+
+body {
+  min-width: 900px;
   background: var(--bg);
 }
 
@@ -119,7 +126,7 @@ pre {
 .app-shell {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
-  height: 100vh;
+  height: 100%;
   overflow: hidden;
   transition: grid-template-columns 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -305,8 +312,14 @@ pre {
   display: flex;
   min-width: 0;
   min-height: 0;
+  height: 100%;
   flex-direction: column;
   background: transparent;
+}
+
+.sidebar-backdrop,
+.panel-backdrop {
+  display: none;
 }
 
 .chat-header {
@@ -701,7 +714,7 @@ pre {
     display: block;
     position: relative;
     width: 100vw;
-    height: 100vh;
+    height: 100%;
     overflow: hidden;
   }
 
@@ -802,6 +815,7 @@ pre {
 
   /* Backdrop overlays for mobile drawers */
   .sidebar-backdrop {
+    display: block;
     position: fixed;
     top: 0;
     left: 0;
@@ -812,6 +826,7 @@ pre {
   }
 
   .panel-backdrop {
+    display: block;
     position: fixed;
     top: 0;
     left: 0;
