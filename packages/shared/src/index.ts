@@ -270,7 +270,7 @@ export interface PermissionPreview {
   // Extra display context for tools that are not plain file edits.
   command?: string;   // run_command: the shell command to execute
   destPath?: string;  // move_file: the destination path
-  query?: string;     // search_files: the search query
+  query?: string;     // search_files/search_web: the search query
   url?: string;       // fetch_url: the URL to request
 }
 

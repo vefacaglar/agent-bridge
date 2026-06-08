@@ -272,7 +272,7 @@ export class AgentLoop {
     const isDelegated = !!(run.coderModel && run.coderProviderId);
 
     // Block the Architect (non-coder/non-utility role in a delegation setup) from calling write/delete/run_command directly.
-    if (isDelegated && agentRole !== "coder" && agentRole !== "utility" && !READONLY_TOOLS.has(toolName) && toolName !== "delegate_tasks" && toolName !== "delegate_to_utility" && toolName !== "update_plan" && toolName !== "set_chat_title" && toolName !== "ask_user_question" && toolName !== "remember") {
+    if (isDelegated && agentRole !== "coder" && agentRole !== "utility" && !READONLY_TOOLS.has(toolName) && toolName !== "search_web" && toolName !== "delegate_tasks" && toolName !== "delegate_to_utility" && toolName !== "update_plan" && toolName !== "set_chat_title" && toolName !== "ask_user_question" && toolName !== "remember") {
       return JSON.stringify({
         success: false,
         error: `You are the ARCHITECT and cannot run "${toolName}" directly — this is by design, not a missing permission. Delegate it to a coder with delegate_tasks. Example: delegate_tasks({ tasks: [{ title: "<short title>", instructions: "<self-contained English instructions; include any shell command to run>" }] }). For a tiny read-only lookup use delegate_to_utility instead.`
@@ -288,7 +288,7 @@ export class AgentLoop {
     }
 
     // HARD RULE: non-build modes are read-only. No file mutation, no run_command,
-    // no fetch_url — even if the user approves. The model must switch to Build
+    // no fetch_url/search_web — even if the user approves. The model must switch to Build
     // mode before anything changes. We block here regardless of any grant.
     if (!strategy.allowsMutation && MODIFYING_TOOLS.has(toolName)) {
       return JSON.stringify({
@@ -307,7 +307,7 @@ export class AgentLoop {
     }
 
     const isDangerous = DANGEROUS_TOOLS.has(toolCall.function?.name);
-    // run_command / fetch_url require approval in most modes — but NOT in Full
+    // run_command / search_web / fetch_url require approval in most modes — but NOT in Full
     // Access mode, where the user has explicitly opted in to autonomous operation
     // with no interruptions. A matching standing grant also lets them run silently
     // in any mode. Other tools gate only in ask_permissions mode (gatesEveryTool).

@@ -4,7 +4,7 @@ import { buildModeBaseTools } from "./shared.js";
 /**
  * Build mode (the `accept_edits` backend mode shown in the UI): the model
  * implements directly with workspace tools; ordinary approved edits do not ask,
- * but dangerous tools (run_command/fetch_url) still gate. This is also the
+ * but dangerous tools (run_command/search_web/fetch_url) still gate. This is also the
  * default for unknown/legacy modes.
  */
 export const buildStrategy: ModeStrategy = {

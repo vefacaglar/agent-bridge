@@ -44,7 +44,9 @@ export function actionQuestion(preview: PermissionPreview | null | undefined, to
     case 'list': return `Do you want to list ${target}?`;
     case 'mkdir': return `Do you want to create the folder ${target}?`;
     case 'move': return `Do you want to move ${target} to ${preview.destPath ?? ''}?`;
-    case 'search': return `Do you want to search for "${preview.query ?? ''}"?`;
+    case 'search': return toolName === 'search_web'
+      ? `Do you want to search the web for "${preview.query ?? ''}"?`
+      : `Do you want to search for "${preview.query ?? ''}"?`;
     case 'command': return 'Do you want to run this command?';
     case 'fetch': return `Do you want to fetch ${preview.url ?? ''}?`;
     default: return 'Do you want to proceed?';

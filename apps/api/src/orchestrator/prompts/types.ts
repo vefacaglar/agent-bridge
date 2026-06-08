@@ -56,7 +56,7 @@ export interface ModeStrategy {
   allowsDelegation: boolean;
   /** Whether update_plan is offered and accepted in this mode (plan only). */
   allowsPlanTool: boolean;
-  /** Whether dangerous tools (run_command/fetch_url) skip gating (full access). */
+  /** Whether dangerous tools (run_command/search_web/fetch_url) skip gating (full access). */
   bypassDangerousGating: boolean;
   /** Whether every tool call must be gated behind approval (ask_permissions). */
   gatesEveryTool: boolean;

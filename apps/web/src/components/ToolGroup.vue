@@ -395,6 +395,8 @@ function getToolLabel(name: string, args: string): string {
       return `Moved: ${parsed.source_path ?? ''} → ${parsed.destination_path ?? ''}`;
     case 'search_files':
       return `Searched: ${parsed.query ?? ''}`;
+    case 'search_web':
+      return `Web search: ${parsed.query ?? ''}`;
     case 'run_command':
       return `Command: ${parsed.command ?? ''}`;
     case 'fetch_url':
@@ -476,6 +478,8 @@ function formatToolParams(name: string, argumentsJson: string): string {
         return `Source: ${args.source_path || ''}\nDestination: ${args.destination_path || ''}`;
       case 'search_files':
         return `Query: "${args.query || ''}"${args.path ? `\nIn path: ${args.path}` : ''}`;
+      case 'search_web':
+        return `Query: "${args.query || ''}"${args.max_results ? `\nMax results: ${args.max_results}` : ''}`;
       case 'fetch_url':
         return `URL: ${args.url || ''}`;
       case 'set_chat_title':

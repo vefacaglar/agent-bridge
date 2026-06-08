@@ -71,7 +71,8 @@ export class PermissionCoordinator {
    * For run_command the match is by PREFIX: approving "go build ./internal/config/"
    * also covers "go build ./internal/config/..." (the new command starts with the
    * granted one). This lets one approval cover closely-related invocations without
-   * re-prompting. Other tools (e.g. fetch_url host) still match exactly.
+   * re-prompting. Other tools (e.g. search_web query or fetch_url host) still
+   * match exactly.
    */
   check(run: Run, toolCall: any): boolean {
     // The user chose "allow everything for this run" — skip all gating for it.
@@ -86,8 +87,8 @@ export class PermissionCoordinator {
         return this.hasRunCommandPrefixGrant(run, command);
       }
 
-      // fetch_url falls through to the exact match below: grants are scoped per
-      // host (a new host still asks; an approved host runs silently).
+      // search_web/fetch_url fall through to the exact match below: grants are
+      // scoped per query/host (a new query/host still asks; an approved one runs silently).
 
       const globalPerm = db
         .prepare("SELECT 1 FROM permissions WHERE scope = 'global' AND tool = ? AND command = ? AND status = 'allowed'")

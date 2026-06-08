@@ -33,6 +33,13 @@ const options = computed(() => {
       return o;
     });
   }
+  if (toolName.value === 'search_web') {
+    return PERMISSION_OPTIONS.map((o) => {
+      if (o.decision === 'allow_project') return { ...o, label: 'Yes, and allow this search in this project' };
+      if (o.decision === 'allow_always') return { ...o, label: 'Yes, and allow this search globally' };
+      return o;
+    });
+  }
   if (toolName.value === 'fetch_url') {
     // fetch_url grants are scoped to the host, so a new host still asks while an
     // approved host runs silently — relabel the "don't ask again" options.

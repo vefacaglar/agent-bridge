@@ -17,7 +17,7 @@ YOUR TASK: ${taskTitle}
 RULES:
 - Build mode: inspect, then directly use workspace tools to complete this one task.
 - Stay strictly within the delegated scope; no unrelated refactors.
-- run_command/fetch_url require approval; use them only when needed.
+- run_command/search_web/fetch_url require approval; use them only when needed.
 - Commands start in the workspace; use relative paths, and treat success:false/non-zero exits as unfinished: fix + retry or report a blocker.
 - Think and report in ENGLISH. End with a short report: files changed, behavior, assumptions/problems.
 - Do not paste full files. You cannot delegate further.${projectContextSuffix(projectName, projectPath)}`;

@@ -188,6 +188,27 @@ export const WORKSPACE_TOOLS = [
   {
     type: "function" as const,
     function: {
+      name: "search_web",
+      description: "Search the web and return top text results with title, URL, and snippet. Requires user approval.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description: "Web search query."
+          },
+          max_results: {
+            type: "number",
+            description: "Maximum number of results to return, from 1 to 10. Defaults to 5."
+          }
+        },
+        required: ["query"]
+      }
+    }
+  },
+  {
+    type: "function" as const,
+    function: {
       name: "fetch_url",
       description: "Fetch an http(s) URL as text. Requires user approval.",
       parameters: {
@@ -452,7 +473,7 @@ export const DELEGATE_UTILITY_TOOL = {
 };
 
 /** Tools that must always be gated behind an explicit permission prompt. */
-export const DANGEROUS_TOOLS = new Set(["run_command", "fetch_url"]);
+export const DANGEROUS_TOOLS = new Set(["run_command", "search_web", "fetch_url"]);
 
 /**
  * Read-only tools — they only inspect the workspace, never mutate it or run
@@ -490,6 +511,15 @@ export function permissionKey(toolCall: ToolCall): { tool: string; command: stri
       command = "";
     }
     return { tool, command };
+  }
+  if (tool === "search_web") {
+    let query = "";
+    try {
+      query = String(JSON.parse(toolCall.function.arguments || "{}").query ?? "").trim();
+    } catch {
+      query = "";
+    }
+    return { tool, command: query };
   }
   if (tool === "fetch_url") {
     // Scope the grant to the host, so approving one site does not approve the
@@ -642,6 +672,16 @@ export function buildPermissionPreview(run: Run, toolCall: ToolCall): Permission
         oldContent: null,
         newContent: null,
         command: typeof args.command === "string" ? args.command : ""
+      };
+    case "search_web":
+      return {
+        tool: "search_web",
+        action: "search",
+        path: "",
+        absolutePath: baseDir,
+        oldContent: null,
+        newContent: null,
+        query: typeof args.query === "string" ? args.query : ""
       };
     case "fetch_url":
       return {
@@ -816,6 +856,8 @@ export function executeWorkspaceTool(run: Run, toolCall: ToolCall): string {
         }
         return JSON.stringify({ success: false, error: "run_command must be executed via executeWorkspaceToolAsync." });
       }
+      case "search_web":
+        return JSON.stringify({ success: false, error: "search_web must be executed via executeWorkspaceToolAsync." });
       case "fetch_url":
         // Network access, so it is gated like run_command. Returns a promise
         // that the caller awaits via executeWorkspaceToolAsync.
@@ -830,8 +872,8 @@ export function executeWorkspaceTool(run: Run, toolCall: ToolCall): string {
 
 /**
  * Async variant of executeWorkspaceTool. Identical for synchronous tools, but
- * handles fetch_url (the only tool that performs network I/O) by awaiting the
- * HTTP request. The orchestrator should call this so web fetches resolve.
+ * handles network tools by awaiting the HTTP request. The orchestrator should
+ * call this so web fetches resolve.
  */
 export async function executeWorkspaceToolAsync(run: Run, toolCall: ToolCall): Promise<string> {
   if (toolCall.function.name === "run_command") {
@@ -844,6 +886,17 @@ export async function executeWorkspaceToolAsync(run: Run, toolCall: ToolCall): P
     }
   }
   if (toolCall.function.name !== "fetch_url") {
+    if (toolCall.function.name === "search_web") {
+      try {
+        const args = JSON.parse(toolCall.function.arguments);
+        return await searchWeb(
+          typeof args.query === "string" ? args.query : "",
+          typeof args.max_results === "number" ? args.max_results : undefined
+        );
+      } catch (err: any) {
+        return JSON.stringify({ success: false, error: err.message });
+      }
+    }
     return executeWorkspaceTool(run, toolCall);
   }
   try {
@@ -929,6 +982,84 @@ async function fetchUrl(rawUrl: string): Promise<string> {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function searchWeb(rawQuery: string, rawMaxResults?: number): Promise<string> {
+  const query = rawQuery.trim();
+  if (query === "") {
+    return JSON.stringify({ success: false, error: "Missing parameter: query" });
+  }
+  const maxResults = Math.min(Math.max(Math.floor(rawMaxResults ?? 5), 1), 10);
+  const searchUrl = `https://html.duckduckgo.com/html/?${new URLSearchParams({ q: query }).toString()}`;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30_000);
+  try {
+    const response = await fetch(searchUrl, {
+      method: "GET",
+      redirect: "follow",
+      signal: controller.signal,
+      headers: { "User-Agent": "Locagens/1.0 (+local workspace assistant)" }
+    });
+    const body = await response.text();
+    const results = parseDuckDuckGoResults(body).slice(0, maxResults);
+    return JSON.stringify({
+      success: response.ok,
+      status: response.status,
+      query,
+      source: "duckduckgo_html",
+      results
+    });
+  } catch (err: any) {
+    const aborted = err?.name === "AbortError";
+    return JSON.stringify({ success: false, error: aborted ? "Search timed out after 30s." : (err?.message ?? "Search failed.") });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function parseDuckDuckGoResults(html: string): Array<{ title: string; url: string; snippet: string }> {
+  const results: Array<{ title: string; url: string; snippet: string }> = [];
+  const blocks = html.match(/<div class="result[\s\S]*?(?=<div class="result|<\/body>)/g) ?? [];
+  for (const block of blocks) {
+    const linkMatch = block.match(/<a[^>]*class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/);
+    if (!linkMatch) continue;
+    const url = normalizeSearchResultUrl(decodeHtml(linkMatch[1]));
+    const title = stripHtml(linkMatch[2]);
+    if (!url || !title) continue;
+    const snippetMatch = block.match(/<a[^>]*class="result__snippet"[^>]*>([\s\S]*?)<\/a>|<div[^>]*class="result__snippet"[^>]*>([\s\S]*?)<\/div>/);
+    results.push({
+      title,
+      url,
+      snippet: stripHtml(snippetMatch?.[1] ?? snippetMatch?.[2] ?? "")
+    });
+  }
+  return results;
+}
+
+function normalizeSearchResultUrl(rawUrl: string): string {
+  try {
+    const parsed = new URL(rawUrl, "https://duckduckgo.com");
+    const redirected = parsed.searchParams.get("uddg");
+    return redirected ? decodeURIComponent(redirected) : parsed.toString();
+  } catch {
+    return rawUrl;
+  }
+}
+
+function stripHtml(value: string): string {
+  return decodeHtml(value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim());
+}
+
+function decodeHtml(value: string): string {
+  return value
+    .replace(/&#(\d+);/g, (_m, code) => String.fromCharCode(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_m, code) => String.fromCharCode(Number.parseInt(code, 16)))
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">");
 }
 
 /** Ensures a required path argument is present, returning it. */

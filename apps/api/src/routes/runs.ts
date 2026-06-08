@@ -215,7 +215,7 @@ export function registerRunRoutes(server: FastifyInstance, ctx: AppContext) {
         const { tool, command } = permissionKey(pending.toolCall);
         // Never remember a grant for a run_command that escapes the workspace
         // (cd .., absolute/home paths) — those keep prompting on every call.
-        // fetch_url IS persistable, scoped per host (command holds the host).
+        // search_web/fetch_url ARE persistable, scoped by query/host (command holds that scope).
         const neverPersist = tool === "run_command" && commandEscapesWorkspace(command);
 
         // In Full Access mode, ANY approved (persistable) run_command is saved —
