@@ -277,8 +277,8 @@ test("Orchestrator Integration Tests", async (t) => {
 
     assert.ok(chat.length <= 1200, `chat prompt too large: ${chat.length}`);
     assert.ok(plan.length <= 3600, `plan prompt too large: ${plan.length}`);
-    assert.ok(build.length <= 2800, `build prompt too large: ${build.length}`);
-    assert.ok(architect.length <= 4500, `architect prompt too large: ${architect.length}`);
+    assert.ok(build.length <= 3000, `build prompt too large: ${build.length}`);
+    assert.ok(architect.length <= 5000, `architect prompt too large: ${architect.length}`);
     assert.ok(coder.length <= 900, `coder prompt too large: ${coder.length}`);
     assert.ok(utility.length <= 800, `utility prompt too large: ${utility.length}`);
 
@@ -667,6 +667,64 @@ test("Orchestrator Integration Tests", async (t) => {
     assert.strictEqual(result.success, false);
     assert.ok(result.error.includes("ARCHITECT"));
     assert.ok(result.error.includes("delegate_tasks"));
+  });
+
+  await t.test("Orchestrator - idle architect with an approved plan gets one nudge before finishing", async () => {
+    const registry = new ProviderRegistry(testConfigPath);
+    const runRepo = new RunRepository();
+    const messageRepo = new MessageRepository();
+    const planRepo = new PlanRepository();
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, planRepo, new MemoryRepository());
+
+    const runId = "run-test-idle-nudge";
+    const runData: Run = {
+      id: runId,
+      title: "Test Idle Nudge",
+      task: "Implement the approved plan",
+      status: "created",
+      providerId: "test-provider",
+      providerDisplayName: "Test Provider",
+      model: "model-1",
+      coderProviderId: "test-provider",
+      coderModel: "model-1",
+      mode: "accept_edits",
+      projectPath: process.cwd(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    await runRepo.create(runData);
+    // An approved plan exists -> implementation is expected, so the idle nudge is armed.
+    await planRepo.upsert(runId, {
+      title: "Build it",
+      tasks: [{ text: "Scaffold", status: "pending" }]
+    });
+
+    let callCount = 0;
+    const userMessagesSeen: string[][] = [];
+    globalThis.fetch = async (_url: any, options: any) => {
+      callCount++;
+      // Record the user-role messages the model received this turn so we can prove
+      // the nudge was injected on the second call.
+      userMessagesSeen.push((JSON.parse(options.body).messages || [])
+        .filter((m: any) => m.role === "user")
+        .map((m: any) => m.content));
+      // The architect always answers with plain text and NO tool calls — the
+      // premature-stop failure mode we are guarding against.
+      return {
+        ok: true,
+        json: async () => ({ choices: [{ message: { role: "assistant", content: "I'll begin now." } }] })
+      } as any;
+    };
+
+    await orchestrator.run(runId);
+
+    // First call finishes with no tool call -> one nudge -> second call -> done.
+    assert.strictEqual(callCount, 2, "expected exactly one idle nudge (2 model calls)");
+    assert.ok(
+      userMessagesSeen[1].some(c => c.includes("without calling any tool")),
+      "the second model call should include the injected idle nudge"
+    );
+    assert.strictEqual(runRepo.getById(runId)?.status, "done");
   });
 
   await t.test("Orchestrator - delegate_to_utility runs a utility sub-agent", async () => {

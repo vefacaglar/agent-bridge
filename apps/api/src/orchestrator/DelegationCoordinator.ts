@@ -126,7 +126,7 @@ export class DelegationCoordinator implements Delegator {
     try {
       args = JSON.parse(toolCall.function.arguments || "{}");
     } catch (e: any) {
-      return JSON.stringify({ success: false, error: `Invalid delegate_tasks arguments: ${e.message}` });
+      return JSON.stringify({ success: false, error: `Could not parse delegate_tasks arguments (${e.message}). This usually means the arguments were too large and got cut off. Do NOT paste file contents or large code into 'instructions' — the coder reads files itself with read_file. Keep each task's instructions short: describe what to change and cite file paths, then retry.` });
     }
 
     const limit = this.maxSubAgentsFor(run);
@@ -200,7 +200,7 @@ export class DelegationCoordinator implements Delegator {
     try {
       args = JSON.parse(toolCall.function.arguments || "{}");
     } catch (e: any) {
-      return JSON.stringify({ success: false, error: `Invalid delegate_to_utility arguments: ${e.message}` });
+      return JSON.stringify({ success: false, error: `Could not parse delegate_to_utility arguments (${e.message}). This usually means they were too large and got cut off. Do NOT paste file contents into 'instructions' — utility reads files itself. Keep each task short: say what to look up and cite file paths, then retry.` });
     }
 
     const rawTasks = Array.isArray(args.tasks) ? args.tasks : [];

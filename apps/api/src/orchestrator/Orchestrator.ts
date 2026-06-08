@@ -221,6 +221,16 @@ export class Orchestrator {
         planContext
       );
 
+      // When an approved plan exists, implementation is clearly expected. Weak
+      // architects sometimes just say "I'll start now" and end the turn without
+      // calling a tool, which would finish the run prematurely. This nudge makes
+      // the loop give them one more shot to actually act (capped — see AgentLoop).
+      const idleNudge = planContext
+        ? (delegation
+            ? "You ended your turn without calling any tool, but there is an approved plan to implement and you have not started yet. Do not merely announce that you will begin — call delegate_tasks NOW to implement the first step(s). Only stop without a tool call if the work is genuinely already complete, and then say so explicitly."
+            : "You ended your turn without calling any tool, but there is an approved plan to implement and you have not started yet. Do not merely announce that you will begin — use the workspace tools NOW to implement the first step(s). Only stop without a tool call if the work is genuinely already complete, and then say so explicitly.")
+        : undefined;
+
       const finalText = await this.agentLoop.run(runId, run, [...initialMessages], {
         providerId: run.providerId,
         providerDisplayName: run.providerDisplayName,
@@ -228,7 +238,9 @@ export class Orchestrator {
         reasoningEffort: run.reasoningEffort,
         systemPrompt,
         tools,
-        agentRole: delegation ? "planner" : undefined
+        agentRole: delegation ? "planner" : undefined,
+        idleNudge,
+        maxIdleNudges: idleNudge ? 1 : 0
       });
 
       await this.messages.emitStatus(runId, "done");

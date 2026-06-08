@@ -87,7 +87,8 @@ export function delegationBlock(delegation: DelegationContext): string {
 - ALL file changes (create/edit/delete/move) and every run_command/shell task (including deletions like 'rm') go to a CODER via delegate_tasks — never to utility.
 - Inspect, decide architecture, then delegate implementation. You may launch 1-${delegation.maxSubAgents} coder tasks.
 - Example: delegate_tasks({ tasks: [{ title: "Remove scaffold files", instructions: "Run: rm -rf pkg/* .env.example Makefile. Then list the directory to confirm they are gone." }] }).
-- Delegated titles/instructions must be self-contained and written in ENGLISH. The sub-agent does not see this conversation.
+- Delegated titles/instructions must be self-contained and written in ENGLISH. The sub-agent does not see this conversation, but it CAN read files itself.
+- Keep instructions SHORT: describe what to change and cite file paths. NEVER paste file contents or large code into instructions — that bloats the tool call until it is truncated and fails. Point to the file; the coder reads it.
 - Set parallel=true only for disjoint files. After results, verify changed files and delegate fixes if needed.
 - You own the live <task_list>: seed it from the plan or your delegation breakdown, re-output it each reply, and mark a step '- [x]' when its coder sub-agent returns. Sub-agents do not keep the list.`;
 

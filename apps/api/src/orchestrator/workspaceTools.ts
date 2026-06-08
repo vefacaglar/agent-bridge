@@ -391,7 +391,7 @@ export const DELEGATE_TASKS_TOOL = {
             type: "object",
             properties: {
               title: { type: "string", description: "Short task title." },
-              instructions: { type: "string", description: "Self-contained instructions; the sub-agent sees only this text." },
+              instructions: { type: "string", description: "Self-contained instructions (sub-agent sees only this). Keep short: describe the change and cite file paths; do NOT paste file contents — the coder reads files itself." },
               files: {
                 type: "array",
                 description: "Expected touched files.",
@@ -436,7 +436,7 @@ export const DELEGATE_UTILITY_TOOL = {
             type: "object",
             properties: {
               title: { type: "string", description: "Short task title." },
-              instructions: { type: "string", description: "Self-contained instructions and desired short answer." }
+              instructions: { type: "string", description: "Self-contained instructions and the short answer wanted. Cite file paths; do NOT paste file contents — utility reads files itself." }
             },
             required: ["title", "instructions"]
           }

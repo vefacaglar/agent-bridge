@@ -20,6 +20,16 @@ export interface AgentRunOptions {
   tools: any[];
   agentRole?: RunMessage["agentRole"];
   agentName?: string;
+  /**
+   * Weak architects sometimes announce that they will start ("I'll begin now")
+   * and then end the turn with NO tool call, which the loop would treat as a
+   * finished run. When this nudge text is set and the agent ends the run having
+   * made ZERO tool calls, the loop injects this reminder (invisibly) and lets the
+   * model try again, up to maxIdleNudges times. Tying it to zero tool calls caps
+   * the extra turns hard and prevents an infinite loop.
+   */
+  idleNudge?: string;
+  maxIdleNudges?: number;
 }
 
 /**
@@ -80,6 +90,10 @@ export class AgentLoop {
     const provider = this.registry.getProvider(opts.providerId);
     const currentMessages = messages;
     let lastText = "";
+    // Tracks whether the agent has taken ANY action this run, and how many idle
+    // nudges we've already spent (see AgentRunOptions.idleNudge).
+    let toolCallsMade = 0;
+    let nudgesUsed = 0;
 
     let completionDone = false;
     while (!completionDone) {
@@ -175,6 +189,7 @@ export class AgentLoop {
       if (response.content) lastText = response.content;
 
       if (response.toolCalls && response.toolCalls.length > 0) {
+        toolCallsMade += response.toolCalls.length;
         currentMessages.push({
           role: "assistant",
           content: response.content || "",
@@ -203,6 +218,17 @@ export class AgentLoop {
             name: tc.function.name
           });
         }
+      } else if (
+        opts.idleNudge &&
+        toolCallsMade === 0 &&
+        nudgesUsed < (opts.maxIdleNudges ?? 0)
+      ) {
+        // The agent ended its turn without ever acting, despite work being
+        // expected. Re-add its text and inject one invisible reminder (not
+        // persisted, so it stays out of the UI) so it actually calls a tool.
+        nudgesUsed++;
+        currentMessages.push({ role: "assistant", content: response.content || "" });
+        currentMessages.push({ role: "user", content: opts.idleNudge });
       } else {
         completionDone = true;
       }
