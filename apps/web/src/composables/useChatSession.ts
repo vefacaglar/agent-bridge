@@ -1,5 +1,5 @@
 import { computed, ref, type ComputedRef, type Ref } from 'vue';
-import { tryOnScopeDispose, useThrottleFn } from '@vueuse/core';
+import { tryOnScopeDispose } from '@vueuse/core';
 import type { ProviderMetadata, Run, RunMessage, RunStatus, Plan } from '@agent-bridge/shared';
 import { api, type PermissionDecision } from '../api/client';
 import { ACTIVE_STATUSES } from '../lib/format';
@@ -46,6 +46,7 @@ export function useChatSession(options: ChatSessionOptions) {
   const providers = options.providers;
   const runs = options.runs;
   const messages = ref<RunMessage[]>([]);
+  const sidePanelMessages = ref<RunMessage[]>([]);
 
   const activeRunId = options.activeRunId;
   const activeRun = options.activeRun;
@@ -64,11 +65,15 @@ export function useChatSession(options: ChatSessionOptions) {
   let eventSource: EventSource | null = null;
   let pendingPermissionPollTimer: ReturnType<typeof setTimeout> | null = null;
   let isDisposed = false;
+  let liveMessageFlushFrame: number | null = null;
+  let sidePanelSnapshotTimer: ReturnType<typeof setTimeout> | null = null;
   // Raw SSE updates stay in a plain Map so high-frequency token/sub-agent
-  // events do not touch Vue reactivity until the throttled flush runs.
+  // events do not touch Vue reactivity until the scheduled flush runs.
   const pendingMessageUpdates = new Map<string, RunMessage>();
+  const SIDE_PANEL_SNAPSHOT_DELAY_MS = 200;
 
   const groupedMessages = computed<MessageGroup[]>(() => groupMessages(messages.value));
+  const sidePanelGroupedMessages = computed<MessageGroup[]>(() => groupMessages(sidePanelMessages.value));
 
   const visibleTitle = computed(() => activeRun.value?.title || 'New chat');
 
@@ -157,14 +162,16 @@ export function useChatSession(options: ChatSessionOptions) {
 
   async function loadMessages(runId: string) {
     const data = await api.getMessages(runId);
-    if (data) messages.value = data;
+    if (data) {
+      replaceMessages(data);
+    }
   }
 
   // --- Selection -----------------------------------------------------------
 
   async function selectRun(run: Run) {
     clearPendingPermissionPoll();
-    flushPendingMessages();
+    flushAllMessageSurfaces();
     eventSource?.close();
     eventSource = null;
     clearPendingMessageUpdates();
@@ -214,7 +221,7 @@ export function useChatSession(options: ChatSessionOptions) {
     // that run — it keeps going on the backend. We just stop watching its live
     // stream here; selecting it again later reconnects and reloads its history.
     clearPendingPermissionPoll();
-    flushPendingMessages();
+    flushAllMessageSurfaces();
     eventSource?.close();
     eventSource = null;
     clearPendingMessageUpdates();
@@ -231,7 +238,7 @@ export function useChatSession(options: ChatSessionOptions) {
     activeRunId.value = null;
     localStorage.removeItem('activeRunId');
     activeRun.value = null;
-    messages.value = [];
+    resetMessageSurfaces();
     currentPlan.value = null;
     taskInput.value = '';
     queuedTaskInput.value = '';
@@ -240,9 +247,36 @@ export function useChatSession(options: ChatSessionOptions) {
 
   // --- Live event stream ---------------------------------------------------
 
-  function flushPendingMessages() {
-    if (isDisposed || pendingMessageUpdates.size === 0) return;
+  function cancelLiveMessageFlush() {
+    if (liveMessageFlushFrame !== null) {
+      cancelAnimationFrame(liveMessageFlushFrame);
+      liveMessageFlushFrame = null;
+    }
+  }
 
+  function cancelSidePanelSnapshot() {
+    if (sidePanelSnapshotTimer) {
+      clearTimeout(sidePanelSnapshotTimer);
+      sidePanelSnapshotTimer = null;
+    }
+  }
+
+  function syncSidePanelMessages() {
+    cancelSidePanelSnapshot();
+    if (isDisposed) return;
+    sidePanelMessages.value = messages.value;
+  }
+
+  function scheduleSidePanelSnapshot() {
+    if (isDisposed || sidePanelSnapshotTimer) return;
+    sidePanelSnapshotTimer = setTimeout(() => {
+      sidePanelSnapshotTimer = null;
+      syncSidePanelMessages();
+    }, SIDE_PANEL_SNAPSHOT_DELAY_MS);
+  }
+
+  function applyPendingMessageUpdates(): boolean {
+    if (pendingMessageUpdates.size === 0) return false;
     const updates = Array.from(pendingMessageUpdates.values());
     pendingMessageUpdates.clear();
 
@@ -260,23 +294,61 @@ export function useChatSession(options: ChatSessionOptions) {
     }
 
     messages.value = next;
+    return true;
   }
 
-  const throttledFlushPendingMessages = useThrottleFn(flushPendingMessages, 200, true, true);
+  function flushLiveMessages() {
+    if (isDisposed) return;
+    cancelLiveMessageFlush();
+
+    if (applyPendingMessageUpdates()) {
+      scheduleSidePanelSnapshot();
+    }
+  }
+
+  function flushAllMessageSurfaces() {
+    if (isDisposed) return;
+    cancelLiveMessageFlush();
+    applyPendingMessageUpdates();
+    syncSidePanelMessages();
+  }
+
+  function scheduleLiveMessageFlush() {
+    if (isDisposed || liveMessageFlushFrame !== null) return;
+    liveMessageFlushFrame = requestAnimationFrame(() => {
+      liveMessageFlushFrame = null;
+      flushLiveMessages();
+    });
+  }
+
+  function clearPendingMessageUpdates() {
+    cancelLiveMessageFlush();
+    pendingMessageUpdates.clear();
+  }
+
+  function resetMessageSurfaces() {
+    clearPendingMessageUpdates();
+    cancelSidePanelSnapshot();
+    messages.value = [];
+    sidePanelMessages.value = [];
+  }
+
+  function replaceMessages(nextMessages: RunMessage[]) {
+    clearPendingMessageUpdates();
+    cancelSidePanelSnapshot();
+    messages.value = nextMessages;
+    sidePanelMessages.value = nextMessages;
+  }
 
   function queueMessageUpdate(message: RunMessage) {
     if (isDisposed) return;
     pendingMessageUpdates.set(message.id, message);
-    void throttledFlushPendingMessages();
-  }
-
-  function clearPendingMessageUpdates() {
-    pendingMessageUpdates.clear();
+    scheduleLiveMessageFlush();
   }
 
   function connectEventSource(runId: string) {
     clearPendingPermissionPoll();
-    flushPendingMessages();
+    flushAllMessageSurfaces();
     eventSource?.close();
     clearPendingMessageUpdates();
     eventSource = new EventSource(api.eventsUrl(runId));
@@ -356,9 +428,9 @@ export function useChatSession(options: ChatSessionOptions) {
 
   function finishEventStream(options: { sendQueuedMessage?: boolean } = {}) {
     clearPendingPermissionPoll();
-    // Terminal SSE events may close the stream before a trailing throttle tick,
+    // Terminal SSE events may close the stream before a scheduled render tick,
     // so force the latest buffered message into reactive state before teardown.
-    flushPendingMessages();
+    flushAllMessageSurfaces();
     eventSource?.close();
     eventSource = null;
     isRunning.value = false;
@@ -422,7 +494,7 @@ export function useChatSession(options: ChatSessionOptions) {
       await loadRuns();
       connectEventSource(runId);
     } else {
-      messages.value = [];
+      resetMessageSurfaces();
       currentPlan.value = null;
 
       try {
@@ -518,23 +590,26 @@ export function useChatSession(options: ChatSessionOptions) {
 
   function disconnect() {
     clearPendingPermissionPoll();
-    flushPendingMessages();
+    flushAllMessageSurfaces();
     eventSource?.close();
     eventSource = null;
     clearPendingMessageUpdates();
+    cancelSidePanelSnapshot();
   }
 
   tryOnScopeDispose(() => {
     clearPendingPermissionPoll();
-    flushPendingMessages();
+    flushAllMessageSurfaces();
     isDisposed = true;
     clearPendingMessageUpdates();
+    cancelSidePanelSnapshot();
   });
 
   return {
     providers,
     runs,
     messages,
+    sidePanelMessages,
     activeRunId,
     activeRun,
     isRunning,
@@ -546,6 +621,7 @@ export function useChatSession(options: ChatSessionOptions) {
     pendingPermissionRequest,
     pendingQuestionRequest,
     groupedMessages,
+    sidePanelGroupedMessages,
     visibleTitle,
     activeConfirmationGroup,
     loadProviders,

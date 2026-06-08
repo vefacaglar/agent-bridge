@@ -46,6 +46,8 @@ const {
   visibleTitle,
   activeConfirmationGroup,
   messages,
+  sidePanelMessages,
+  sidePanelGroupedMessages,
   currentPlan
 } = chat;
 
@@ -132,12 +134,12 @@ const currentTaskList = computed<string | null>(() => {
 // switches chats.
 const sidePanelCollapsed = ref(localStorage.getItem('sidePanelCollapsed') === 'true');
 const agentSummaryLinks = computed(() => collectAgentSummaryLinks(groupedMessages.value, isRunning.value));
-const hasWorkspaceChanges = computed(() => hasWorkspaceChangeSignals(messages.value));
+const hasWorkspaceChanges = computed(() => hasWorkspaceChangeSignals(sidePanelMessages.value));
 const workspaceChanges = computed(() =>
-  sidePanelOpen.value ? collectWorkspaceChanges(messages.value, activeRun.value?.projectPath) : []
+  sidePanelOpen.value ? collectWorkspaceChanges(sidePanelMessages.value, activeRun.value?.projectPath) : []
 );
 const agentSummaries = computed(() =>
-  sidePanelOpen.value ? collectAgentSummaries(groupedMessages.value, isRunning.value) : []
+  sidePanelOpen.value ? collectAgentSummaries(sidePanelGroupedMessages.value, isRunning.value) : []
 );
 const hasSidePanelContent = computed(() =>
   !!currentPlan.value || hasWorkspaceChanges.value || agentSummaryLinks.value.length > 0
