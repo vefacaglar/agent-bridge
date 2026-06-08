@@ -62,6 +62,7 @@ export function useChatSession(options: ChatSessionOptions) {
   const pendingQuestionRequest = ref<any>(null);
 
   let eventSource: EventSource | null = null;
+  let pendingPermissionPollTimer: ReturnType<typeof setTimeout> | null = null;
   let isDisposed = false;
   // Raw SSE updates stay in a plain Map so high-frequency token/sub-agent
   // events do not touch Vue reactivity until the throttled flush runs.
@@ -83,6 +84,51 @@ export function useChatSession(options: ChatSessionOptions) {
 
   function requestFocus() {
     focusSignal.value++;
+  }
+
+  function permissionRequestKey(request: any): string {
+    const toolCall = request?.toolCall;
+    return `${request?.runId ?? ''}:${toolCall?.id ?? ''}:${toolCall?.function?.name ?? ''}:${toolCall?.function?.arguments ?? ''}`;
+  }
+
+  function clearPermissionRequestIfCurrent(key: string) {
+    if (!pendingPermissionRequest.value || permissionRequestKey(pendingPermissionRequest.value) === key) {
+      showPermissionModal.value = false;
+      pendingPermissionRequest.value = null;
+    }
+  }
+
+  function clearPendingPermissionPoll() {
+    if (pendingPermissionPollTimer) {
+      clearTimeout(pendingPermissionPollTimer);
+      pendingPermissionPollTimer = null;
+    }
+  }
+
+  async function refreshPendingPermission(runId: string): Promise<boolean> {
+    if (isDisposed || activeRun.value?.id !== runId) return false;
+    const pending = await api.getRunPending(runId);
+    if (!pending || activeRun.value?.id !== runId) return false;
+
+    if (pending.permissionRequest) {
+      pendingPermissionRequest.value = pending.permissionRequest;
+      showPermissionModal.value = true;
+      return true;
+    }
+    return false;
+  }
+
+  function schedulePendingPermissionRefresh(runId: string, delays = [0, 80, 250]) {
+    clearPendingPermissionPoll();
+    const [delay, ...rest] = delays;
+    if (delay === undefined) return;
+
+    pendingPermissionPollTimer = setTimeout(() => {
+      pendingPermissionPollTimer = null;
+      void refreshPendingPermission(runId).then((found) => {
+        if (!found) schedulePendingPermissionRefresh(runId, rest);
+      });
+    }, delay);
   }
 
   function canShowConfirmation(group: MessageGroup): boolean {
@@ -117,6 +163,7 @@ export function useChatSession(options: ChatSessionOptions) {
   // --- Selection -----------------------------------------------------------
 
   async function selectRun(run: Run) {
+    clearPendingPermissionPoll();
     flushPendingMessages();
     eventSource?.close();
     eventSource = null;
@@ -166,6 +213,7 @@ export function useChatSession(options: ChatSessionOptions) {
     // Starting a new chat while another run is still generating must NOT cancel
     // that run — it keeps going on the backend. We just stop watching its live
     // stream here; selecting it again later reconnects and reloads its history.
+    clearPendingPermissionPoll();
     flushPendingMessages();
     eventSource?.close();
     eventSource = null;
@@ -227,6 +275,7 @@ export function useChatSession(options: ChatSessionOptions) {
   }
 
   function connectEventSource(runId: string) {
+    clearPendingPermissionPoll();
     flushPendingMessages();
     eventSource?.close();
     clearPendingMessageUpdates();
@@ -238,7 +287,7 @@ export function useChatSession(options: ChatSessionOptions) {
 
       if (data.type === 'status_changed') {
         updateRunStatus(runId, data.status);
-        if (data.status !== 'awaiting_permission') {
+        if (data.status === 'done' || data.status === 'failed' || data.status === 'cancelled') {
           showPermissionModal.value = false;
           pendingPermissionRequest.value = null;
         }
@@ -306,6 +355,7 @@ export function useChatSession(options: ChatSessionOptions) {
   }
 
   function finishEventStream(options: { sendQueuedMessage?: boolean } = {}) {
+    clearPendingPermissionPoll();
     // Terminal SSE events may close the stream before a trailing throttle tick,
     // so force the latest buffered message into reactive state before teardown.
     flushPendingMessages();
@@ -455,16 +505,19 @@ export function useChatSession(options: ChatSessionOptions) {
 
   async function handlePermissionDecision(decision: PermissionDecision) {
     if (!activeRunId.value) return;
+    const runId = activeRunId.value;
+    const requestKey = permissionRequestKey(pendingPermissionRequest.value);
     try {
-      await api.sendPermissionDecision(activeRunId.value, decision);
-      showPermissionModal.value = false;
-      pendingPermissionRequest.value = null;
+      await api.sendPermissionDecision(runId, decision);
+      clearPermissionRequestIfCurrent(requestKey);
+      schedulePendingPermissionRefresh(runId);
     } catch (err: any) {
       await showAlert(err.message || 'Connection error.');
     }
   }
 
   function disconnect() {
+    clearPendingPermissionPoll();
     flushPendingMessages();
     eventSource?.close();
     eventSource = null;
@@ -472,6 +525,7 @@ export function useChatSession(options: ChatSessionOptions) {
   }
 
   tryOnScopeDispose(() => {
+    clearPendingPermissionPoll();
     flushPendingMessages();
     isDisposed = true;
     clearPendingMessageUpdates();
