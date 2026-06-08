@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { execSync } from "node:child_process";
+import { exec } from "node:child_process";
 import type { Run, ToolCall, PermissionPreview } from "@agent-bridge/shared";
 
 /**
@@ -814,24 +814,7 @@ export function executeWorkspaceTool(run: Run, toolCall: ToolCall): string {
         if (command === "") {
           throw new Error("Missing parameter: command");
         }
-        try {
-          const stdout = execSync(command, {
-            cwd: baseDir,
-            encoding: "utf-8",
-            timeout: 120_000,
-            maxBuffer: 4 * 1024 * 1024,
-            stdio: ["ignore", "pipe", "pipe"]
-          });
-          return JSON.stringify({ success: true, exitCode: 0, stdout: truncateOutput(stdout), stderr: "" });
-        } catch (cmdErr: any) {
-          return JSON.stringify({
-            success: false,
-            exitCode: typeof cmdErr.status === "number" ? cmdErr.status : null,
-            stdout: truncateOutput(cmdErr.stdout?.toString?.() ?? ""),
-            stderr: truncateOutput(cmdErr.stderr?.toString?.() ?? cmdErr.message ?? ""),
-            error: cmdErr.signal === "SIGTERM" ? "Command timed out after 120s." : undefined
-          });
-        }
+        return JSON.stringify({ success: false, error: "run_command must be executed via executeWorkspaceToolAsync." });
       }
       case "fetch_url":
         // Network access, so it is gated like run_command. Returns a promise
@@ -851,6 +834,15 @@ export function executeWorkspaceTool(run: Run, toolCall: ToolCall): string {
  * HTTP request. The orchestrator should call this so web fetches resolve.
  */
 export async function executeWorkspaceToolAsync(run: Run, toolCall: ToolCall): Promise<string> {
+  if (toolCall.function.name === "run_command") {
+    try {
+      const args = JSON.parse(toolCall.function.arguments);
+      const baseDir = path.resolve(run.projectPath || process.cwd());
+      return await runShellCommand(baseDir, typeof args.command === "string" ? args.command : "");
+    } catch (err: any) {
+      return JSON.stringify({ success: false, error: err.message });
+    }
+  }
   if (toolCall.function.name !== "fetch_url") {
     return executeWorkspaceTool(run, toolCall);
   }
@@ -860,6 +852,41 @@ export async function executeWorkspaceToolAsync(run: Run, toolCall: ToolCall): P
   } catch (err: any) {
     return JSON.stringify({ success: false, error: err.message });
   }
+}
+
+/** Runs shell commands without blocking the orchestrator's event loop. */
+function runShellCommand(baseDir: string, rawCommand: string): Promise<string> {
+  const command = rawCommand.trim();
+  if (command === "") {
+    return Promise.resolve(JSON.stringify({ success: false, error: "Missing parameter: command" }));
+  }
+
+  return new Promise((resolve) => {
+    exec(command, {
+      cwd: baseDir,
+      encoding: "utf-8",
+      timeout: 120_000,
+      maxBuffer: 4 * 1024 * 1024
+    }, (cmdErr, stdout, stderr) => {
+      if (!cmdErr) {
+        resolve(JSON.stringify({
+          success: true,
+          exitCode: 0,
+          stdout: truncateOutput(stdout?.toString?.() ?? ""),
+          stderr: truncateOutput(stderr?.toString?.() ?? "")
+        }));
+        return;
+      }
+
+      resolve(JSON.stringify({
+        success: false,
+        exitCode: typeof cmdErr.code === "number" ? cmdErr.code : null,
+        stdout: truncateOutput(stdout?.toString?.() ?? ""),
+        stderr: truncateOutput(stderr?.toString?.() ?? cmdErr.message ?? ""),
+        error: cmdErr.signal === "SIGTERM" ? "Command timed out after 120s." : undefined
+      }));
+    });
+  });
 }
 
 /** Fetches an http(s) URL and returns its text body (truncated). */
