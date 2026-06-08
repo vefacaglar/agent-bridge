@@ -249,7 +249,7 @@ export class AgentLoop {
     if (isDelegated && agentRole !== "coder" && agentRole !== "utility" && !READONLY_TOOLS.has(toolName) && toolName !== "delegate_tasks" && toolName !== "delegate_to_utility" && toolName !== "update_plan" && toolName !== "set_chat_title" && toolName !== "ask_user_question" && toolName !== "remember") {
       return JSON.stringify({
         success: false,
-        error: `Blocked: Architect model is not allowed to run mutating or command tools directly when a coder preset is configured. You must delegate this implementation task to a coder sub-agent using delegate_tasks.`
+        error: `You are the ARCHITECT and cannot run "${toolName}" directly — this is by design, not a missing permission. Delegate it to a coder with delegate_tasks. Example: delegate_tasks({ tasks: [{ title: "<short title>", instructions: "<self-contained English instructions; include any shell command to run>" }] }). For a tiny read-only lookup use delegate_to_utility instead.`
       });
     }
 
@@ -257,7 +257,7 @@ export class AgentLoop {
     if (agentRole === "utility" && !UTILITY_TOOL_NAMES.has(toolName)) {
       return JSON.stringify({
         success: false,
-        error: `Blocked: Utility sub-agent is not allowed to execute "${toolName}". It is restricted to: read_file, list_directory, search_files, and move_file.`
+        error: `Blocked: Utility sub-agent cannot run "${toolName}". Utility is read-only (read_file/list_directory/search_files) plus move_file. Deletes, edits, writes, and shell commands must be delegated to a coder via delegate_tasks — not to utility.`
       });
     }
 

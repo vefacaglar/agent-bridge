@@ -665,7 +665,7 @@ function applyEdit(content: string, oldString: string, newString: string, replac
   }
   const occurrences = content.split(oldString).length - 1;
   if (occurrences === 0) {
-    throw new Error("old_string was not found in the file.");
+    throw new Error("old_string was not found in the file. read_file it first and copy the exact text to replace, including whitespace and indentation.");
   }
   if (occurrences > 1 && !replaceAll) {
     throw new Error(`old_string is not unique (found ${occurrences} times). Provide more surrounding context or set replace_all to true.`);

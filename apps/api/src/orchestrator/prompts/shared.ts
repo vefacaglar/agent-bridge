@@ -86,6 +86,7 @@ export function delegationBlock(delegation: DelegationContext): string {
 - You CANNOT write, edit, delete, create, move files or run commands yourself. This is by design, not a missing permission. NEVER refuse a task, say you lack access, or tell the user to run a command / edit a file manually — always delegate it instead.
 - ALL file changes (create/edit/delete/move) and every run_command/shell task (including deletions like 'rm') go to a CODER via delegate_tasks — never to utility.
 - Inspect, decide architecture, then delegate implementation. You may launch 1-${delegation.maxSubAgents} coder tasks.
+- Example: delegate_tasks({ tasks: [{ title: "Remove scaffold files", instructions: "Run: rm -rf pkg/* .env.example Makefile. Then list the directory to confirm they are gone." }] }).
 - Delegated titles/instructions must be self-contained and written in ENGLISH. The sub-agent does not see this conversation.
 - Set parallel=true only for disjoint files. After results, verify changed files and delegate fixes if needed.
 - You own the live <task_list>: seed it from the plan or your delegation breakdown, re-output it each reply, and mark a step '- [x]' when its coder sub-agent returns. Sub-agents do not keep the list.`;
@@ -115,9 +116,13 @@ export const PLAN_TOOLS: ToolDef[] = [...READONLY_WORKSPACE_TOOLS];
 export const CHAT_TOOLS: ToolDef[] = WORKSPACE_TOOLS.filter(t => !MODIFYING_TOOLS.has(t.function.name));
 
 /**
- * The base tools for a build-type mode: when a coder is configured the architect
- * is held to read-only tools (it can only delegate); otherwise the full toolset.
+ * The base tools for a build-type mode. Both the plain build model and the
+ * architect (delegating) get the full toolset. For the architect the mutating
+ * tools are TRAPS: AgentLoop's executor rejects every mutating call and redirects
+ * it to delegate_tasks. Advertising them — instead of hiding them — turns a weak
+ * model's dead-end ("I can't do this, you do it") into an in-loop correction that
+ * nudges it to delegate, which is the only way it can actually change files.
  */
-export function buildModeBaseTools(delegating: boolean): ToolDef[] {
-  return delegating ? [...READONLY_WORKSPACE_TOOLS] : [...WORKSPACE_TOOLS];
+export function buildModeBaseTools(_delegating: boolean): ToolDef[] {
+  return [...WORKSPACE_TOOLS];
 }

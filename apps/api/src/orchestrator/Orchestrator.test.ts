@@ -277,8 +277,8 @@ test("Orchestrator Integration Tests", async (t) => {
 
     assert.ok(chat.length <= 1200, `chat prompt too large: ${chat.length}`);
     assert.ok(plan.length <= 3600, `plan prompt too large: ${plan.length}`);
-    assert.ok(build.length <= 2600, `build prompt too large: ${build.length}`);
-    assert.ok(architect.length <= 4100, `architect prompt too large: ${architect.length}`);
+    assert.ok(build.length <= 2800, `build prompt too large: ${build.length}`);
+    assert.ok(architect.length <= 4500, `architect prompt too large: ${architect.length}`);
     assert.ok(coder.length <= 900, `coder prompt too large: ${coder.length}`);
     assert.ok(utility.length <= 800, `utility prompt too large: ${utility.length}`);
 
@@ -593,6 +593,80 @@ test("Orchestrator Integration Tests", async (t) => {
     assert.strictEqual(delegateResult.results[0].summary, "Coder finished A");
 
     assert.strictEqual(savedMsgs[4].content, "All subtasks complete.");
+  });
+
+  await t.test("Orchestrator - architect sees mutating tools as traps and is redirected to delegate_tasks", async () => {
+    const registry = new ProviderRegistry(testConfigPath);
+    const runRepo = new RunRepository();
+    const messageRepo = new MessageRepository();
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository());
+
+    const runId = "run-test-trap";
+    const runData: Run = {
+      id: runId,
+      title: "Test Trap",
+      task: "Delete a file",
+      status: "created",
+      providerId: "test-provider",
+      providerDisplayName: "Test Provider",
+      model: "model-1",
+      // Dual-model so the main agent is the architect.
+      coderProviderId: "test-provider",
+      coderModel: "model-1",
+      mode: "accept_edits",
+      projectPath: process.cwd(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    await runRepo.create(runData);
+
+    let callCount = 0;
+    let advertisedTools: any[] = [];
+    globalThis.fetch = async (_url: any, options: any) => {
+      callCount++;
+      if (callCount === 1) {
+        // Capture the tools advertised to the architect, then have it attempt a
+        // direct delete (which must be trapped and redirected).
+        advertisedTools = JSON.parse(options.body).tools || [];
+        return {
+          ok: true,
+          json: async () => ({
+            choices: [{
+              message: {
+                role: "assistant",
+                content: "Deleting the file.",
+                tool_calls: [{
+                  id: "call_delete_1",
+                  type: "function",
+                  function: { name: "delete_file", arguments: JSON.stringify({ path: "trap-test.txt" }) }
+                }]
+              }
+            }]
+          })
+        } as any;
+      }
+      return {
+        ok: true,
+        json: async () => ({ choices: [{ message: { role: "assistant", content: "Delegated instead." } }] })
+      } as any;
+    };
+
+    await orchestrator.run(runId);
+
+    // #1a: mutating tools are advertised to the architect (as traps), alongside delegate_tasks.
+    const toolNames = advertisedTools.map((tool: any) => tool.function?.name);
+    assert.ok(toolNames.includes("delete_file"), "architect should be advertised delete_file as a trap");
+    assert.ok(toolNames.includes("write_file"), "architect should be advertised write_file as a trap");
+    assert.ok(toolNames.includes("delegate_tasks"), "architect should have delegate_tasks");
+
+    // #1b: calling one is rejected with a redirect to delegate_tasks, not executed.
+    const savedMsgs = messageRepo.listByRunId(runId);
+    const toolMsg = savedMsgs.find(m => m.role === "tool");
+    assert.ok(toolMsg, "expected a tool result message");
+    const result = JSON.parse(toolMsg!.content);
+    assert.strictEqual(result.success, false);
+    assert.ok(result.error.includes("ARCHITECT"));
+    assert.ok(result.error.includes("delegate_tasks"));
   });
 
   await t.test("Orchestrator - delegate_to_utility runs a utility sub-agent", async () => {
@@ -1075,6 +1149,7 @@ test("Orchestrator Integration Tests", async (t) => {
     assert.ok(toolMsg);
     const result = JSON.parse(toolMsg!.content);
     assert.strictEqual(result.success, false);
-    assert.match(result.error, /Blocked: Architect model is not allowed/);
+    assert.match(result.error, /You are the ARCHITECT and cannot run/);
+    assert.match(result.error, /delegate_tasks/);
   });
 });

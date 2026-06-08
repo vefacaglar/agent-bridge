@@ -415,14 +415,17 @@ the model picker in the composer (`useComposerSettings.selectedPresetId`). When 
 preset is selected the run is plain single-model and behaves exactly as before.
 
 When (and only when) a coder model is configured, the architect loop is given an
-extra `delegate_tasks` tool — and, importantly, is **stripped of every
-file-mutating / command tool**. With a coder configured the architect keeps only
-the read-only tools (`read_file`, `list_directory`, `search_files`) plus
-`delegate_tasks` (and `set_chat_title`). It physically cannot `write_file`,
-`edit_file`, `run_command`, etc., so the only way for it to change the project is
-to delegate. This is deliberate: weak architect models otherwise ignore the soft
-"prefer delegating" guidance and just do all the work themselves. (Tool set-up
-lives in `Orchestrator.drive()`.)
+extra `delegate_tasks` tool. The architect is still **advertised** the full
+workspace toolset (including `write_file`/`edit_file`/`delete_file`/`run_command`),
+but every mutating call is a **trap**: `AgentLoop.runToolCall` rejects it with a
+`success:false` error that redirects the model to `delegate_tasks`. So the
+architect cannot actually change the project itself — the only working path is to
+delegate — but instead of hitting a dead-end (no tool to call) it gets an in-loop
+correction. This replaced the earlier "strip the tools entirely" approach, which
+left weak models with no way to express intent so they gave up and told the user
+to run commands manually. The trap keeps them moving toward delegation. (Tool
+set-up lives in `Orchestrator.drive()` via `buildModeBaseTools`; the trap/redirect
+lives in `AgentLoop.runToolCall`.)
 
 ```txt
 delegate_tasks(tasks[{ title, instructions, files? }], parallel?)
