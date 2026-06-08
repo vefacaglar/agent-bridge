@@ -1,21 +1,17 @@
-import type { Run, RunStatus, RunMessage, ChatMessage, PlanTask, UserQuestion, ReasoningEffort } from "@agent-bridge/shared";
+import type { Run, RunMessage, ChatMessage, ReasoningEffort } from "@agent-bridge/shared";
 import type { ModelProvider } from "../providers/ModelProvider.js";
 import { RunRepository, MessageRepository, PlanRepository, MemoryRepository } from "../database/repositories.js";
 import { ProviderRegistry } from "../providers/ProviderRegistry.js";
 import { eventBus } from "./eventBus.js";
 import { appendFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { db } from "../database/db.js";
 import { buildSystemPrompt, buildCoderSystemPrompt, buildUtilitySystemPrompt, formatMemoryContext, getModeStrategy } from "./systemPrompt.js";
-import { WORKSPACE_TOOLS, DELEGATE_TASKS_TOOL, DELEGATE_UTILITY_TOOL, UTILITY_TOOLS, UTILITY_TOOL_NAMES, SET_TITLE_TOOL, ASK_QUESTION_TOOL, REMEMBER_TOOL, executeWorkspaceToolAsync, buildPermissionPreview, DANGEROUS_TOOLS, READONLY_TOOLS, MODIFYING_TOOLS, permissionKey, commandEscapesWorkspace } from "./workspaceTools.js";
-
-type PermissionDecision = "allow_once" | "allow_project" | "allow_always" | "deny";
-
-/** The user's reply to an ask_user_question request, aligned to the questions order. */
-interface QuestionAnswerInput {
-  selections: string[][];  // chosen option labels per question
-  notes: string[];         // free-text comment per question ("" if none)
-}
+import { WORKSPACE_TOOLS, DELEGATE_TASKS_TOOL, DELEGATE_UTILITY_TOOL, UTILITY_TOOLS, UTILITY_TOOL_NAMES, executeWorkspaceToolAsync, DANGEROUS_TOOLS, READONLY_TOOLS, MODIFYING_TOOLS } from "./workspaceTools.js";
+import { getOrchestratorTool, availableSchemas } from "./tools/index.js";
+import type { OrchestratorToolContext } from "./tools/index.js";
+import { RunMessageStream } from "./RunMessageStream.js";
+import { PermissionCoordinator, type PermissionDecision } from "./PermissionCoordinator.js";
+import { QuestionCoordinator } from "./QuestionCoordinator.js";
 
 /** One execution attempt for a delegated task: a model paired with its toolset. */
 interface SubAgentTier {
@@ -45,29 +41,16 @@ function usageLogPath(): string | null {
 
 export class Orchestrator {
   private activeRuns: Set<string> = new Set();
-  private pendingPermissions = new Map<string, {
-    resolve: (decision: PermissionDecision) => void;
-    toolCall: any;
-  }>();
-  // Serializes concurrent permission prompts for the same run. Parallel coder
-  // sub-agents share one runId and the pending-permission slot is single, so
-  // their approval prompts must be shown one at a time, not overwrite each other.
-  private permissionChain = new Map<string, Promise<void>>();
-  // Pending ask_user_question requests, keyed by runId. Resolved with the user's
-  // answer: chosen option labels AND a free-text note per question (both aligned
-  // to the questions order).
-  private pendingQuestions = new Map<string, {
-    resolve: (answer: QuestionAnswerInput) => void;
-    questions: UserQuestion[];
-  }>();
 
-  // Throttles high-frequency SQLite writes during live message token streaming
-  private pendingMessageDbUpdates = new Map<string, {
-    msg: RunMessage;
-    lastWriteTime: number;
-    timer: NodeJS.Timeout | null;
-  }>();
-  private pendingDbWrites = new Set<Promise<unknown>>();
+  // Outbound persistence + SSE for this orchestrator's runs.
+  private messages: RunMessageStream;
+  // Tool-permission flow (standing grants, prompts, serialization).
+  private permissions: PermissionCoordinator;
+  // ask_user_question flow (pause the run, collect the user's answer).
+  private questions: QuestionCoordinator;
+  // The capability surface passed to orchestrator-native tool handlers
+  // (set_chat_title / update_plan / ask_user_question / remember).
+  private toolContext: OrchestratorToolContext;
 
   constructor(
     private runRepo: RunRepository,
@@ -75,253 +58,50 @@ export class Orchestrator {
     private registry: ProviderRegistry,
     private planRepo: PlanRepository,
     private memoryRepo: MemoryRepository
-  ) {}
+  ) {
+    this.messages = new RunMessageStream(this.runRepo, this.messageRepo);
+    this.permissions = new PermissionCoordinator(this.activeRuns, this.messages);
+    this.questions = new QuestionCoordinator(this.activeRuns, this.messages);
+    this.toolContext = {
+      runRepo: this.runRepo,
+      planRepo: this.planRepo,
+      memoryRepo: this.memoryRepo,
+      eventBus,
+      requestUserAnswer: (runId, questions) => this.questions.request(runId, questions),
+      isActive: (runId) => this.activeRuns.has(runId),
+      setGenerating: (runId) => this.messages.emitStatus(runId, "generating")
+    };
+  }
 
-  // --- Permission handling -------------------------------------------------
+  // --- Permission / question pass-throughs (owned by the coordinators) -----
 
   resolvePermission(runId: string, decision: PermissionDecision): boolean {
-    const pending = this.pendingPermissions.get(runId);
-    if (pending) {
-      pending.resolve(decision);
-      this.pendingPermissions.delete(runId);
-      return true;
-    }
-    return false;
+    return this.permissions.resolve(runId, decision);
   }
 
   getPendingPermission(runId: string) {
-    return this.pendingPermissions.get(runId);
+    return this.permissions.getPending(runId);
   }
 
-  // --- User question handling ----------------------------------------------
-
-  resolveQuestion(runId: string, answer: QuestionAnswerInput): boolean {
-    const pending = this.pendingQuestions.get(runId);
-    if (pending) {
-      pending.resolve(answer);
-      this.pendingQuestions.delete(runId);
-      return true;
-    }
-    return false;
+  resolveQuestion(runId: string, answer: { selections: string[][]; notes: string[] }): boolean {
+    return this.questions.resolve(runId, answer);
   }
 
   getPendingQuestion(runId: string) {
-    return this.pendingQuestions.get(runId);
-  }
-
-  /**
-   * Pauses the run and asks the user one or more multiple-choice questions,
-   * resolving with their selections (one string[] per question). Mirrors the
-   * permission flow: emits the request, flips status to awaiting_input, and waits.
-   * No serialization chain is needed — only the main agent (a single sequential
-   * loop) ever asks questions; sub-agents never get the tool.
-   */
-  private async requestUserAnswer(runId: string, questions: UserQuestion[]): Promise<QuestionAnswerInput> {
-    if (!this.activeRuns.has(runId)) return { selections: [], notes: [] };
-    return await new Promise<QuestionAnswerInput>((resolve) => {
-      this.pendingQuestions.set(runId, { resolve, questions });
-      void this.emitStatus(runId, "awaiting_input");
-      eventBus.emit(`run:${runId}`, { type: "question_requested", runId, questions });
-    });
-  }
-
-  /**
-   * Whether a standing grant covers this tool call. Grants are scoped per tool.
-   * For run_command the match is by PREFIX: approving "go build ./internal/config/"
-   * also covers "go build ./internal/config/..." (the new command starts with the
-   * granted one). This lets one approval cover closely-related invocations without
-   * re-prompting. Other tools (e.g. fetch_url host) still match exactly.
-   */
-  private checkPermission(run: Run, toolCall: any): boolean {
-    try {
-      const { tool, command } = permissionKey(toolCall);
-
-      if (tool === "run_command") {
-        // Commands that navigate outside the workspace always ask, regardless of
-        // any grant — so a folder-escaping command can never run silently.
-        if (commandEscapesWorkspace(command)) return false;
-        return this.hasRunCommandPrefixGrant(run, command);
-      }
-
-      // fetch_url falls through to the exact match below: grants are scoped per
-      // host (a new host still asks; an approved host runs silently).
-
-      const globalPerm = db
-        .prepare("SELECT 1 FROM permissions WHERE scope = 'global' AND tool = ? AND command = ? AND status = 'allowed'")
-        .get(tool, command);
-      if (globalPerm) return true;
-
-      if (run.projectPath) {
-        const projectPerm = db
-          .prepare("SELECT 1 FROM permissions WHERE scope = 'project' AND project_path = ? AND tool = ? AND command = ? AND status = 'allowed'")
-          .get(run.projectPath, tool, command);
-        if (projectPerm) return true;
-      }
-    } catch (err) {
-      console.error("[Orchestrator] Error checking permissions:", err);
-    }
-    return false;
-  }
-
-  /**
-   * A run_command grant covers the current command when the command starts with
-   * a granted command string. Empty grants are ignored so a blank grant can never
-   * match everything.
-   */
-  private hasRunCommandPrefixGrant(run: Run, command: string): boolean {
-    if (!command) return false;
-    const covers = (rows: { command: string }[]) =>
-      rows.some(r => r.command && command.startsWith(r.command));
-
-    const globalGrants = db
-      .prepare("SELECT command FROM permissions WHERE scope = 'global' AND tool = 'run_command' AND status = 'allowed'")
-      .all() as { command: string }[];
-    if (covers(globalGrants)) return true;
-
-    if (run.projectPath) {
-      const projectGrants = db
-        .prepare("SELECT command FROM permissions WHERE scope = 'project' AND project_path = ? AND tool = 'run_command' AND status = 'allowed'")
-        .all(run.projectPath) as { command: string }[];
-      if (covers(projectGrants)) return true;
-    }
-    return false;
-  }
-
-  private async requestPermission(runId: string, run: Run, toolCall: any): Promise<PermissionDecision> {
-    // Acquire the per-run permission lock so only one prompt is outstanding at a
-    // time (parallel sub-agents would otherwise clobber the single pending slot).
-    const prev = this.permissionChain.get(runId) ?? Promise.resolve();
-    let release!: () => void;
-    const gate = new Promise<void>((r) => { release = r; });
-    this.permissionChain.set(runId, prev.then(() => gate));
-    await prev;
-
-    try {
-      // If the run was cancelled while we waited in line, deny without prompting.
-      if (!this.activeRuns.has(runId)) return "deny";
-
-      return await new Promise<PermissionDecision>((resolve) => {
-        this.pendingPermissions.set(runId, { resolve, toolCall });
-        void this.emitStatus(runId, "awaiting_permission");
-        eventBus.emit(`run:${runId}`, {
-          type: "permission_requested",
-          runId,
-          toolCall,
-          preview: buildPermissionPreview(run, toolCall)
-        });
-      });
-    } finally {
-      release();
-    }
-  }
-
-  // --- Event helpers -------------------------------------------------------
-
-  private trackDbWrite<T>(promise: Promise<T>): Promise<T> {
-    this.pendingDbWrites.add(promise);
-    void promise.then(
-      () => this.pendingDbWrites.delete(promise),
-      () => this.pendingDbWrites.delete(promise)
-    );
-    return promise;
-  }
-
-  private async emitStatus(runId: string, status: RunStatus, extraUpdates?: Partial<Run>) {
-    await this.trackDbWrite(this.runRepo.update(runId, { status, ...extraUpdates }));
-    eventBus.emit(`run:${runId}`, { type: "status_changed", status });
-  }
-
-  private emitMessage(runId: string, msg: RunMessage) {
-    this.trackDbWrite(this.messageRepo.create(msg)).catch((err) => {
-      console.error(`[Orchestrator] Failed to persist message ${msg.id}:`, err.message);
-    });
-    eventBus.emit(`run:${runId}`, { type: "message_created", message: msg });
-  }
-
-  private updateMessage(runId: string, msg: RunMessage) {
-    this.scheduleMessageDbUpdate(msg);
-    eventBus.emit(`run:${runId}`, { type: "message_updated", message: msg });
-  }
-
-  private scheduleMessageDbUpdate(msg: RunMessage) {
-    const now = Date.now();
-    const existing = this.pendingMessageDbUpdates.get(msg.id);
-
-    if (existing) {
-      existing.msg = msg;
-      if (!existing.timer) {
-        const elapsed = now - existing.lastWriteTime;
-        const delay = Math.max(0, 1000 - elapsed);
-        existing.timer = setTimeout(() => {
-          void this.flushMessageDbUpdate(msg.id).catch((err) => {
-            console.error(`[Orchestrator] Failed to flush message update ${msg.id}:`, err.message);
-          });
-        }, delay);
-      }
-    } else {
-      // First update for this message: write immediately
-      this.trackDbWrite(this.messageRepo.update(msg.id, {
-        content: msg.content,
-        reasoningContent: msg.reasoningContent,
-        rawResponse: msg.rawResponse
-      })).catch((err) => {
-        console.error(`[Orchestrator] Failed to persist message update ${msg.id}:`, err.message);
-      });
-      this.pendingMessageDbUpdates.set(msg.id, {
-        msg,
-        lastWriteTime: now,
-        timer: null
-      });
-    }
-  }
-
-  private async flushMessageDbUpdate(msgId: string) {
-    const entry = this.pendingMessageDbUpdates.get(msgId);
-    if (!entry) return;
-
-    if (entry.timer) {
-      clearTimeout(entry.timer);
-      entry.timer = null;
-    }
-
-    await this.trackDbWrite(this.messageRepo.update(msgId, {
-      content: entry.msg.content,
-      reasoningContent: entry.msg.reasoningContent,
-      rawResponse: entry.msg.rawResponse
-    }));
-    this.pendingMessageDbUpdates.delete(msgId);
-  }
-
-  private async flushAllPendingDbUpdates() {
-    for (const msgId of this.pendingMessageDbUpdates.keys()) {
-      await this.flushMessageDbUpdate(msgId);
-    }
-    if (this.pendingDbWrites.size > 0) {
-      await Promise.allSettled([...this.pendingDbWrites]);
-    }
+    return this.questions.getPending(runId);
   }
 
   // --- Run lifecycle -------------------------------------------------------
 
   async cancel(runId: string): Promise<boolean> {
-    await this.flushAllPendingDbUpdates();
-    // Unblock any pending permission promise so the run loop can unwind.
-    const pending = this.pendingPermissions.get(runId);
-    if (pending) {
-      pending.resolve("deny");
-      this.pendingPermissions.delete(runId);
-    }
-    // Likewise resolve any pending question (with no selections) so its tool call
-    // returns and the loop can unwind.
-    const pendingQ = this.pendingQuestions.get(runId);
-    if (pendingQ) {
-      pendingQ.resolve({ selections: [], notes: [] });
-      this.pendingQuestions.delete(runId);
-    }
+    await this.messages.flushAllPendingDbUpdates();
+    // Unblock any pending permission/question promise so the run loop can unwind.
+    this.permissions.cancelPending(runId);
+    this.questions.cancelPending(runId);
 
     if (this.activeRuns.has(runId)) {
       this.activeRuns.delete(runId);
-      await this.emitStatus(runId, "cancelled");
+      await this.messages.emitStatus(runId, "cancelled");
       eventBus.emit(`run:${runId}`, { type: "run_failed", errorMessage: "Chat generation cancelled by user." });
       console.log(`[Orchestrator] Run ${runId} has been cancelled by user.`);
       return true;
@@ -330,7 +110,7 @@ export class Orchestrator {
     // Fallback for runs marked active in DB but not in memory (e.g. after restart).
     const run = this.runRepo.getById(runId);
     if (run && (run.status === "created" || run.status === "generating" || run.status === "awaiting_permission")) {
-      await this.emitStatus(runId, "cancelled");
+      await this.messages.emitStatus(runId, "cancelled");
       eventBus.emit(`run:${runId}`, { type: "run_failed", errorMessage: "Chat generation cancelled by user." });
       console.log(`[Orchestrator] Run ${runId} (inactive in memory) has been marked as cancelled.`);
       return true;
@@ -490,7 +270,7 @@ export class Orchestrator {
   ): Promise<void> {
     try {
       console.log(`[Orchestrator] Run ${runId} - Entering GENERATING state`);
-      await this.emitStatus(runId, "generating");
+      await this.messages.emitStatus(runId, "generating");
 
       // The mode strategy carries this run's full behavior: prompt section, base
       // tool set, and gating policy. All per-mode branching reads from it.
@@ -523,10 +303,10 @@ export class Orchestrator {
       // The utility-delegation tool is offered only when a utility model is
       // configured (and the run can delegate at all).
       const withUtility = delegation?.utilityModel ? [...withDelegate, DELEGATE_UTILITY_TOOL] : withDelegate;
-      // set_chat_title, ask_user_question and remember are available to the main
-      // agent in every mode (they only rename the run / ask the user / save a
-      // memory row); sub-agents never get them.
-      const tools = [...withUtility, SET_TITLE_TOOL, ASK_QUESTION_TOOL, REMEMBER_TOOL];
+      // The orchestrator-native tools the strategy allows: update_plan (plan
+      // mode only) plus set_chat_title / ask_user_question / remember (every
+      // mode). Sub-agents never get these. See orchestrator/tools.
+      const tools = [...withUtility, ...availableSchemas(strategy)];
 
       // Durable memories for this run's context (all global + this project's),
       // injected into the system prompt so the model honors them from the start.
@@ -551,7 +331,7 @@ export class Orchestrator {
         agentRole: delegation ? "planner" : undefined
       });
 
-      await this.emitStatus(runId, "done");
+      await this.messages.emitStatus(runId, "done");
       eventBus.emit(`run:${runId}`, { type: "run_completed", finalOutput: finalText });
       console.log(`[Orchestrator] Run ${runId} - Completed successfully.`);
     } catch (error: any) {
@@ -567,16 +347,16 @@ export class Orchestrator {
           content: error.message || "Failed to query provider.",
           createdAt: new Date().toISOString()
         };
-        this.emitMessage(runId, errorMsg);
+        this.messages.emitMessage(runId, errorMsg);
 
-        await this.emitStatus(runId, "failed", { errorMessage: error.message });
+        await this.messages.emitStatus(runId, "failed", { errorMessage: error.message });
         eventBus.emit(`run:${runId}`, { type: "run_failed", errorMessage: error.message });
       }
     } finally {
-      await this.flushAllPendingDbUpdates();
+      await this.messages.flushAllPendingDbUpdates();
       this.activeRuns.delete(runId);
-      this.permissionChain.delete(runId);
-      this.pendingQuestions.delete(runId);
+      this.permissions.clear(runId);
+      this.questions.cancelPending(runId);
     }
   }
 
@@ -649,15 +429,15 @@ export class Orchestrator {
         };
 
         if (!hasCreatedMessage) {
-          this.emitMessage(runId, assistantMsg);
+          this.messages.emitMessage(runId, assistantMsg);
           hasCreatedMessage = true;
         } else {
-          this.updateMessage(runId, assistantMsg);
+          this.messages.updateMessage(runId, assistantMsg);
         }
       });
 
       checkCancelled();
-      await this.flushMessageDbUpdate(msgId);
+      await this.messages.flushMessageDbUpdate(msgId);
 
       // Prompt-cache measurement: one line per model call so cache hit-rate is
       // observable live in the server console during a run. inputTokens is the
@@ -699,9 +479,9 @@ export class Orchestrator {
       };
 
       if (!hasCreatedMessage) {
-        this.emitMessage(runId, finalMsg);
+        this.messages.emitMessage(runId, finalMsg);
       } else {
-        this.updateMessage(runId, finalMsg);
+        this.messages.updateMessage(runId, finalMsg);
       }
 
       if (response.content) lastText = response.content;
@@ -726,7 +506,7 @@ export class Orchestrator {
             content: result,
             createdAt: new Date().toISOString()
           };
-          this.emitMessage(runId, toolMsg);
+          this.messages.emitMessage(runId, toolMsg);
 
           currentMessages.push({
             role: "tool",
@@ -978,37 +758,13 @@ export class Orchestrator {
     // of branching on run.mode directly.
     const strategy = getModeStrategy(run.mode);
 
-    // update_plan is an internal bookkeeping tool (no filesystem/network side
-    // effects), so it runs silently without any permission prompt. The stable
-    // plan PANEL belongs to Plan mode only — in any other mode (Build/Chat) we
-    // reject the call (some models invoke it out of habit even though it isn't
-    // offered) and tell the model to write the plan as plain inline text instead.
-    if (toolCall.function?.name === "update_plan") {
-      if (!strategy.allowsPlanTool) {
-        return JSON.stringify({
-          success: false,
-          error: `update_plan is only available in Plan mode. In ${run.mode} mode, do not create a plan panel — write any plan as plain text directly in your reply, then proceed.`
-        });
-      }
-      return this.executePlanUpdate(runId, toolCall);
-    }
-
-    // set_chat_title only renames the run (no filesystem/network I/O), so it is
-    // allowed in every mode and runs silently without a permission prompt.
-    if (toolCall.function?.name === "set_chat_title") {
-      return this.executeSetTitle(runId, toolCall);
-    }
-
-    // ask_user_question pauses the run for user input (no filesystem/network
-    // I/O); allowed in every mode and never goes through the permission flow.
-    if (toolCall.function?.name === "ask_user_question") {
-      return this.executeAskQuestion(runId, toolCall);
-    }
-
-    // remember writes a durable memory row (no filesystem/network I/O); allowed
-    // in every mode and runs silently without a permission prompt.
-    if (toolCall.function?.name === "remember") {
-      return this.executeRemember(run, toolCall);
+    // Orchestrator-native tools (set_chat_title / update_plan / ask_user_question
+    // / remember) run silently here — no filesystem/network I/O, no permission
+    // gating. Each is a registered handler that owns its own per-mode rules (e.g.
+    // update_plan rejects outside plan mode). See orchestrator/tools.
+    const nativeTool = getOrchestratorTool(toolCall.function?.name);
+    if (nativeTool) {
+      return nativeTool.execute(this.toolContext, runId, run, toolCall);
     }
 
     // delegate_tasks fans out to coder sub-agents; the orchestrator runs their
@@ -1066,181 +822,15 @@ export class Orchestrator {
     // with no interruptions. A matching standing grant also lets them run silently
     // in any mode. Other tools gate only in ask_permissions mode (gatesEveryTool).
     const mustGate = !strategy.bypassDangerousGating && (isDangerous || strategy.gatesEveryTool);
-    const needsPermission = mustGate && !this.checkPermission(run, toolCall);
+    const needsPermission = mustGate && !this.permissions.check(run, toolCall);
 
     if (needsPermission) {
-      const decision = await this.requestPermission(runId, run, toolCall);
+      const decision = await this.permissions.request(runId, run, toolCall);
       if (decision === "deny") {
         return JSON.stringify({ success: false, error: "Permission denied by user." });
       }
-      await this.emitStatus(runId, "generating");
+      await this.messages.emitStatus(runId, "generating");
     }
     return executeWorkspaceToolAsync(run, toolCall);
-  }
-
-  /**
-   * Renames the run from the model's set_chat_title call and broadcasts the new
-   * title to the UI. Never throws — failures come back as a JSON error.
-   */
-  private async executeSetTitle(runId: string, toolCall: any): Promise<string> {
-    try {
-      const args = JSON.parse(toolCall.function.arguments || "{}");
-      let title = typeof args.title === "string" ? args.title.trim() : "";
-      // Strip wrapping quotes the model sometimes adds, and cap the length.
-      title = title.replace(/^["'`]+|["'`]+$/g, "").trim().slice(0, 80);
-      if (!title) {
-        return JSON.stringify({ success: false, error: "Title was empty." });
-      }
-
-      await this.runRepo.update(runId, { title });
-      eventBus.emit(`run:${runId}`, { type: "run_title_changed", runId, title });
-
-      return JSON.stringify({ success: true, title });
-    } catch (err: any) {
-      return JSON.stringify({ success: false, error: err?.message ?? "Failed to set title." });
-    }
-  }
-
-  /**
-   * Handles an ask_user_question call: validates/normalizes the questions, pauses
-   * the run for the user's selections, and returns those selections to the model
-   * as the tool result. Never throws — failures come back as a JSON error.
-   */
-  private async executeAskQuestion(runId: string, toolCall: any): Promise<string> {
-    let args: any;
-    try {
-      args = JSON.parse(toolCall.function.arguments || "{}");
-    } catch (e: any) {
-      return JSON.stringify({ success: false, error: `Invalid ask_user_question arguments: ${e.message}` });
-    }
-
-    // In plan mode, once a plan exists the plan panel already carries the
-    // approve/revise/reject controls ("Start building"). Block ask_user_question
-    // here so the model can't pop a redundant approval card alongside the panel;
-    // it should simply end its turn and let the user approve via the panel.
-    const run = this.runRepo.getById(runId);
-    if (run?.mode === "plan" && this.planRepo.getActive(runId)) {
-      return JSON.stringify({
-        success: false,
-        error:
-          "Do not ask for approval here. A plan already exists; the plan panel provides the approve/revise/reject controls. End your turn and let the user decide via the panel."
-      });
-    }
-
-    const rawQuestions = Array.isArray(args.questions) ? args.questions : [];
-    const questions: UserQuestion[] = rawQuestions
-      .filter((q: any) => q && typeof q.question === "string" && q.question.trim() && Array.isArray(q.options))
-      .slice(0, 4)
-      .map((q: any) => ({
-        question: String(q.question),
-        header: typeof q.header === "string" ? q.header.trim().slice(0, 12) : "",
-        multiSelect: !!q.multiSelect,
-        options: q.options
-          .map((o: any) =>
-            typeof o === "string"
-              ? { label: o }
-              : o && typeof o.label === "string"
-                ? { label: String(o.label), description: typeof o.description === "string" ? o.description : undefined }
-                : null
-          )
-          .filter((o: any): o is { label: string; description?: string } => !!o && !!o.label.trim())
-          .slice(0, 4)
-      }))
-      .filter((q: UserQuestion) => q.options.length > 0);
-
-    if (questions.length === 0) {
-      return JSON.stringify({ success: false, error: "No valid questions (each needs a question and at least one option)." });
-    }
-
-    const { selections, notes } = await this.requestUserAnswer(runId, questions);
-
-    // If the run was cancelled while waiting, don't flip status back — let the
-    // loop's next cancellation check unwind it.
-    if (!this.activeRuns.has(runId)) {
-      return JSON.stringify({ success: false, error: "Cancelled before the user answered." });
-    }
-    await this.emitStatus(runId, "generating");
-
-    const answers = questions.map((q, i) => {
-      const note = (notes[i] ?? "").trim();
-      return {
-        question: q.question,
-        header: q.header,
-        selected: selections[i] ?? [],
-        ...(note ? { note } : {})
-      };
-    });
-    return JSON.stringify({ success: true, answers });
-  }
-
-  /**
-   * Saves (or revises) a durable memory from the model's remember call. Silent —
-   * no permission prompt, no SSE; the user manages memories in Settings. A
-   * "project" memory is scoped to this run's project path. Never throws.
-   */
-  private async executeRemember(run: Run, toolCall: any): Promise<string> {
-    try {
-      const args = JSON.parse(toolCall.function.arguments || "{}");
-      const content = typeof args.content === "string" ? args.content.trim() : "";
-      if (!content) {
-        return JSON.stringify({ success: false, error: "Nothing to remember: content was empty." });
-      }
-
-      // Revise an existing memory in place when the model passes update_id.
-      const updateId = typeof args.update_id === "number" ? args.update_id : Number(args.update_id);
-      if (Number.isInteger(updateId) && updateId > 0) {
-        const updated = await this.memoryRepo.update(updateId, content);
-        if (updated) {
-          return JSON.stringify({ success: true, action: "updated", memory: updated });
-        }
-        // Fall through to create if the id no longer exists.
-      }
-
-      const scope = args.scope === "global" ? "global" : "project";
-      const memory = await this.memoryRepo.create({
-        scope,
-        projectPath: scope === "project" ? (run.projectPath || "") : "",
-        category: args.category,
-        content
-      });
-      return JSON.stringify({ success: true, action: "created", memory });
-    } catch (err: any) {
-      return JSON.stringify({ success: false, error: err?.message ?? "Failed to save memory." });
-    }
-  }
-
-  /**
-   * Persists the assistant's plan for a run and broadcasts it to the UI. Called
-   * when the model invokes update_plan; never throws — failures are returned to
-   * the model as a JSON error so it can react.
-   */
-  private async executePlanUpdate(runId: string, toolCall: any): Promise<string> {
-    try {
-      const args = JSON.parse(toolCall.function.arguments || "{}");
-      const rawTasks = Array.isArray(args.tasks) ? args.tasks : [];
-      const tasks: PlanTask[] = rawTasks.map((t: any) => ({
-        text: typeof t?.text === "string" ? t.text : "",
-        status: t?.status === "in_progress" || t?.status === "completed" ? t.status : "pending"
-      }));
-
-      const plan = await this.planRepo.upsert(runId, {
-        title: typeof args.title === "string" ? args.title : undefined,
-        body: typeof args.body === "string" ? args.body : undefined,
-        tasks,
-        startNew: !!args.start_new
-      });
-
-      eventBus.emit(`run:${runId}`, { type: "plan_updated", plan });
-
-      return JSON.stringify({
-        success: true,
-        planId: plan.id,
-        version: plan.version,
-        taskCount: plan.tasks.length,
-        completed: plan.tasks.filter(t => t.status === "completed").length
-      });
-    } catch (err: any) {
-      return JSON.stringify({ success: false, error: err.message });
-    }
   }
 }

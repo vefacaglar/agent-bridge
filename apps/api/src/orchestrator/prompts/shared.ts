@@ -1,5 +1,5 @@
 import type { Memory } from "@agent-bridge/shared";
-import { WORKSPACE_TOOLS, UPDATE_PLAN_TOOL, READONLY_TOOLS, MODIFYING_TOOLS } from "../workspaceTools.js";
+import { WORKSPACE_TOOLS, READONLY_TOOLS, MODIFYING_TOOLS } from "../workspaceTools.js";
 import type { DelegationContext, ToolDef } from "./types.js";
 
 /** Appends the active project workspace context, when available. */
@@ -84,8 +84,12 @@ export function delegationBlock(delegation: DelegationContext): string {
 /** Read-only workspace tools — the base set plan mode and architects are held to. */
 export const READONLY_WORKSPACE_TOOLS: ToolDef[] = WORKSPACE_TOOLS.filter(t => READONLY_TOOLS.has(t.function.name));
 
-/** Plan mode's base tools: read-only inspection plus the plan-panel tool. */
-export const PLAN_TOOLS: ToolDef[] = [...READONLY_WORKSPACE_TOOLS, UPDATE_PLAN_TOOL];
+/**
+ * Plan mode's base tools: read-only inspection only. The plan-panel tool
+ * (update_plan) is advertised separately via the orchestrator tool registry
+ * (availableSchemas), gated by the strategy's allowsPlanTool flag.
+ */
+export const PLAN_TOOLS: ToolDef[] = [...READONLY_WORKSPACE_TOOLS];
 
 /** Chat mode's base tools: everything except file-mutating / command tools. */
 export const CHAT_TOOLS: ToolDef[] = WORKSPACE_TOOLS.filter(t => !MODIFYING_TOOLS.has(t.function.name));
