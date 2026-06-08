@@ -16,6 +16,8 @@ import {
   ASK_QUESTION_TOOL,
   DELEGATE_TASKS_TOOL,
   DELEGATE_UTILITY_TOOL,
+  commandScansOutsideWorkspace,
+  executeWorkspaceToolAsync,
   REMEMBER_TOOL,
   SET_TITLE_TOOL,
   UPDATE_PLAN_TOOL,
@@ -311,6 +313,34 @@ test("Orchestrator Integration Tests", async (t) => {
     for (const tool of tools) {
       assert.ok(tool.function.description.length <= 180, `${tool.function.name} description too large`);
     }
+  });
+
+  await t.test("Workspace tools - reject whole-machine find scans without running shell", async () => {
+    assert.strictEqual(commandScansOutsideWorkspace('find / -name "some-tool" -type f 2>/dev/null | head -5'), true);
+    assert.strictEqual(commandScansOutsideWorkspace("find . -name package.json"), false);
+
+    const result = JSON.parse(await executeWorkspaceToolAsync({
+      id: "run-test-find-block",
+      title: "Find block",
+      task: "Block bad find",
+      status: "created",
+      providerId: "test-provider",
+      providerDisplayName: "Test Provider",
+      model: "model-1",
+      projectPath: process.cwd(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }, {
+      id: "tool-find-block",
+      type: "function",
+      function: {
+        name: "run_command",
+        arguments: JSON.stringify({ command: 'find / -name "some-tool" -type f 2>/dev/null | head -5' })
+      }
+    }));
+
+    assert.strictEqual(result.success, false);
+    assert.match(result.error, /Refusing to scan outside the workspace/);
   });
 
   await t.test("Orchestrator - pauses for permissions in ask_permissions mode and resumes on approval", async () => {

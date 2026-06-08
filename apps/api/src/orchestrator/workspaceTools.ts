@@ -558,6 +558,11 @@ export function commandEscapesWorkspace(command: string): boolean {
   return false;
 }
 
+export function commandScansOutsideWorkspace(command: string): boolean {
+  if (!command) return false;
+  return /(^|[;&|]\s*)find\s+['"]?(\/|~|\.\.)([\s/'"]|$)/.test(command);
+}
+
 /** Resolves a workspace-relative path to an absolute one, refusing to escape. */
 function resolveInside(baseDir: string, relativePath: string): string {
   const absolutePath = path.resolve(baseDir, relativePath);
@@ -912,6 +917,12 @@ function runShellCommand(baseDir: string, rawCommand: string): Promise<string> {
   const command = rawCommand.trim();
   if (command === "") {
     return Promise.resolve(JSON.stringify({ success: false, error: "Missing parameter: command" }));
+  }
+  if (commandScansOutsideWorkspace(command)) {
+    return Promise.resolve(JSON.stringify({
+      success: false,
+      error: "Refusing to scan outside the workspace. Search project-relative paths, or check installed tools with direct version/path commands."
+    }));
   }
 
   return new Promise((resolve) => {
