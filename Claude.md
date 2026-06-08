@@ -261,8 +261,11 @@ pinned bar = the live, per-message checklist. They are independent.
 standing grant exists. In `ask_permissions` mode every tool call is gated the
 same way. The approval flow emits `permission_requested`, sets status
 `awaiting_permission`, and waits for a decision: `allow_once`, `allow_project`,
-`allow_always`, or `deny`. `allow_project` / `allow_always` are persisted in
-the `permissions` table.
+`allow_always`, `allow_run`, or `deny`. `allow_project` / `allow_always` are
+persisted in the `permissions` table. `allow_run` is the user's mid-run escape
+from prompt fatigue: it approves the current call AND silences every later prompt
+for the rest of that run. It is run-scoped and in-memory (a `bypassRuns` set in
+`PermissionCoordinator`, cleared when the run finishes) — not persisted.
 
 The `permission_requested` event carries a `PermissionPreview` (built by
 `buildPermissionPreview`): the tool, action

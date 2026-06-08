@@ -4,7 +4,7 @@ import { eventBus } from "./eventBus.js";
 import { buildPermissionPreview, permissionKey, commandEscapesWorkspace } from "./workspaceTools.js";
 import type { RunMessageStream } from "./RunMessageStream.js";
 
-export type PermissionDecision = "allow_once" | "allow_project" | "allow_always" | "deny";
+export type PermissionDecision = "allow_once" | "allow_project" | "allow_always" | "allow_run" | "deny";
 
 /** A pending permission request: the awaited resolver plus the gated tool call. */
 interface PendingPermission {
@@ -24,6 +24,10 @@ export class PermissionCoordinator {
   // sub-agents share one runId and the pending slot is single, so their approval
   // prompts must be shown one at a time, not overwrite each other.
   private chain = new Map<string, Promise<void>>();
+  // Runs the user chose to stop gating entirely (the "allow_run" decision): every
+  // subsequent tool call in the run runs without a prompt. In-memory and run-scoped
+  // — cleared when the run finishes. The user's mid-run escape from prompt fatigue.
+  private bypassRuns = new Set<string>();
 
   constructor(
     private activeRuns: Set<string>,
@@ -32,6 +36,8 @@ export class PermissionCoordinator {
 
   /** Resolves a pending request with the user's decision. Returns false if none. */
   resolve(runId: string, decision: PermissionDecision): boolean {
+    // "allow_run" approves this call AND silences every later prompt in the run.
+    if (decision === "allow_run") this.bypassRuns.add(runId);
     const pending = this.pending.get(runId);
     if (pending) {
       pending.resolve(decision);
@@ -57,6 +63,7 @@ export class PermissionCoordinator {
   /** Drops any chain bookkeeping for a finished run. */
   clear(runId: string) {
     this.chain.delete(runId);
+    this.bypassRuns.delete(runId);
   }
 
   /**
@@ -67,6 +74,8 @@ export class PermissionCoordinator {
    * re-prompting. Other tools (e.g. fetch_url host) still match exactly.
    */
   check(run: Run, toolCall: any): boolean {
+    // The user chose "allow everything for this run" — skip all gating for it.
+    if (this.bypassRuns.has(run.id)) return true;
     try {
       const { tool, command } = permissionKey(toolCall);
 

@@ -95,7 +95,7 @@ function onKeyDown(e: KeyboardEvent) {
   } else if (e.key === 'Enter') {
     e.preventDefault();
     decide(options.value[selected.value].decision);
-  } else if (['1', '2', '3', '4'].includes(e.key)) {
+  } else if (/^[1-9]$/.test(e.key)) {
     e.preventDefault();
     const option = options.value[Number(e.key) - 1];
     if (option) decide(option.decision);

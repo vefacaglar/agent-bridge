@@ -4,7 +4,7 @@ import { type AppContext, normalizeProject } from "../context.js";
 import { eventBus } from "../orchestrator/eventBus.js";
 import { permissionKey, commandEscapesWorkspace, buildPermissionPreview } from "../orchestrator/workspaceTools.js";
 
-const PERMISSION_DECISIONS = ["allow_once", "allow_project", "allow_always", "deny"] as const;
+const PERMISSION_DECISIONS = ["allow_once", "allow_project", "allow_always", "allow_run", "deny"] as const;
 type PermissionDecision = (typeof PERMISSION_DECISIONS)[number];
 const REASONING_EFFORTS = new Set<ReasoningEffort>(["default", "none", "minimal", "low", "medium", "high", "xhigh", "max"]);
 

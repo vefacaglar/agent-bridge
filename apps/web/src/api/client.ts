@@ -18,7 +18,7 @@ function resolveApiBase(): string {
 
 export const API_BASE = resolveApiBase();
 
-export type PermissionDecision = 'allow_once' | 'allow_project' | 'allow_always' | 'deny';
+export type PermissionDecision = 'allow_once' | 'allow_project' | 'allow_always' | 'allow_run' | 'deny';
 
 // Optional dual-model fields: when an agent preset is active the architect uses
 // providerId/model and delegates code-writing to the coder model below.

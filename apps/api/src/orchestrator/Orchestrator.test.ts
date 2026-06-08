@@ -396,6 +396,73 @@ test("Orchestrator Integration Tests", async (t) => {
     assert.ok(fs.existsSync(createdFilePath));
   });
 
+  await t.test("Orchestrator - allow_run stops gating every later tool call in the run", async () => {
+    const registry = new ProviderRegistry(testConfigPath);
+    const runRepo = new RunRepository();
+    const messageRepo = new MessageRepository();
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository());
+
+    const runId = "run-test-allow-run";
+    const runData: Run = {
+      id: runId,
+      title: "Test allow_run",
+      task: "Create two files",
+      status: "created",
+      providerId: "test-provider",
+      providerDisplayName: "Test Provider",
+      model: "model-1",
+      // ask_permissions gates EVERY tool call, so without allow_run both writes
+      // would prompt.
+      mode: "ask_permissions",
+      projectPath: process.cwd(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    await runRepo.create(runData);
+
+    const fileA = path.join(process.cwd(), "allow_run_a.json");
+    const fileB = path.join(process.cwd(), "allow_run_b.json");
+    t.after(() => {
+      for (const f of [fileA, fileB]) if (fs.existsSync(f)) fs.unlinkSync(f);
+      db.exec("DELETE FROM permissions");
+    });
+
+    let callCount = 0;
+    const write = (id: string, name: string) => ({
+      ok: true,
+      json: async () => ({
+        choices: [{
+          message: {
+            role: "assistant",
+            content: "writing",
+            tool_calls: [{ id, type: "function", function: { name: "write_file", arguments: JSON.stringify({ path: name, content: "{}" }) } }]
+          }
+        }]
+      })
+    } as any);
+    globalThis.fetch = async () => {
+      callCount++;
+      if (callCount === 1) return write("call_a", "allow_run_a.json"); // first write -> prompts
+      if (callCount === 2) return write("call_b", "allow_run_b.json"); // second write -> must NOT prompt
+      return { ok: true, json: async () => ({ choices: [{ message: { role: "assistant", content: "done" } }] }) } as any;
+    };
+
+    const runPromise = orchestrator.run(runId);
+
+    // Wait for the first permission prompt, then choose "allow everything for this run".
+    await new Promise(r => setTimeout(r, 100));
+    assert.strictEqual(runRepo.getById(runId)?.status, "awaiting_permission");
+    assert.ok(orchestrator.resolvePermission(runId, "allow_run"));
+
+    // If the second write still gated, the run would hang awaiting a prompt that
+    // never comes; reaching "done" proves the bypass silenced it.
+    await runPromise;
+
+    assert.strictEqual(runRepo.getById(runId)?.status, "done");
+    assert.ok(fs.existsSync(fileA), "first file written");
+    assert.ok(fs.existsSync(fileB), "second file written without a second prompt");
+  });
+
   await t.test("Orchestrator - runs tool call read_file and list_directory successfully", async () => {
     const registry = new ProviderRegistry(testConfigPath);
     const runRepo = new RunRepository();
