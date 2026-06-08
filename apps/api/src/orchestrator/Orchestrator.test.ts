@@ -278,7 +278,7 @@ test("Orchestrator Integration Tests", async (t) => {
     assert.ok(chat.length <= 1200, `chat prompt too large: ${chat.length}`);
     assert.ok(plan.length <= 3200, `plan prompt too large: ${plan.length}`);
     assert.ok(build.length <= 2600, `build prompt too large: ${build.length}`);
-    assert.ok(architect.length <= 3800, `architect prompt too large: ${architect.length}`);
+    assert.ok(architect.length <= 4100, `architect prompt too large: ${architect.length}`);
     assert.ok(coder.length <= 900, `coder prompt too large: ${coder.length}`);
     assert.ok(utility.length <= 800, `utility prompt too large: ${utility.length}`);
 
@@ -289,7 +289,8 @@ test("Orchestrator Integration Tests", async (t) => {
     assert.ok(plan.includes("Do not use emojis in visible conversation"));
     assert.ok(plan.includes("Do not use bold text except for real section headings"));
     assert.ok(build.includes("implementation must stay strictly within it"));
-    assert.ok(architect.includes("To change files, call delegate_tasks"));
+    assert.ok(architect.includes("go to a CODER via delegate_tasks"));
+    assert.ok(architect.includes("NEVER refuse a task"));
     assert.ok(architect.includes("Never delegate shell/delete/write work to utility"));
     assert.ok(utility.includes("You cannot run commands, delete files, edit files"));
   });
