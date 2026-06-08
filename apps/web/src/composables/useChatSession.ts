@@ -1,4 +1,5 @@
 import { computed, ref, type ComputedRef, type Ref } from 'vue';
+import { tryOnScopeDispose, useThrottleFn } from '@vueuse/core';
 import type { ProviderMetadata, Run, RunMessage, RunStatus, Plan } from '@agent-bridge/shared';
 import { api, type PermissionDecision } from '../api/client';
 import { ACTIVE_STATUSES } from '../lib/format';
@@ -61,8 +62,10 @@ export function useChatSession(options: ChatSessionOptions) {
   const pendingQuestionRequest = ref<any>(null);
 
   let eventSource: EventSource | null = null;
-  let pendingMessageFrame: number | null = null;
-  const pendingMessages = new Map<string, RunMessage>();
+  let isDisposed = false;
+  // Raw SSE updates stay in a plain Map so high-frequency token/sub-agent
+  // events do not touch Vue reactivity until the throttled flush runs.
+  const pendingMessageUpdates = new Map<string, RunMessage>();
 
   const groupedMessages = computed<MessageGroup[]>(() => groupMessages(messages.value));
 
@@ -114,6 +117,7 @@ export function useChatSession(options: ChatSessionOptions) {
   // --- Selection -----------------------------------------------------------
 
   async function selectRun(run: Run) {
+    flushPendingMessages();
     eventSource?.close();
     eventSource = null;
     clearPendingMessageUpdates();
@@ -162,6 +166,7 @@ export function useChatSession(options: ChatSessionOptions) {
     // Starting a new chat while another run is still generating must NOT cancel
     // that run — it keeps going on the backend. We just stop watching its live
     // stream here; selecting it again later reconnects and reloads its history.
+    flushPendingMessages();
     eventSource?.close();
     eventSource = null;
     clearPendingMessageUpdates();
@@ -188,11 +193,10 @@ export function useChatSession(options: ChatSessionOptions) {
   // --- Live event stream ---------------------------------------------------
 
   function flushPendingMessages() {
-    pendingMessageFrame = null;
-    if (pendingMessages.size === 0) return;
+    if (isDisposed || pendingMessageUpdates.size === 0) return;
 
-    const updates = Array.from(pendingMessages.values());
-    pendingMessages.clear();
+    const updates = Array.from(pendingMessageUpdates.values());
+    pendingMessageUpdates.clear();
 
     const next = messages.value.slice();
     const indexById = new Map(next.map((message, index) => [message.id, index]));
@@ -210,21 +214,20 @@ export function useChatSession(options: ChatSessionOptions) {
     messages.value = next;
   }
 
+  const throttledFlushPendingMessages = useThrottleFn(flushPendingMessages, 200, true, true);
+
   function queueMessageUpdate(message: RunMessage) {
-    pendingMessages.set(message.id, message);
-    if (pendingMessageFrame !== null) return;
-    pendingMessageFrame = requestAnimationFrame(flushPendingMessages);
+    if (isDisposed) return;
+    pendingMessageUpdates.set(message.id, message);
+    void throttledFlushPendingMessages();
   }
 
   function clearPendingMessageUpdates() {
-    if (pendingMessageFrame !== null) {
-      cancelAnimationFrame(pendingMessageFrame);
-      pendingMessageFrame = null;
-    }
-    pendingMessages.clear();
+    pendingMessageUpdates.clear();
   }
 
   function connectEventSource(runId: string) {
+    flushPendingMessages();
     eventSource?.close();
     clearPendingMessageUpdates();
     eventSource = new EventSource(api.eventsUrl(runId));
@@ -303,6 +306,8 @@ export function useChatSession(options: ChatSessionOptions) {
   }
 
   function finishEventStream(options: { sendQueuedMessage?: boolean } = {}) {
+    // Terminal SSE events may close the stream before a trailing throttle tick,
+    // so force the latest buffered message into reactive state before teardown.
     flushPendingMessages();
     eventSource?.close();
     eventSource = null;
@@ -460,9 +465,17 @@ export function useChatSession(options: ChatSessionOptions) {
   }
 
   function disconnect() {
+    flushPendingMessages();
     eventSource?.close();
     eventSource = null;
+    clearPendingMessageUpdates();
   }
+
+  tryOnScopeDispose(() => {
+    flushPendingMessages();
+    isDisposed = true;
+    clearPendingMessageUpdates();
+  });
 
   return {
     providers,
