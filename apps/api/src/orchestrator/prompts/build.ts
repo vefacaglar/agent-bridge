@@ -19,7 +19,7 @@ export const buildStrategy: ModeStrategy = {
   promptSection(): string {
     return `\n\nCURRENT OPERATIONAL MODE: BUILD MODE
 - You are implementing, not just planning. Directly create/edit/delete files with workspace tools; do not ask before ordinary approved edits.
-- Do NOT call update_plan here — the stable plan panel belongs to Plan mode only. If you want to outline steps, write them as plain text in your reply (or a <task_list> for complex work), then implement.
-- If using a <task_list> for a complex task, keep it live and incremental, re-outputting the full list as steps complete.`;
+- Do NOT call update_plan here — the stable plan panel belongs to Plan mode only.
+- For any multi-step or multi-file work, keep a live <task_list> and re-output it each reply, marking steps done. If an APPROVED PLAN is provided above, seed the task_list from its steps. Skip the list only for a trivial one-step fix.`;
   }
 };

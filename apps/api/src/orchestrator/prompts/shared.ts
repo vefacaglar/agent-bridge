@@ -1,4 +1,4 @@
-import type { Memory } from "@agent-bridge/shared";
+import type { Memory, Plan } from "@agent-bridge/shared";
 import { WORKSPACE_TOOLS, READONLY_TOOLS, MODIFYING_TOOLS } from "../workspaceTools.js";
 import type { DelegationContext, ToolDef } from "./types.js";
 
@@ -35,6 +35,24 @@ export function formatMemoryContext(memories: Memory[]): string {
   return section;
 }
 
+/**
+ * Renders the run's active plan (created in plan mode via update_plan) into a
+ * prompt block for implementation modes, so the model can seed and maintain its
+ * live <task_list> from the plan's steps. Returns "" when there is no plan. The
+ * checkbox state mirrors each task's status so already-finished steps come
+ * pre-marked.
+ */
+export function formatActivePlan(plan: Plan | null | undefined): string {
+  if (!plan) return "";
+  const steps = (plan.tasks || [])
+    .map(t => `- [${t.status === "completed" ? "x" : " "}] ${t.text}`)
+    .join("\n");
+  let block = `\n\nAPPROVED PLAN (from Plan mode — implement this):\nTitle: ${plan.title}`;
+  if (steps) block += `\nSteps:\n${steps}`;
+  block += `\n- Seed your live <task_list> from these steps on your first reply and keep it updated (mark done) as you complete each one. Stay strictly within this plan.`;
+  return block;
+}
+
 /** The shared base prompt + global rules used by every non-chat mode. */
 export const GLOBAL_RULES = `You are Locagens, a local-first AI assistant working in the user's active project workspace.
 
@@ -47,7 +65,7 @@ GLOBAL RULES:
 - Ask only when blocked on a real user decision. Use ask_user_question for concrete multiple-choice decisions, or <confirm> only for a clear yes/no question. Do not infer approval from casual wording.
 - Inspect with read_file/list_directory/search_files before risky edits. Use edit_file for targeted edits.
 - run_command and fetch_url require user approval. Ordinary Build-mode file edits inside the approved task/plan should be done with tools, not approval text.
-- Before implementation, use the 'update_plan' tool to outline steps. For complex or long-running tasks, maintain a live <task_list> checklist in your visible replies. Do not use task lists for simple, quick changes.
+- Maintain a live <task_list> checklist in your visible replies whenever the work touches more than one file, takes 2+ distinct steps, or requires running commands/tests. Skip it only for a single-file, single-step quick fix. Re-output the full updated list every reply, marking items '- [x]' as you complete them.
 - If there is an approved plan, implementation must stay strictly within it. If it is incomplete, unsafe, or wrong, stop and ask for a plan revision.`;
 
 /** The "first request of this run" block: tells the model to read guidance files. */
@@ -68,7 +86,8 @@ export function delegationBlock(delegation: DelegationContext): string {
 - You do NOT have write/edit/delete/create/move/run tools. To change files, call delegate_tasks.
 - Inspect, decide architecture, then delegate implementation. You may launch 1-${delegation.maxSubAgents} coder tasks.
 - Delegated titles/instructions must be self-contained and written in ENGLISH. The sub-agent does not see this conversation.
-- Set parallel=true only for disjoint files. After results, verify changed files and delegate fixes if needed.`;
+- Set parallel=true only for disjoint files. After results, verify changed files and delegate fixes if needed.
+- You own the live <task_list>: seed it from the plan or your delegation breakdown, re-output it each reply, and mark a step '- [x]' when its coder sub-agent returns. Sub-agents do not keep the list.`;
 
   if (delegation.utilityModel) {
     block += `

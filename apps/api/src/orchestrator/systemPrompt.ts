@@ -9,5 +9,6 @@ export {
   buildCoderSystemPrompt,
   buildUtilitySystemPrompt,
   formatMemoryContext,
+  formatActivePlan,
   getModeStrategy
 } from "./prompts/index.js";

@@ -278,7 +278,7 @@ test("Orchestrator Integration Tests", async (t) => {
     assert.ok(chat.length <= 1200, `chat prompt too large: ${chat.length}`);
     assert.ok(plan.length <= 3200, `plan prompt too large: ${plan.length}`);
     assert.ok(build.length <= 2600, `build prompt too large: ${build.length}`);
-    assert.ok(architect.length <= 3600, `architect prompt too large: ${architect.length}`);
+    assert.ok(architect.length <= 3800, `architect prompt too large: ${architect.length}`);
     assert.ok(coder.length <= 900, `coder prompt too large: ${coder.length}`);
     assert.ok(utility.length <= 800, `utility prompt too large: ${utility.length}`);
 

@@ -2,7 +2,7 @@ import type { Run, RunMessage, ChatMessage } from "@agent-bridge/shared";
 import { RunRepository, MessageRepository, PlanRepository, MemoryRepository } from "../database/repositories.js";
 import { ProviderRegistry } from "../providers/ProviderRegistry.js";
 import { eventBus } from "./eventBus.js";
-import { buildSystemPrompt, formatMemoryContext, getModeStrategy } from "./systemPrompt.js";
+import { buildSystemPrompt, formatMemoryContext, formatActivePlan, getModeStrategy } from "./systemPrompt.js";
 import { DELEGATE_TASKS_TOOL, DELEGATE_UTILITY_TOOL } from "./workspaceTools.js";
 import { availableSchemas } from "./tools/index.js";
 import type { OrchestratorToolContext } from "./tools/index.js";
@@ -204,13 +204,21 @@ export class Orchestrator {
       // injected into the system prompt so the model honors them from the start.
       const memoryContext = formatMemoryContext(this.memoryRepo.listForContext(run.projectPath));
 
+      // In implementation modes, inject the run's active plan (created in plan
+      // mode via update_plan) so the model seeds and maintains its live
+      // <task_list> from it. Plan/chat modes skip this: plan mode owns the plan
+      // already, chat does no proactive work.
+      const activePlan = strategy.allowsMutation ? this.planRepo.getActive(runId) : null;
+      const planContext = formatActivePlan(activePlan);
+
       const systemPrompt = buildSystemPrompt(
         run.projectName,
         run.projectPath,
         run.mode,
         run.mode !== "chat" && shouldReadProjectGuidance,
         delegation,
-        memoryContext
+        memoryContext,
+        planContext
       );
 
       const finalText = await this.agentLoop.run(runId, run, [...initialMessages], {
