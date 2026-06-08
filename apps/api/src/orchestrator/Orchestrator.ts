@@ -6,8 +6,8 @@ import { eventBus } from "./eventBus.js";
 import { appendFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { db } from "../database/db.js";
-import { buildSystemPrompt, buildCoderSystemPrompt, buildUtilitySystemPrompt, formatMemoryContext } from "./systemPrompt.js";
-import { WORKSPACE_TOOLS, UPDATE_PLAN_TOOL, DELEGATE_TASKS_TOOL, DELEGATE_UTILITY_TOOL, UTILITY_TOOLS, UTILITY_TOOL_NAMES, SET_TITLE_TOOL, ASK_QUESTION_TOOL, REMEMBER_TOOL, executeWorkspaceToolAsync, buildPermissionPreview, DANGEROUS_TOOLS, READONLY_TOOLS, MODIFYING_TOOLS, permissionKey, commandEscapesWorkspace } from "./workspaceTools.js";
+import { buildSystemPrompt, buildCoderSystemPrompt, buildUtilitySystemPrompt, formatMemoryContext, getModeStrategy } from "./systemPrompt.js";
+import { WORKSPACE_TOOLS, DELEGATE_TASKS_TOOL, DELEGATE_UTILITY_TOOL, UTILITY_TOOLS, UTILITY_TOOL_NAMES, SET_TITLE_TOOL, ASK_QUESTION_TOOL, REMEMBER_TOOL, executeWorkspaceToolAsync, buildPermissionPreview, DANGEROUS_TOOLS, READONLY_TOOLS, MODIFYING_TOOLS, permissionKey, commandEscapesWorkspace } from "./workspaceTools.js";
 
 type PermissionDecision = "allow_once" | "allow_project" | "allow_always" | "deny";
 
@@ -492,11 +492,15 @@ export class Orchestrator {
       console.log(`[Orchestrator] Run ${runId} - Entering GENERATING state`);
       await this.emitStatus(runId, "generating");
 
+      // The mode strategy carries this run's full behavior: prompt section, base
+      // tool set, and gating policy. All per-mode branching reads from it.
+      const strategy = getModeStrategy(run.mode);
+
       // Dual-model: when a coder model is wired up, the main model is the
       // architect — it gets the delegate_tasks tool and architect instructions.
       // Delegation means implementation, so it is only offered in build-type
       // modes — never in plan mode (planning only) or chat mode (lightweight).
-      const canDelegate = run.mode !== "plan" && run.mode !== "chat";
+      const canDelegate = strategy.allowsDelegation;
       // An optional utility tier (cheap lookups/renames) rides alongside the
       // coder; it is only offered when the preset configured a utility model.
       const hasUtility = !!(run.utilityModel && run.utilityProviderId);
@@ -508,21 +512,13 @@ export class Orchestrator {
           }
         : undefined;
 
-      // Plan mode is planning-only: expose ONLY read-only tools plus update_plan,
-      // so the model literally cannot mutate the workspace or run commands there.
-      // When a coder is configured the architect is also held to read-only tools:
-      // it physically cannot write code / run commands itself, so the only way to
-      // implement is to delegate (weak models otherwise ignore the soft "prefer
-      // delegating" instruction and do all the work directly).
-      // Plain single-model runs get the full toolset.
-      const readonlyTools = WORKSPACE_TOOLS.filter(t => READONLY_TOOLS.has(t.function.name));
-      const baseTools = run.mode === "plan"
-        ? [...readonlyTools, UPDATE_PLAN_TOOL]
-        : run.mode === "chat"
-          ? WORKSPACE_TOOLS.filter(t => !MODIFYING_TOOLS.has(t.function.name))
-          : delegation
-            ? [...readonlyTools]
-            : [...WORKSPACE_TOOLS];
+      // The strategy selects the base tools for this mode. Plan mode gets
+      // read-only tools plus update_plan; chat gets non-mutating tools; build
+      // modes get the full toolset, except when a coder is configured — then the
+      // architect is held to read-only tools so the only way it can implement is
+      // to delegate (weak models otherwise ignore the soft "prefer delegating"
+      // instruction and do all the work directly).
+      const baseTools = strategy.selectBaseTools(!!delegation);
       const withDelegate = delegation ? [...baseTools, DELEGATE_TASKS_TOOL] : baseTools;
       // The utility-delegation tool is offered only when a utility model is
       // configured (and the run can delegate at all).
@@ -819,7 +815,7 @@ export class Orchestrator {
     // Safety net: delegation is implementation, which is forbidden in plan/chat
     // mode. The tool is normally not even advertised in those modes, but guard
     // here too in case the model calls it from replayed history.
-    if (run.mode === "plan" || run.mode === "chat") {
+    if (!getModeStrategy(run.mode).allowsDelegation) {
       return JSON.stringify({ success: false, error: `Cannot delegate tasks in ${run.mode} mode. Switch to Build mode to implement.` });
     }
 
@@ -893,7 +889,7 @@ export class Orchestrator {
     if (!run.utilityModel || !run.utilityProviderId) {
       return JSON.stringify({ success: false, error: "No utility model is configured for this run." });
     }
-    if (run.mode === "plan" || run.mode === "chat") {
+    if (!getModeStrategy(run.mode).allowsDelegation) {
       return JSON.stringify({ success: false, error: `Cannot delegate in ${run.mode} mode. Switch to Build mode.` });
     }
 
@@ -977,13 +973,18 @@ export class Orchestrator {
    * run_command always asks before executing), then runs it.
    */
   private async runToolCall(runId: string, run: Run, toolCall: any, agentRole?: string): Promise<string> {
+    // This run's mode strategy: it owns the gating policy (which tools are
+    // allowed, what must be approved) so the checks below read its flags instead
+    // of branching on run.mode directly.
+    const strategy = getModeStrategy(run.mode);
+
     // update_plan is an internal bookkeeping tool (no filesystem/network side
     // effects), so it runs silently without any permission prompt. The stable
     // plan PANEL belongs to Plan mode only — in any other mode (Build/Chat) we
     // reject the call (some models invoke it out of habit even though it isn't
     // offered) and tell the model to write the plan as plain inline text instead.
     if (toolCall.function?.name === "update_plan") {
-      if (run.mode !== "plan") {
+      if (!strategy.allowsPlanTool) {
         return JSON.stringify({
           success: false,
           error: `update_plan is only available in Plan mode. In ${run.mode} mode, do not create a plan panel — write any plan as plain text directly in your reply, then proceed.`
@@ -1040,18 +1041,19 @@ export class Orchestrator {
       });
     }
 
-    // HARD RULE: plan mode is read-only. No file mutation, no run_command, no
-    // fetch_url — even if the user approves. The model must switch to Build mode
-    // before anything changes. We block here regardless of any permission grant.
-    const isBuildMode = run.mode === "accept_edits" || run.mode === "auto" || run.mode === "ask_permissions" || run.mode === "full_access";
-    if (!isBuildMode && MODIFYING_TOOLS.has(toolName)) {
+    // HARD RULE: non-build modes are read-only. No file mutation, no run_command,
+    // no fetch_url — even if the user approves. The model must switch to Build
+    // mode before anything changes. We block here regardless of any grant.
+    if (!strategy.allowsMutation && MODIFYING_TOOLS.has(toolName)) {
       return JSON.stringify({
         success: false,
         error: `Blocked: "${toolName}" is not allowed in ${run.mode} mode. ${run.mode === "chat" ? "Chat" : "Plan"} mode makes NO changes to the workspace and runs NO commands. Ask the user to switch to Build mode to implement.`
       });
     }
 
-    if (run.mode === "plan" && !READONLY_TOOLS.has(toolName)) {
+    // Plan mode additionally allows ONLY read-only tools (it offers update_plan,
+    // handled above, plus inspection) — block anything else outright.
+    if (strategy.allowsPlanTool && !READONLY_TOOLS.has(toolName)) {
       return JSON.stringify({
         success: false,
         error: `Blocked: "${toolName}" is not allowed in Plan mode. Plan mode makes NO changes and runs NO commands. Ask the user to switch to Build mode to implement.`
@@ -1062,8 +1064,8 @@ export class Orchestrator {
     // run_command / fetch_url require approval in most modes — but NOT in Full
     // Access mode, where the user has explicitly opted in to autonomous operation
     // with no interruptions. A matching standing grant also lets them run silently
-    // in any mode. Other tools gate only in ask_permissions mode.
-    const mustGate = run.mode !== "full_access" && (isDangerous || run.mode === "ask_permissions");
+    // in any mode. Other tools gate only in ask_permissions mode (gatesEveryTool).
+    const mustGate = !strategy.bypassDangerousGating && (isDangerous || strategy.gatesEveryTool);
     const needsPermission = mustGate && !this.checkPermission(run, toolCall);
 
     if (needsPermission) {
