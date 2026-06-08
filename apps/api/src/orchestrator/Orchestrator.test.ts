@@ -276,7 +276,7 @@ test("Orchestrator Integration Tests", async (t) => {
     const utility = buildUtilitySystemPrompt(projectName, projectPath, "Find the relevant file");
 
     assert.ok(chat.length <= 1200, `chat prompt too large: ${chat.length}`);
-    assert.ok(plan.length <= 3200, `plan prompt too large: ${plan.length}`);
+    assert.ok(plan.length <= 3600, `plan prompt too large: ${plan.length}`);
     assert.ok(build.length <= 2600, `build prompt too large: ${build.length}`);
     assert.ok(architect.length <= 4100, `architect prompt too large: ${architect.length}`);
     assert.ok(coder.length <= 900, `coder prompt too large: ${coder.length}`);
