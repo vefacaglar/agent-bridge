@@ -30,6 +30,20 @@ export function dbPath(): string {
   return path.join(dataDir(), "locagens.db");
 }
 
+/**
+ * Writable provider catalog for the current environment. In prod it lives in the
+ * user data dir (seeded on first run from the bundled default below); the backend
+ * reads/writes here so provider edits persist outside the read-only app bundle.
+ */
+export function providerConfigPath(): string {
+  return path.join(dataDir(), "providers.json");
+}
+
+/** The committed catalog bundled into the app (prod only, read-only resource). */
+export function bundledProviderConfig(): string {
+  return path.join(process.resourcesPath, "config", "providers.json");
+}
+
 /** Bundled backend entry (prod only — forked as a child process). */
 export function backendScript(): string {
   return path.join(process.resourcesPath, "api", "server.bundle.cjs");
