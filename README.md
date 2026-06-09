@@ -28,14 +28,19 @@ Fastify backend
 SQLite persistence
 OpenAI-compatible provider adapter
 Anthropic provider adapter
-local providers.local.json configuration
+committed config/providers.json catalog with writable user overlay
+API keys kept in the OS keychain, never in JSON
+per-model context limits and tiered pricing -> local cost / usage logs
+reasoning-effort conversion per model (reasoningWire)
 single provider/model run creation
 optional architect/coder/utility agent presets
-chat, build, and plan modes
-workspace filesystem tools
+build, plan, and full-access modes
+workspace filesystem + web search tools
+ask_user_question multiple-choice flow
+two-tier persistent memory (global + project)
 permission flow for commands and URL fetches
 SSE live updates
-run/message/project/permission persistence
+run/message/project/permission/memory/usage persistence
 right-hand plan panel
 ```
 
@@ -70,8 +75,8 @@ agent-bridge/
   packages/
     shared/
       src/
-  providers.example.json
-  providers.local.json
+  config/
+    providers.json
   Agents.md
   Claude.md
   README.md
@@ -79,18 +84,24 @@ agent-bridge/
 
 ## Provider Configuration
 
-Provider settings are read from local JSON config outside the project by
-default. API keys are stored in macOS Keychain when available; the JSON config
-keeps only an `apiKeyRef`.
+Provider settings live in a committed, version-controlled catalog at
+`config/providers.json` (providers, models, per-model settings, pricing, and
+agent presets — never secrets), so every clone shares the same setup. API keys
+are never written to JSON: on macOS the key is stored in the Keychain and the
+file keeps only a non-secret `apiKeyRef` pointer.
 
 ```txt
-providers.example.json   committed template
-~/Library/Application Support/Locagens/providers.local.json   local provider config on macOS
+config/providers.json   committed catalog (NO secrets)
+OS keychain             holds the actual API key, referenced by apiKeyRef
 ```
 
-`LOCAGENS_PROVIDER_CONFIG_PATH` can override the local config path. A legacy
-project-level `providers.local.json` is still read as a fallback so existing
-setups can migrate by saving provider settings once.
+`LOCAGENS_PROVIDER_CONFIG_PATH` overrides the catalog path (used by tests). When
+`LOCAGENS_PROVIDER_USER_CONFIG_PATH` is set, the registry treats
+`config/providers.json` as a read-only base and merges a writable user overlay on
+top (the user's custom providers, edits, and removal tombstones); saves write
+only the overlay, so app updates can refresh the base catalog without losing the
+user's own providers. In the packaged desktop app the overlay lives at
+`<userData>/providers.user.json`.
 
 Example:
 
@@ -101,39 +112,45 @@ Example:
       "type": "openai-compatible",
       "displayName": "OpenAI",
       "baseUrl": "https://api.openai.com/v1",
-      "apiKey": "YOUR_OPENAI_API_KEY",
+      "apiKeyRef": "macos-keychain:openai",
       "models": ["gpt-5.5"]
     },
     "anthropic": {
       "type": "anthropic",
       "displayName": "Anthropic",
       "baseUrl": "https://api.anthropic.com",
-      "apiKey": "YOUR_ANTHROPIC_API_KEY",
+      "apiKeyRef": "macos-keychain:anthropic",
       "models": ["claude-sonnet-4.5"]
     }
   }
 }
 ```
 
-Provider secrets do not live in the JSON config on macOS. Public provider
-metadata omits API keys. The local settings API returns editable provider config
-with API keys masked; saves can preserve an existing key without sending it back
-to the browser.
+Public provider metadata omits API keys. The local settings API returns editable
+provider config with the API key masked by a preserve marker, so the frontend can
+edit other fields without receiving or re-posting the secret.
 
-`providers.local.json` may also include `agentPresets`, which define an
+Each provider's `modelSettings[model]` block may carry a `reasoning` effort, a
+`contextLimit`, and `pricing` (tiered input/output/cache rates per 1M tokens).
+Cost is computed locally from these rates and the provider's reported token
+counts, then stored per call in `usage_logs`. A model with no configured pricing
+costs 0.
+
+`config/providers.json` may also include `agentPresets`, which define an
 architect provider/model, coder provider/model, `maxSubAgents`, and optionally a
 utility provider/model.
 
 ## Modes
 
 ```txt
-Chat   lightweight conversation; no proactive workspace scan or edits
-Build  applies file edits directly through workspace tools
-Plan   writes a stable plan to the plan panel; no file mutations
+Build         applies file edits directly through workspace tools
+Plan          writes a stable plan to the plan panel; no file mutations
+Full Access   autonomous build; still gates dangerous tools
 ```
 
-The backend also supports `ask_permissions` and `auto` for older runs or direct
-API use. `run_command` and `fetch_url` always require permission unless a
+The backend also keeps `chat`, `ask_permissions`, and `auto` modes for older
+persisted runs or direct API use, but the UI only exposes the three above.
+`run_command`, `fetch_url`, and `search_web` always require permission unless a
 matching standing grant exists.
 
 When an agent preset is active in Build mode, the architect receives read-only
@@ -156,10 +173,13 @@ move_file
 search_files
 run_command
 fetch_url
-update_plan
+search_web
 set_chat_title
-delegate_tasks
-delegate_to_utility
+ask_user_question
+remember
+update_plan            (plan mode)
+delegate_tasks         (preset build modes)
+delegate_to_utility    (preset build modes)
 ```
 
 All file paths are resolved relative to the selected project folder and cannot
