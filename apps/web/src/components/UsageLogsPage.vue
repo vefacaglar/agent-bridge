@@ -8,12 +8,23 @@ const emit = defineEmits<{
 }>();
 
 const logs = ref<UsageLog[]>([]);
+const totalLogsCount = ref(0);
 const isLoading = ref(true);
 
 // Filter states
 const searchQuery = ref('');
 const selectedProvider = ref('');
 const selectedRole = ref('');
+
+// Unique values for filter dropdowns
+const uniqueProviders = ref<string[]>([]);
+const uniqueRoles = ref<string[]>([]);
+
+// Summary metrics
+const totalCost = ref(0);
+const totalCalls = ref(0);
+const totalTokens = ref(0);
+const avgCacheHitRate = ref(0);
 
 // Pagination states
 const currentPage = ref(1);
@@ -22,8 +33,29 @@ const itemsPerPage = 50;
 async function loadLogs() {
   isLoading.value = true;
   try {
-    const data = await api.getUsageLogs();
-    logs.value = data || [];
+    const offset = (currentPage.value - 1) * itemsPerPage;
+    const response = await api.getUsageLogs({
+      limit: itemsPerPage,
+      offset,
+      search: searchQuery.value || undefined,
+      providerId: selectedProvider.value || undefined,
+      agentRole: selectedRole.value || undefined
+    });
+
+    if (response) {
+      logs.value = response.logs || [];
+      totalLogsCount.value = response.total || 0;
+      uniqueProviders.value = response.uniqueProviders || [];
+      uniqueRoles.value = response.uniqueRoles || [];
+
+      totalCost.value = response.metrics?.totalCost || 0;
+      totalCalls.value = response.metrics?.totalCalls || 0;
+      totalTokens.value = response.metrics?.totalTokens || 0;
+      avgCacheHitRate.value = response.metrics?.avgCacheHitRate || 0;
+    } else {
+      logs.value = [];
+      totalLogsCount.value = 0;
+    }
   } catch (err) {
     console.error('Failed to load usage logs:', err);
   } finally {
@@ -33,74 +65,9 @@ async function loadLogs() {
 
 onMounted(loadLogs);
 
-// Unique values for filter dropdowns
-const uniqueProviders = computed(() => {
-  const set = new Set<string>();
-  logs.value.forEach(l => {
-    if (l.providerId) set.add(l.providerId);
-  });
-  return Array.from(set).sort();
-});
-
-const uniqueRoles = computed(() => {
-  const set = new Set<string>();
-  logs.value.forEach(l => {
-    if (l.agentRole) set.add(l.agentRole);
-  });
-  return Array.from(set).sort();
-});
-
-// Summary metrics (always based on the complete unfiltered list of logs, to show total usage)
-const totalCost = computed(() => {
-  return logs.value.reduce((sum, log) => sum + (log.cost || 0), 0);
-});
-
-const totalCalls = computed(() => {
-  return logs.value.length;
-});
-
-const totalTokens = computed(() => {
-  return logs.value.reduce((sum, log) => {
-    return sum + (log.inputTokens || 0) + (log.outputTokens || 0) + (log.cacheReadTokens || 0);
-  }, 0);
-});
-
-const avgCacheHitRate = computed(() => {
-  const totalPrompt = logs.value.reduce((sum, log) => {
-    return sum + (log.inputTokens || 0) + (log.cacheReadTokens || 0);
-  }, 0);
-  const totalCacheRead = logs.value.reduce((sum, log) => {
-    return sum + (log.cacheReadTokens || 0);
-  }, 0);
-  return totalPrompt > 0 ? Math.round((totalCacheRead / totalPrompt) * 100) : 0;
-});
-
-// Filtering logic
-const filteredLogs = computed(() => {
-  let result = logs.value;
-
-  if (selectedProvider.value) {
-    result = result.filter(l => l.providerId === selectedProvider.value);
-  }
-
-  if (selectedRole.value) {
-    result = result.filter(l => l.agentRole === selectedRole.value);
-  }
-
-  if (searchQuery.value) {
-    const query = searchQuery.value.toLowerCase().trim();
-    result = result.filter(l => 
-      l.runId.toLowerCase().includes(query) ||
-      (l.model && l.model.toLowerCase().includes(query))
-    );
-  }
-
-  return result;
-});
-
 // Pagination logic
 const totalPages = computed(() => {
-  return Math.ceil(filteredLogs.value.length / itemsPerPage) || 1;
+  return Math.ceil(totalLogsCount.value / itemsPerPage) || 1;
 });
 
 watch(totalPages, (newVal) => {
@@ -109,11 +76,26 @@ watch(totalPages, (newVal) => {
   }
 });
 
-const paginatedLogs = computed(() => {
-  const start = (currentPage.value - 1) * itemsPerPage;
-  const end = start + itemsPerPage;
-  return filteredLogs.value.slice(start, end);
-});
+const paginatedLogs = computed(() => logs.value);
+
+let debounceTimer: any = null;
+watch(
+  [currentPage, searchQuery, selectedProvider, selectedRole],
+  ([page, search, provider, role], [_, oldSearch, oldProvider, oldRole]) => {
+    const filtersChanged = search !== oldSearch || provider !== oldProvider || role !== oldRole;
+
+    if (filtersChanged && page !== 1) {
+      currentPage.value = 1;
+      return;
+    }
+
+    clearTimeout(debounceTimer);
+    const delay = search !== oldSearch ? 300 : 0;
+    debounceTimer = setTimeout(() => {
+      loadLogs();
+    }, delay);
+  }
+);
 
 function setPage(page: number) {
   if (page < 1 || page > totalPages.value) return;
@@ -262,14 +244,14 @@ function getHitRateClass(rate: number): string {
         <span>Loading usage logs...</span>
       </div>
 
-      <div v-else-if="filteredLogs.length === 0" class="empty-state">
+      <div v-else-if="totalLogsCount === 0" class="empty-state">
         <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="empty-icon">
           <circle cx="12" cy="12" r="10"/>
           <line x1="12" y1="8" x2="12" y2="12"/>
           <line x1="12" y1="16" x2="12.01" y2="16"/>
         </svg>
         <h3>No Logs Found</h3>
-        <p v-if="logs.length > 0">No records match the current filter criteria.</p>
+        <p v-if="totalCalls > 0">No records match the current filter criteria.</p>
         <p v-else>Run a chat session to generate usage and pricing logs.</p>
       </div>
 
@@ -332,9 +314,9 @@ function getHitRateClass(rate: number): string {
     </div>
 
     <!-- Pagination Controls -->
-    <div v-if="filteredLogs.length > 0" class="pagination-bar">
+    <div v-if="totalLogsCount > 0" class="pagination-bar">
       <div class="page-info">
-        Showing {{ (currentPage - 1) * itemsPerPage + 1 }} - {{ Math.min(currentPage * itemsPerPage, filteredLogs.length) }} of {{ filteredLogs.length }} runs
+        Showing {{ (currentPage - 1) * itemsPerPage + 1 }} - {{ Math.min(currentPage * itemsPerPage, totalLogsCount) }} of {{ totalLogsCount }} runs
       </div>
       <div class="page-buttons">
         <button 

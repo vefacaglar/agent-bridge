@@ -422,8 +422,21 @@ export function registerRunRoutes(server: FastifyInstance, ctx: AppContext) {
     });
   });
 
-  // Get all usage logs.
-  server.get("/api/usage-logs", async () => {
-    return ctx.usageLogRepo.listAll();
+  // Get paginated/filtered usage logs.
+  server.get("/api/usage-logs", async (request) => {
+    const query = request.query as any;
+    const limit = parseInt(query.limit) || 50;
+    const offset = parseInt(query.offset) || 0;
+    const search = query.search || undefined;
+    const providerId = query.providerId || undefined;
+    const agentRole = query.agentRole || undefined;
+
+    return ctx.usageLogRepo.getPaginated({
+      limit,
+      offset,
+      search,
+      providerId,
+      agentRole
+    });
   });
 }

@@ -339,3 +339,16 @@ export interface UsageLog {
   durationMs?: number;
 }
 
+export interface PaginatedUsageLogs {
+  logs: UsageLog[];
+  total: number;
+  uniqueProviders: string[];
+  uniqueRoles: string[];
+  metrics: {
+    totalCost: number;
+    totalCalls: number;
+    totalTokens: number;
+    avgCacheHitRate: number;
+  };
+}
+

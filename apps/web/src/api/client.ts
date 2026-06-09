@@ -1,4 +1,4 @@
-import type { ProviderMetadata, Run, RunMessage, Project, PermissionRule, Plan, AgentPreset, Memory, MemoryCategory, MemoryScope, AppSettings, UsageLog } from '@agent-bridge/shared';
+import type { ProviderMetadata, Run, RunMessage, Project, PermissionRule, Plan, AgentPreset, Memory, MemoryCategory, MemoryScope, AppSettings, PaginatedUsageLogs } from '@agent-bridge/shared';
 
 /**
  * Resolves the backend base URL. The config file (settings.json) is the single
@@ -100,7 +100,24 @@ export const api = {
   getRunPending: (runId: string) => getJson<{ permissionRequest: any | null; questionRequest: any | null }>(`/api/runs/${runId}/pending`),
   getProjects: () => getJson<Project[]>('/api/projects'),
   getPermissions: () => getJson<PermissionRule[]>('/api/permissions'),
-  getUsageLogs: () => getJson<UsageLog[]>('/api/usage-logs'),
+  getUsageLogs: (params?: {
+    limit?: number;
+    offset?: number;
+    search?: string;
+    providerId?: string;
+    agentRole?: string;
+  }) => {
+    const searchParams = new URLSearchParams();
+    if (params) {
+      if (params.limit !== undefined) searchParams.set('limit', String(params.limit));
+      if (params.offset !== undefined) searchParams.set('offset', String(params.offset));
+      if (params.search) searchParams.set('search', params.search);
+      if (params.providerId) searchParams.set('providerId', params.providerId);
+      if (params.agentRole) searchParams.set('agentRole', params.agentRole);
+    }
+    const queryStr = searchParams.toString();
+    return getJson<PaginatedUsageLogs>(`/api/usage-logs${queryStr ? '?' + queryStr : ''}`);
+  },
 
   eventsUrl: (runId: string) => `${API_BASE}/api/runs/${runId}/events`,
 

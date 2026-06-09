@@ -1,4 +1,4 @@
-import type { Run, RunMessage, RunStatus, Project, PermissionRule, Plan, PlanTask, Memory, MemoryScope, MemoryCategory, UsageLog } from "@agent-bridge/shared";
+import type { Run, RunMessage, RunStatus, Project, PermissionRule, Plan, PlanTask, Memory, MemoryScope, MemoryCategory, UsageLog, PaginatedUsageLogs } from "@agent-bridge/shared";
 import { db, runDbWrite } from "./db.js";
 
 
@@ -539,6 +539,97 @@ export class UsageLogRepository {
       createdAt: row.created_at,
       durationMs: row.duration_ms || undefined
     }));
+  }
+
+  getPaginated(params: {
+    limit: number;
+    offset: number;
+    search?: string;
+    providerId?: string;
+    agentRole?: string;
+  }): PaginatedUsageLogs {
+    const whereClauses: string[] = [];
+    const queryParams: any[] = [];
+
+    if (params.providerId) {
+      whereClauses.push("provider_id = ?");
+      queryParams.push(params.providerId);
+    }
+
+    if (params.agentRole) {
+      whereClauses.push("agent_role = ?");
+      queryParams.push(params.agentRole);
+    }
+
+    if (params.search) {
+      whereClauses.push("(run_id LIKE ? OR model LIKE ?)");
+      const term = `%${params.search.trim()}%`;
+      queryParams.push(term, term);
+    }
+
+    const whereSql = whereClauses.length > 0 ? "WHERE " + whereClauses.join(" AND ") : "";
+
+    // 1. Paginated query
+    const selectSql = `SELECT * FROM usage_logs ${whereSql} ORDER BY created_at DESC LIMIT ? OFFSET ?`;
+    const rows = db.prepare(selectSql).all(...queryParams, params.limit, params.offset) as any[];
+    const logs = rows.map((row) => ({
+      id: row.id,
+      runId: row.run_id,
+      agentRole: row.agent_role || undefined,
+      providerId: row.provider_id,
+      model: row.model,
+      inputTokens: row.input_tokens,
+      outputTokens: row.output_tokens,
+      cacheReadTokens: row.cache_read_tokens,
+      cacheWriteTokens: row.cache_write_tokens,
+      cacheHitRate: row.cache_hit_rate,
+      cost: row.cost,
+      createdAt: row.created_at,
+      durationMs: row.duration_ms || undefined
+    }));
+
+    // 2. Count query
+    const countSql = `SELECT COUNT(*) as total FROM usage_logs ${whereSql}`;
+    const totalRow = db.prepare(countSql).get(...queryParams) as any;
+    const total = totalRow ? totalRow.total : 0;
+
+    // 3. Dropdown helpers - Unfiltered unique values
+    const providersRows = db.prepare("SELECT DISTINCT provider_id FROM usage_logs WHERE provider_id IS NOT NULL AND provider_id != ''").all() as any[];
+    const uniqueProviders = providersRows.map((row) => row.provider_id).sort();
+
+    const rolesRows = db.prepare("SELECT DISTINCT agent_role FROM usage_logs WHERE agent_role IS NOT NULL AND agent_role != ''").all() as any[];
+    const uniqueRoles = rolesRows.map((row) => row.agent_role).sort();
+
+    // 4. Overall metrics - Unfiltered
+    const metricsRow = db.prepare(`
+      SELECT 
+        SUM(cost) as totalCost, 
+        COUNT(*) as totalCalls, 
+        SUM(input_tokens + output_tokens + COALESCE(cache_read_tokens, 0)) as totalTokens,
+        SUM(input_tokens + COALESCE(cache_read_tokens, 0)) as totalPromptTokens,
+        SUM(COALESCE(cache_read_tokens, 0)) as totalCacheReadTokens
+      FROM usage_logs
+    `).get() as any;
+
+    const totalCost = metricsRow?.totalCost || 0;
+    const totalCalls = metricsRow?.totalCalls || 0;
+    const totalTokens = metricsRow?.totalTokens || 0;
+    const totalPrompt = metricsRow?.totalPromptTokens || 0;
+    const totalCacheRead = metricsRow?.totalCacheReadTokens || 0;
+    const avgCacheHitRate = totalPrompt > 0 ? Math.round((totalCacheRead / totalPrompt) * 100) : 0;
+
+    return {
+      logs,
+      total,
+      uniqueProviders,
+      uniqueRoles,
+      metrics: {
+        totalCost,
+        totalCalls,
+        totalTokens,
+        avgCacheHitRate
+      }
+    };
   }
 }
 
