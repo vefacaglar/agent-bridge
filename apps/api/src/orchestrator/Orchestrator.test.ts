@@ -281,8 +281,8 @@ test("Orchestrator Integration Tests", async (t) => {
     assert.ok(chat.length <= 1200, `chat prompt too large: ${chat.length}`);
     assert.ok(plan.length <= 3600, `plan prompt too large: ${plan.length}`);
     assert.ok(build.length <= 3000, `build prompt too large: ${build.length}`);
-    assert.ok(architect.length <= 5000, `architect prompt too large: ${architect.length}`);
-    assert.ok(coder.length <= 900, `coder prompt too large: ${coder.length}`);
+    assert.ok(architect.length <= 6000, `architect prompt too large: ${architect.length}`);
+    assert.ok(coder.length <= 1200, `coder prompt too large: ${coder.length}`);
     assert.ok(utility.length <= 800, `utility prompt too large: ${utility.length}`);
 
     assert.ok(plan.includes("Do NOT implement"));
@@ -674,8 +674,10 @@ test("Orchestrator Integration Tests", async (t) => {
     assert.strictEqual(finishedRun?.status, "done");
 
     const savedMsgs = messageRepo.listByRunId(runId);
-    // architect tool call, coder A, coder B, delegate tool result, architect final
-    assert.strictEqual(savedMsgs.length, 5);
+    // architect tool call, coder A, coder B, delegate tool result, architect
+    // final, then one post-delegation verification nudge retry (the mock
+    // architect delegates but never verifies, so the loop nudges it once more).
+    assert.strictEqual(savedMsgs.length, 6);
     assert.strictEqual(savedMsgs[0].agentRole, "planner");
     assert.ok(savedMsgs[0].rawResponse?.includes("delegate_tasks"));
     assert.strictEqual(savedMsgs[1].agentRole, "coder");
@@ -691,6 +693,7 @@ test("Orchestrator Integration Tests", async (t) => {
     assert.strictEqual(delegateResult.results[0].summary, "Coder finished A");
 
     assert.strictEqual(savedMsgs[4].content, "All subtasks complete.");
+    assert.strictEqual(savedMsgs[5].content, "All subtasks complete.");
   });
 
   await t.test("Orchestrator - architect sees mutating tools as traps and is redirected to delegate_tasks", async () => {

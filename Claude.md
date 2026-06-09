@@ -45,7 +45,7 @@ Repository style: monorepo
 For quick navigation and to minimize token usage, consult these reference documents before making changes:
 
 - **`apps/api/src/routes/API_ENDPOINT_MAP.md`** — Complete HTTP API reference (30 endpoints with route handlers and repository calls)
-- **`docs/database-schema.md`** — Full SQLite schema (6 tables, all columns, indexes, migrations, relationships)
+- **`docs/database-schema.md`** — Full SQLite schema (7 tables, all columns, indexes, migrations, relationships)
 
 These maps show file locations, dependencies, and data flow without requiring you to read the source code.
 
@@ -80,7 +80,16 @@ apps/
         ProviderRegistry.ts    loads providers.local.json, provider configs, presets
       database/
         db.ts                  Connection + schema + migrations + startup cleanup
-        repositories.ts        Run/Message/Project/Permission/Plan repositories
+        repositories.ts        Barrel: re-exports every repository + interface
+        repositories/          One file per repository (DI: db injected via ctor)
+          interfaces.ts        I*Repository contracts + *Input types
+          RunRepository.ts     Run rows
+          MessageRepository.ts Message rows
+          PlanRepository.ts    Plan rows
+          ProjectRepository.ts Project rows
+          PermissionRepository.ts  Standing permission grants
+          MemoryRepository.ts  Global/project memory rows
+          UsageLogRepository.ts    Token/cost usage logs (paginated)
 
   web/                         Vue frontend
     src/
@@ -535,6 +544,8 @@ projects     path (pk), name, created_at
 permissions  scope, project_path, tool, command, status; UNIQUE(scope, project_path, tool, command)
 plans        id, run_id, title, body?, tasks (JSON), status ('active'|'completed'), version
 memory       id, scope ('global'|'project'), project_path, category, content, created_at, updated_at
+usage_logs   id, run_id, agent_role?, provider_id, model, input/output/cache tokens,
+             cache_hit_rate, cost, duration_ms?, created_at
 ```
 
 All agent messages are stored. A run must be reopenable after restart. On
