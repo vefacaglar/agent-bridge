@@ -518,5 +518,24 @@ export class UsageLogRepository {
       createdAt: row.created_at
     }));
   }
+
+  listAll(): UsageLog[] {
+    const stmt = db.prepare("SELECT * FROM usage_logs ORDER BY created_at DESC");
+    const rows = stmt.all() as any[];
+    return rows.map((row) => ({
+      id: row.id,
+      runId: row.run_id,
+      agentRole: row.agent_role || undefined,
+      providerId: row.provider_id,
+      model: row.model,
+      inputTokens: row.input_tokens,
+      outputTokens: row.output_tokens,
+      cacheReadTokens: row.cache_read_tokens,
+      cacheWriteTokens: row.cache_write_tokens,
+      cacheHitRate: row.cache_hit_rate,
+      cost: row.cost,
+      createdAt: row.created_at
+    }));
+  }
 }
 

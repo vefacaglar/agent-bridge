@@ -160,8 +160,21 @@ export class AgentLoop {
       // Prompt-cache measurement: one line per model call so cache hit-rate is
       // observable live in the server console during a run. inputTokens is the
       // fresh (full-rate) prompt; cacheRead is served cheaply from cache.
-      if (response.usage) {
-        const u = response.usage;
+      let usage = response.usage;
+      if (!usage) {
+        // Fallback estimation (e.g. for streaming OpenAI calls where usage chunk is omitted)
+        const promptText = (opts.systemPrompt || "") + messages.map(m => m.content || "").join("\n");
+        const estIn = Math.round(promptText.length / 3.8) || 1;
+        const estOut = Math.round((response.content || "").length / 3.8) || 1;
+        usage = {
+          inputTokens: estIn,
+          outputTokens: estOut,
+          totalTokens: estIn + estOut
+        };
+      }
+
+      if (usage) {
+        const u = usage;
         const fresh = u.inputTokens ?? 0;
         const cacheRead = u.cacheReadInputTokens ?? 0;
         const cacheWrite = u.cacheWriteInputTokens ?? 0;

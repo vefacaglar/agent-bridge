@@ -8,6 +8,7 @@ import AddProjectModal from './components/AddProjectModal.vue';
 import SettingsScreen from './components/settings/SettingsScreen.vue';
 import AgentTaskList from './components/AgentTaskList.vue';
 import PlanPanel from './components/PlanPanel.vue';
+import UsageLogsPage from './components/UsageLogsPage.vue';
 import { collectWorkspaceChanges, hasWorkspaceChangeSignals } from './lib/workspaceChanges';
 import { collectAgentSummaries, collectAgentSummaryLinks } from './lib/messageGroups';
 
@@ -29,7 +30,8 @@ const {
   deleteProject,
   providersConfig,
   isProvidersConfigLoading,
-  reloadProviders
+  reloadProviders,
+  showUsageLogsPage
 } = useAppShell();
 
 const {
@@ -76,6 +78,7 @@ function toggleSidebar() {
 
 function handleSelectRun(run: Run) {
   chat.selectRun(run);
+  showUsageLogsPage.value = false;
   if (window.innerWidth <= 760) {
     isSidebarCollapsed.value = true;
     sidePanelCollapsed.value = true;
@@ -84,6 +87,7 @@ function handleSelectRun(run: Run) {
 
 function handleNewChat() {
   chat.startNewRunSetup();
+  showUsageLogsPage.value = false;
   if (window.innerWidth <= 760) {
     isSidebarCollapsed.value = true;
     sidePanelCollapsed.value = true;
@@ -92,9 +96,19 @@ function handleNewChat() {
 
 function handleSelectProjectAndNewChat(path: string) {
   selectProjectAndNewChat(path);
+  showUsageLogsPage.value = false;
   if (window.innerWidth <= 760) {
     isSidebarCollapsed.value = true;
     sidePanelCollapsed.value = true;
+  }
+}
+
+function handleSelectRunFromLogs(runId: string) {
+  const run = runs.value.find(r => r.id === runId);
+  if (run) {
+    handleSelectRun(run);
+  } else {
+    alert("Chat session not found or has been deleted.");
   }
 }
 
@@ -346,6 +360,7 @@ onUnmounted(() => {
       :runs="runs"
       :active-run-id="activeRunId"
       :is-sidebar-collapsed="isSidebarCollapsed"
+      :show-usage-logs-page="showUsageLogsPage"
       @new-chat="handleNewChat"
       @add-project="projects.openAddProjectModal"
       @select-project="selectProject"
@@ -354,9 +369,10 @@ onUnmounted(() => {
       @delete-project="deleteProject"
       @open-settings="openSettings"
       @toggle-sidebar="toggleSidebar"
+      @open-usage-logs="showUsageLogsPage = true"
     />
 
-    <main class="chat-shell" :class="{ 'landing-mode': !activeRun }">
+    <main class="chat-shell" :class="{ 'landing-mode': !activeRun && !showUsageLogsPage }">
       <header class="chat-header">
         <div class="chat-header-inner">
           <div class="thread-title">
@@ -367,7 +383,15 @@ onUnmounted(() => {
               </svg>
             </button>
             
-            <div v-if="activeRun" class="project-breadcrumb">
+            <div v-if="showUsageLogsPage" class="project-breadcrumb">
+              <svg class="folder-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="20" x2="18" y2="10"/>
+                <line x1="12" y1="20" x2="12" y2="4"/>
+                <line x1="6" y1="20" x2="6" y2="14"/>
+              </svg>
+              <span class="breadcrumb-project" style="font-weight: 500;">Usage Logs</span>
+            </div>
+            <div v-else-if="activeRun" class="project-breadcrumb">
               <svg class="folder-icon open-folder" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="m6 14 1.45-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.55 6a2 2 0 0 1-1.94 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2A2 2 0 0 0 12.07 6H20a2 2 0 0 1 2 2v2"/>
               </svg>
@@ -396,7 +420,11 @@ onUnmounted(() => {
 
       <div v-if="activeRun" class="header-fade-overlay"></div>
 
-      <template v-if="activeRun">
+      <template v-if="showUsageLogsPage">
+        <UsageLogsPage @select-run="handleSelectRunFromLogs" />
+      </template>
+
+      <template v-else-if="activeRun">
         <section :ref="setMessagesContainer" class="messages-scroll">
           <MessageThread
             :active-run="activeRun"
@@ -483,8 +511,8 @@ onUnmounted(() => {
 
     <PlanPanel
       ref="planPanelRef"
-      v-if="sidePanelOpen"
-      :isOpen="sidePanelOpen"
+      v-if="sidePanelOpen && !showUsageLogsPage"
+      :isOpen="sidePanelOpen && !showUsageLogsPage"
       :plan="currentPlan"
       :changes="workspaceChanges"
       :agents="agentSummaries"

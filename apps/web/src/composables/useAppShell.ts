@@ -1,4 +1,4 @@
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { ProviderMetadata, Run, AgentPreset } from '@agent-bridge/shared';
 import { api } from '../api/client';
 import { useChatAutoScroll } from './useChatAutoScroll';
@@ -18,6 +18,13 @@ export function useAppShell() {
 
   const activeRunId = ref<string | null>(localStorage.getItem('activeRunId'));
   const activeRun = ref<Run | null>(null);
+  const showUsageLogsPage = ref(false);
+
+  watch(activeRunId, () => {
+    if (activeRunId.value) {
+      showUsageLogsPage.value = false;
+    }
+  });
 
   const settings = useComposerSettings(providers, agentPresets, activeRunId, activeRun);
 
@@ -145,6 +152,7 @@ export function useAppShell() {
     deleteProject,
     providersConfig,
     isProvidersConfigLoading,
-    reloadProviders
+    reloadProviders,
+    showUsageLogsPage
   };
 }

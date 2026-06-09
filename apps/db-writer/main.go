@@ -171,6 +171,22 @@ func initDB(db *sql.DB) error {
 			updated_at TEXT NOT NULL
 		)`,
 		"CREATE INDEX IF NOT EXISTS idx_memory_scope_project ON memory(scope, project_path)",
+		`CREATE TABLE IF NOT EXISTS usage_logs (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			run_id TEXT NOT NULL,
+			agent_role TEXT,
+			provider_id TEXT NOT NULL,
+			model TEXT NOT NULL,
+			input_tokens INTEGER NOT NULL DEFAULT 0,
+			output_tokens INTEGER NOT NULL DEFAULT 0,
+			cache_read_tokens INTEGER NOT NULL DEFAULT 0,
+			cache_write_tokens INTEGER NOT NULL DEFAULT 0,
+			cache_hit_rate REAL NOT NULL DEFAULT 0.0,
+			cost REAL NOT NULL DEFAULT 0.0,
+			created_at TEXT NOT NULL,
+			FOREIGN KEY (run_id) REFERENCES runs(id)
+		)`,
+		"CREATE INDEX IF NOT EXISTS idx_usage_logs_run ON usage_logs(run_id)",
 	}
 	for _, stmt := range stmts {
 		if _, err := db.Exec(stmt); err != nil {
@@ -266,6 +282,16 @@ func execute(db *sql.DB, req request) (interface{}, error) {
 		return exec(db, "DELETE FROM memory WHERE id = ?", intValue(req.Args, "id"))
 	case "memory.clear":
 		return exec(db, "DELETE FROM memory")
+	case "usage_logs.create":
+		logObj := obj(req.Args, "log")
+		return exec(db, `INSERT INTO usage_logs (
+			run_id, agent_role, provider_id, model,
+			input_tokens, output_tokens, cache_read_tokens, cache_write_tokens,
+			cache_hit_rate, cost, created_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			str(logObj, "runId"), nullable(logObj, "agentRole"), str(logObj, "providerId"), str(logObj, "model"),
+			intValue(logObj, "inputTokens"), intValue(logObj, "outputTokens"), intValue(logObj, "cacheReadTokens"), intValue(logObj, "cacheWriteTokens"),
+			floatValue(logObj, "cacheHitRate"), floatValue(logObj, "cost"), str(logObj, "createdAt"))
 	default:
 		return nil, fmt.Errorf("unknown op %q", req.Op)
 	}
@@ -370,6 +396,21 @@ func intValue(m map[string]interface{}, key string) int64 {
 		return int64(v)
 	default:
 		return 0
+	}
+}
+
+func floatValue(m map[string]interface{}, key string) float64 {
+	switch v := m[key].(type) {
+	case float64:
+		return v
+	case float32:
+		return float64(v)
+	case int64:
+		return float64(v)
+	case int:
+		return float64(v)
+	default:
+		return 0.0
 	}
 }
 

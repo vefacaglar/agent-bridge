@@ -421,4 +421,9 @@ export function registerRunRoutes(server: FastifyInstance, ctx: AppContext) {
       eventBus.off(`run:${id}`, listener);
     });
   });
+
+  // Get all usage logs.
+  server.get("/api/usage-logs", async () => {
+    return ctx.usageLogRepo.listAll();
+  });
 }

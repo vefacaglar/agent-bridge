@@ -15,6 +15,7 @@ const props = defineProps<{
   runs: Run[];
   activeRunId: string | null;
   isSidebarCollapsed: boolean;
+  showUsageLogsPage: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -26,6 +27,7 @@ const emit = defineEmits<{
   (e: 'delete-project', path: string): void;
   (e: 'open-settings'): void;
   (e: 'toggle-sidebar'): void;
+  (e: 'open-usage-logs'): void;
 }>();
 
 const expandedProjects = ref<Record<string, boolean>>((() => {
@@ -118,6 +120,15 @@ function onDeleteProject(path: string, event: Event) {
         <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
       </svg>
       <span>New session</span>
+    </button>
+
+    <button class="nav-action usage-logs-action" :class="{ active: showUsageLogsPage }" @click="emit('open-usage-logs')" style="margin-top: 4px;">
+      <svg class="usage-logs-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;">
+        <line x1="18" y1="20" x2="18" y2="10"/>
+        <line x1="12" y1="20" x2="12" y2="4"/>
+        <line x1="6" y1="20" x2="6" y2="14"/>
+      </svg>
+      <span>Usage Logs</span>
     </button>
 
     <div class="sidebar-block projects-accordion">
@@ -217,6 +228,13 @@ function onDeleteProject(path: string, event: Event) {
 .nav-action {
   padding: 4px 8px;
   font-size: 0.88rem;
+}
+
+.nav-action.active {
+  background: var(--sidebar-active);
+  border: 1px solid var(--border-soft);
+  color: var(--text);
+  font-weight: 500;
 }
 
 .sidebar-header {
