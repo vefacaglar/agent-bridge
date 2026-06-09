@@ -7,7 +7,18 @@
       "models": [
         "gpt-5.5"
       ],
-      "modelSettings": {},
+      "modelSettings": {
+        "gpt-5.5": {
+          "pricing": {
+            "tiers": [
+              {
+                "inputRate": 5,
+                "outputRate": 15
+              }
+            ]
+          }
+        }
+      },
       "apiKeyRef": "macos-keychain:openai"
     },
     "anthropic": {
@@ -19,7 +30,38 @@
         "claude-opus-4-8",
         "claude-haiku-4-5-20251001"
       ],
-      "modelSettings": {},
+      "modelSettings": {
+        "claude-sonnet-4-6": {
+          "pricing": {
+            "tiers": [
+              {
+                "inputRate": 3,
+                "outputRate": 15
+              }
+            ]
+          }
+        },
+        "claude-opus-4-8": {
+          "pricing": {
+            "tiers": [
+              {
+                "inputRate": 15,
+                "outputRate": 75
+              }
+            ]
+          }
+        },
+        "claude-haiku-4-5-20251001": {
+          "pricing": {
+            "tiers": [
+              {
+                "inputRate": 0.25,
+                "outputRate": 1.25
+              }
+            ]
+          }
+        }
+      },
       "apiKeyRef": "macos-keychain:anthropic"
     },
     "opencode": {
@@ -42,7 +84,118 @@
         "mimo-v2.5",
         "hy3-preview"
       ],
-      "modelSettings": {},
+      "modelSettings": {
+        "minimax-m3": {
+          "pricing": {
+            "tiers": [
+              {
+                "inputRate": 0.9,
+                "outputRate": 2.7
+              }
+            ]
+          }
+        },
+        "minimax-m2.7": {
+          "pricing": {
+            "tiers": [
+              {
+                "inputRate": 0.6,
+                "outputRate": 1.8
+              }
+            ]
+          }
+        },
+        "minimax-m2.5": {
+          "pricing": {
+            "tiers": [
+              {
+                "inputRate": 0.3,
+                "outputRate": 0.9
+              }
+            ]
+          }
+        },
+        "kimi-k2.6": {
+          "pricing": {
+            "tiers": [
+              {
+                "inputRate": 1,
+                "outputRate": 3
+              }
+            ]
+          }
+        },
+        "kimi-k2.5": {
+          "pricing": {
+            "tiers": [
+              {
+                "inputRate": 0.8,
+                "outputRate": 2.4
+              }
+            ]
+          }
+        },
+        "glm-5.1": {
+          "pricing": {
+            "tiers": [
+              {
+                "inputRate": 1,
+                "outputRate": 3
+              }
+            ]
+          }
+        },
+        "glm-5": {
+          "pricing": {
+            "tiers": [
+              {
+                "inputRate": 0.6,
+                "outputRate": 1.8
+              }
+            ]
+          }
+        },
+        "deepseek-v4-pro": {
+          "pricing": {
+            "tiers": [
+              {
+                "inputRate": 0.3,
+                "outputRate": 0.5
+              }
+            ]
+          }
+        },
+        "deepseek-v4-flash": {
+          "pricing": {
+            "tiers": [
+              {
+                "inputRate": 0.14,
+                "outputRate": 0.28
+              }
+            ]
+          }
+        },
+        "mimo-v2.5-pro": {
+          "pricing": {
+            "tiers": [
+              {
+                "inputRate": 1.2,
+                "outputRate": 3.6
+              }
+            ]
+          }
+        },
+        "hy3-preview": {
+          "pricing": {
+            "tiers": [
+              {
+                "inputRate": 0.5,
+                "outputRate": 1.5
+              }
+            ]
+          }
+        }
+      },
       "apiKeyRef": "macos-keychain:opencode"
     },
     "commandcode": {
@@ -90,7 +243,15 @@
             "low",
             "medium",
             "high"
-          ]
+          ],
+          "pricing": {
+            "tiers": [
+              {
+                "inputRate": 0.3,
+                "outputRate": 0.5
+              }
+            ]
+          }
         },
         "deepseek/deepseek-v4-flash": {
           "reasoning": {
@@ -117,7 +278,116 @@
             "low",
             "medium",
             "high"
-          ]
+          ],
+          "pricing": {
+            "tiers": [
+              {
+                "inputRate": 0.14,
+                "outputRate": 0.28
+              }
+            ]
+          }
+        },
+        "moonshotai/Kimi-K2.6": {
+          "pricing": {
+            "tiers": [
+              {
+                "inputRate": 1,
+                "outputRate": 3
+              }
+            ]
+          }
+        },
+        "zai-org/GLM-5.1": {
+          "pricing": {
+            "tiers": [
+              {
+                "inputRate": 1,
+                "outputRate": 3
+              }
+            ]
+          }
+        },
+        "MiniMaxAI/MiniMax-M3": {
+          "pricing": {
+            "tiers": [
+              {
+                "inputRate": 0.9,
+                "outputRate": 2.7
+              }
+            ]
+          }
+        },
+        "Qwen/Qwen3.6-Max-Preview": {
+          "pricing": {
+            "tiers": [
+              {
+                "inputRate": 1.2,
+                "outputRate": 3.6
+              }
+            ]
+          }
+        },
+        "Qwen/Qwen3.6-Plus": {
+          "pricing": {
+            "tiers": [
+              {
+                "inputRate": 0.4,
+                "outputRate": 1.2
+              }
+            ]
+          }
+        },
+        "Qwen/Qwen3.7-Max": {
+          "pricing": {
+            "tiers": [
+              {
+                "inputRate": 1.2,
+                "outputRate": 3.6
+              }
+            ]
+          }
+        },
+        "Qwen/Qwen3.7-Plus": {
+          "pricing": {
+            "tiers": [
+              {
+                "inputRate": 0.4,
+                "outputRate": 1.2
+              }
+            ]
+          }
+        },
+        "stepfun/Step-3.7-Flash": {
+          "pricing": {
+            "tiers": [
+              {
+                "inputRate": 0.1,
+                "outputRate": 0.2
+              }
+            ]
+          }
+        },
+        "xiaomi/mimo-v2.5-pro": {
+          "pricing": {
+            "tiers": [
+              {
+                "inputRate": 1.2,
+                "outputRate": 3.6
+              }
+            ]
+          }
+        },
+        "nvidia/nemotron-3-ultra-550b-a55b": {
+          "pricing": {
+            "tiers": [
+              {
+                "inputRate": 0.6,
+                "outputRate": 2.6,
+                "cacheReadRate": 0.2
+              }
+            ]
+          }
         }
       },
       "apiKeyRef": "macos-keychain:commandcode"
@@ -183,7 +453,15 @@
             "low",
             "medium",
             "high"
-          ]
+          ],
+          "pricing": {
+            "tiers": [
+              {
+                "inputRate": 1.2,
+                "outputRate": 3.6
+              }
+            ]
+          }
         }
       },
       "apiKeyRef": "macos-keychain:xiaomitokenplan"
@@ -198,7 +476,48 @@
         "qwen3.6-max",
         "qwen3.6-plus"
       ],
-      "modelSettings": {},
+      "modelSettings": {
+        "qwen3.7-max": {
+          "pricing": {
+            "tiers": [
+              {
+                "inputRate": 1.2,
+                "outputRate": 3.6
+              }
+            ]
+          }
+        },
+        "qwen3.7-plus": {
+          "pricing": {
+            "tiers": [
+              {
+                "inputRate": 0.4,
+                "outputRate": 1.2
+              }
+            ]
+          }
+        },
+        "qwen3.6-max": {
+          "pricing": {
+            "tiers": [
+              {
+                "inputRate": 1.2,
+                "outputRate": 3.6
+              }
+            ]
+          }
+        },
+        "qwen3.6-plus": {
+          "pricing": {
+            "tiers": [
+              {
+                "inputRate": 0.4,
+                "outputRate": 1.2
+              }
+            ]
+          }
+        }
+      },
       "apiKeyRef": "macos-keychain:opencode-go-anthropic"
     }
   },
