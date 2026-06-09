@@ -40,6 +40,17 @@ Package manager: pnpm (workspaces)
 Repository style: monorepo
 ```
 
+## Project Map
+
+For quick navigation and to minimize token usage, consult these reference documents before making changes:
+
+- **`apps/api/src/routes/API_ENDPOINT_MAP.md`** — Complete HTTP API reference (30 endpoints with route handlers and repository calls)
+- **`docs/database-schema.md`** — Full SQLite schema (6 tables, all columns, indexes, migrations, relationships)
+
+These maps show file locations, dependencies, and data flow without requiring you to read the source code.
+
+---
+
 ---
 
 ## Repository Structure
