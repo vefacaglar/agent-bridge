@@ -232,7 +232,9 @@ export class Orchestrator {
         : undefined;
 
       const postDelegationNudge = delegation
-        ? "You delegated tasks to a coder but did not verify the results. You MUST now use read_file to inspect each file the coder changed, confirm correctness, and delegate fixes if needed. Only then can you mark the task complete and finish."
+        ? (delegation.utilityModel
+            ? "You delegated tasks to a coder but did not verify the results. Do NOT read the changed files yourself — that bloats your context. Instead call delegate_to_utility with one task asking the utility model to read each changed file and confirm the changes are correct, returning a SHORT verdict. Only after that verdict can you mark the task complete and finish."
+            : "You delegated tasks to a coder but did not verify the results. You MUST now use read_file to inspect each file the coder changed, confirm correctness, and delegate fixes if needed. Only then can you mark the task complete and finish.")
         : undefined;
 
       const finalText = await this.agentLoop.run(runId, run, [...initialMessages], {

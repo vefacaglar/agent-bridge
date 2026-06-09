@@ -82,6 +82,12 @@ export function initialGuidance(): string {
  * optional utility tier when a utility model is configured.
  */
 export function delegationBlock(delegation: DelegationContext): string {
+  // When a utility tier exists, verification is delegated to it (cheap) instead
+  // of the architect reading every changed file into its expensive context.
+  const verifyStep = delegation.utilityModel
+    ? `1. Delegate verification to the UTILITY tier: call delegate_to_utility with a task asking it to read each changed file and confirm the changes are correct, returning a SHORT verdict. Do NOT read the files yourself — that bloats your expensive context.`
+    : `1. Read each file the coder says it changed (use read_file for each one).`;
+
   let block = `\n\nDUAL-MODEL / ARCHITECT MODE:
 - You are the ARCHITECT. A separate coder model (${delegation.coderModel}) is available as your sub-agent(s).
 - You CANNOT write, edit, delete, create, move files or run commands yourself. This is by design, not a missing permission. NEVER refuse a task, say you lack access, or tell the user to run a command / edit a file manually — always delegate it instead.
@@ -92,7 +98,7 @@ export function delegationBlock(delegation: DelegationContext): string {
 - Keep instructions SHORT: describe what to change and cite file paths. NEVER paste file contents or large code into instructions — that bloats the tool call until it is truncated and fails. Point to the file; the coder reads it.
 - Set parallel=true only for disjoint files.
 - POST-DELEGATION VERIFICATION (MANDATORY): After EVERY delegate_tasks call returns, you MUST:
-  1. Read each file the coder says it changed (use read_file for each one).
+  ${verifyStep}
   2. Confirm the changes match your intent — correct logic, no missing pieces, no regressions.
   3. If anything is wrong, delegate a fix immediately.
   4. Only mark a task as done in your <task_list> AFTER you have verified its output.
@@ -103,7 +109,7 @@ export function delegationBlock(delegation: DelegationContext): string {
     block += `
 - UTILITY TIER: ${delegation.utilityModel} is available via delegate_to_utility.
 - Utility can only read/list/search and move_file. It cannot run commands, delete, edit, write, or create files. Never delegate shell/delete/write work to utility.
-- Use utility only for tiny lookups, file/symbol mapping, summaries, path checks, or simple renames. Keep tasks small, self-contained, and in ENGLISH.
+- Use utility for tiny lookups, file/symbol mapping, summaries, path checks, simple renames, AND for post-delegation verification (reading the coder's changed files and reporting whether they look correct). Keep tasks small, self-contained, and in ENGLISH.
 - Use delegate_tasks for substantial implementation.`;
   }
 

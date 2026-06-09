@@ -246,6 +246,14 @@ export class AgentLoop {
             } catch {
               // If parsing fails, skip tracking
             }
+          } else if (toolName === "delegate_to_utility") {
+            // The architect offloaded verification to the cheap utility tier
+            // (one call covers all changed files). Treat that as full
+            // verification — we can't match individual files through it, so
+            // disable the per-file completeness check.
+            verifiedAfterDelegation = true;
+            filesToVerify = [];
+            filesVerified = new Set();
           } else if (toolName === "read_file" || toolName === "list_directory" || toolName === "search_files") {
             verifiedAfterDelegation = true;
             // Track which specific file was verified

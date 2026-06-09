@@ -20,6 +20,21 @@ const NON_FILE_TOKENS = new Set([
   "d3.js"
 ]);
 
+/**
+ * Hard cap on how much of a sub-agent's report is fed back into the (expensive)
+ * architect context. The coder/utility prompt already asks for a compact report,
+ * but a non-compliant model can still dump a wall of text; this guarantees the
+ * architect's input stays lean regardless. File-path scanning runs on the FULL
+ * summary before trimming, so verification targets are never lost to truncation.
+ */
+const MAX_SUMMARY_CHARS = 1200;
+
+function trimSummary(summary: string): string {
+  if (summary.length <= MAX_SUMMARY_CHARS) return summary;
+  const dropped = summary.length - MAX_SUMMARY_CHARS;
+  return `${summary.slice(0, MAX_SUMMARY_CHARS)}\n…[truncated ${dropped} chars — the sub-agent's report was long. Verify the changed files if you need detail instead of asking it to repeat.]`;
+}
+
 /** One execution attempt for a delegated task: a model paired with its toolset. */
 interface SubAgentTier {
   providerId: string;
@@ -239,14 +254,20 @@ export class DelegationCoordinator implements Delegator {
       }
     }
 
+    // When a utility tier is available, verification is offloaded to it (cheap)
+    // instead of the architect reading each file into its expensive context.
+    const verifyViaUtility = !!(run.utilityModel && run.utilityProviderId);
+    const reminder = verifyViaUtility
+      ? "You MUST now verify these changes via delegate_to_utility: ask the utility model to read each file in _files_to_verify and confirm correctness, returning a SHORT verdict. Do NOT read the files yourself. If something is wrong, delegate a fix."
+      : "You MUST now read_file each file listed in _files_to_verify to confirm the changes are correct before marking any task complete. If changes are wrong, delegate a fix.";
+
     return JSON.stringify({
       success: true,
       parallel,
-      results,
+      results: results.map(r => ({ title: r.title, summary: trimSummary(r.summary) })),
       _verification_required: true,
       _files_to_verify: uniqueFilesToVerify,
-      _reminder:
-        "You MUST now read_file each file listed in _files_to_verify to confirm the changes are correct before marking any task complete. If changes are wrong, delegate a fix.",
+      _reminder: reminder,
       _parallel_advice: !parallel && tasks.length > 1
         ? `You ran ${tasks.length} tasks sequentially. If they touch disjoint files, use parallel: true next time for faster execution.`
         : undefined,
@@ -342,7 +363,7 @@ export class DelegationCoordinator implements Delegator {
     return JSON.stringify({
       success: true,
       parallel,
-      results,
+      results: results.map(r => ({ title: r.title, summary: trimSummary(r.summary) })),
       _verification_required: false,
       _reminder:
         "Review the utility results above and proceed with implementation if the information is sufficient."

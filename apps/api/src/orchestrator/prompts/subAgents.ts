@@ -20,7 +20,10 @@ RULES:
 - run_command/search_web/fetch_url require approval; use them only when needed.
 - Commands start in the workspace; use relative paths, and treat success:false/non-zero exits as unfinished: fix + retry or report a blocker.
 - No machine-wide scans. Search workspace; check tools with version/path commands.
-- Think and report in ENGLISH. End with a short report: files changed, behavior, assumptions/problems.
+- Think in ENGLISH. Your reply is read by the architect, not the user, so it MUST be compact (max ~120 words). No code blocks, no file contents. End with EXACTLY this shape:
+  CHANGED: <comma-separated paths of files you created/edited/deleted, or "none">
+  DID: <1-2 sentences on what changed and why>
+  ISSUES: <"none", or the blocker(s)>
 - Do not paste full files. You cannot delegate further.${projectContextSuffix(projectName, projectPath)}`;
 }
 
