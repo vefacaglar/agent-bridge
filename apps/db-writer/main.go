@@ -184,6 +184,7 @@ func initDB(db *sql.DB) error {
 			cache_hit_rate REAL NOT NULL DEFAULT 0.0,
 			cost REAL NOT NULL DEFAULT 0.0,
 			created_at TEXT NOT NULL,
+			duration_ms INTEGER,
 			FOREIGN KEY (run_id) REFERENCES runs(id)
 		)`,
 		"CREATE INDEX IF NOT EXISTS idx_usage_logs_run ON usage_logs(run_id)",
@@ -200,6 +201,7 @@ func initDB(db *sql.DB) error {
 		_, _ = db.Exec("ALTER TABLE messages ADD COLUMN " + col)
 	}
 	_, _ = db.Exec("UPDATE runs SET last_active_at = COALESCE(updated_at, created_at) WHERE last_active_at IS NULL")
+	_, _ = db.Exec("ALTER TABLE usage_logs ADD COLUMN duration_ms INTEGER")
 	return nil
 }
 
@@ -287,11 +289,11 @@ func execute(db *sql.DB, req request) (interface{}, error) {
 		return exec(db, `INSERT INTO usage_logs (
 			run_id, agent_role, provider_id, model,
 			input_tokens, output_tokens, cache_read_tokens, cache_write_tokens,
-			cache_hit_rate, cost, created_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			cache_hit_rate, cost, created_at, duration_ms
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			str(logObj, "runId"), nullable(logObj, "agentRole"), str(logObj, "providerId"), str(logObj, "model"),
 			intValue(logObj, "inputTokens"), intValue(logObj, "outputTokens"), intValue(logObj, "cacheReadTokens"), intValue(logObj, "cacheWriteTokens"),
-			floatValue(logObj, "cacheHitRate"), floatValue(logObj, "cost"), str(logObj, "createdAt"))
+			floatValue(logObj, "cacheHitRate"), floatValue(logObj, "cost"), str(logObj, "createdAt"), nullable(logObj, "durationMs"))
 	default:
 		return nil, fmt.Errorf("unknown op %q", req.Op)
 	}

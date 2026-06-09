@@ -134,6 +134,26 @@ function openRun(runId: string) {
 }
 
 // Helpers
+function formatDuration(ms: number | undefined): string {
+  if (ms === undefined || ms === null) return '-';
+  if (ms < 1000) return `${ms}ms`;
+  
+  const seconds = ms / 1000;
+  if (seconds < 60) return `${seconds.toFixed(1)}s`;
+  
+  const totalSecs = Math.floor(seconds);
+  const h = Math.floor(totalSecs / 3600);
+  const m = Math.floor((totalSecs % 3600) / 60);
+  const s = totalSecs % 60;
+  
+  const parts = [];
+  if (h > 0) parts.push(`${h}h`);
+  if (m > 0) parts.push(`${m}m`);
+  if (s > 0 || parts.length === 0) parts.push(`${s}s`);
+  
+  return parts.join(' ');
+}
+
 function formatNumber(num: number): string {
   if (num === undefined || num === null) return '0';
   return num.toLocaleString('en-US');
@@ -253,6 +273,7 @@ function getHitRateClass(rate: number): string {
             <th class="col-input-tokens text-right">Tokens (In)</th>
             <th class="col-output-tokens text-right">Tokens (Out)</th>
             <th class="col-hit-rate">Cache Hit</th>
+            <th class="col-duration text-right">Duration</th>
             <th class="col-cost text-right">Cost</th>
           </tr>
         </thead>
@@ -287,6 +308,9 @@ function getHitRateClass(rate: number): string {
                 {{ log.cacheHitRate }}%
               </span>
               <span v-else class="text-faint">-</span>
+            </td>
+            <td class="col-duration font-mono text-right text-faint">
+              {{ formatDuration(log.durationMs) }}
             </td>
             <td class="col-cost font-mono text-right">
               ${{ formatCost(log.cost) }}

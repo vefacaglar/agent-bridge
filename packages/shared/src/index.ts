@@ -336,5 +336,6 @@ export interface UsageLog {
   cacheHitRate: number;
   cost: number;
   createdAt: string;
+  durationMs?: number;
 }
 

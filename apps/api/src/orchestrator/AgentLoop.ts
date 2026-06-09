@@ -120,6 +120,7 @@ export class AgentLoop {
       let accumulatedReasoning = "";
       let hasCreatedMessage = false;
 
+      const startTime = Date.now();
       const response = await provider.complete({
         model: opts.model,
         reasoningEffort: opts.reasoningEffort,
@@ -208,7 +209,8 @@ export class AgentLoop {
           cacheWriteTokens: cacheWrite,
           cacheHitRate: hitPct,
           cost,
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
+          durationMs: Date.now() - startTime
         }).catch(err => {
           console.error(`[Database] Failed to write usage log to database: ${err.message}`);
         });

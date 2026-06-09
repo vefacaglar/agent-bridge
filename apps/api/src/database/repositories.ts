@@ -482,8 +482,8 @@ export class UsageLogRepository {
       INSERT INTO usage_logs (
         run_id, agent_role, provider_id, model,
         input_tokens, output_tokens, cache_read_tokens, cache_write_tokens,
-        cache_hit_rate, cost, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        cache_hit_rate, cost, created_at, duration_ms
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     await runDbWrite({ op: "usage_logs.create", args: { log } }, () => stmt.run(
       log.runId,
@@ -496,7 +496,8 @@ export class UsageLogRepository {
       log.cacheWriteTokens,
       log.cacheHitRate,
       log.cost,
-      log.createdAt
+      log.createdAt,
+      log.durationMs !== undefined ? log.durationMs : null
     ));
   }
 
@@ -515,7 +516,8 @@ export class UsageLogRepository {
       cacheWriteTokens: row.cache_write_tokens,
       cacheHitRate: row.cache_hit_rate,
       cost: row.cost,
-      createdAt: row.created_at
+      createdAt: row.created_at,
+      durationMs: row.duration_ms || undefined
     }));
   }
 
@@ -534,7 +536,8 @@ export class UsageLogRepository {
       cacheWriteTokens: row.cache_write_tokens,
       cacheHitRate: row.cache_hit_rate,
       cost: row.cost,
-      createdAt: row.created_at
+      createdAt: row.created_at,
+      durationMs: row.duration_ms || undefined
     }));
   }
 }

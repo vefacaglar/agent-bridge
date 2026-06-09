@@ -262,10 +262,18 @@ db.exec(`
     cache_hit_rate REAL NOT NULL DEFAULT 0.0,
     cost REAL NOT NULL DEFAULT 0.0,
     created_at TEXT NOT NULL,
+    duration_ms INTEGER,
     FOREIGN KEY (run_id) REFERENCES runs(id)
   );
 `);
 db.exec("CREATE INDEX IF NOT EXISTS idx_usage_logs_run ON usage_logs(run_id)");
+
+// Migration: Add duration_ms column to usage_logs if missing.
+try {
+  db.exec("ALTER TABLE usage_logs ADD COLUMN duration_ms INTEGER");
+} catch (e) {
+  // Ignored if column already exists
+}
 
 
 // Seed default project if empty
