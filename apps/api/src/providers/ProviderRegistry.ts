@@ -1,5 +1,4 @@
 import fs from "fs";
-import os from "node:os";
 import path from "path";
 import type { ProviderMetadata, AgentPreset, ModelReasoningSettings, ReasoningEffort, ReasoningOption, ReasoningStyle, ResolvedReasoningConfig, ModelPricing, PriceTier } from "@agent-bridge/shared";
 import type { ModelProvider } from "./ModelProvider.js";
@@ -81,38 +80,21 @@ export class ProviderRegistry {
     if (process.env.LOCAGENS_PROVIDER_CONFIG_PATH) {
       return process.env.LOCAGENS_PROVIDER_CONFIG_PATH;
     }
-
-    const appDirName = "Locagens";
-    if (process.platform === "darwin") {
-      return path.join(os.homedir(), "Library", "Application Support", appDirName, "providers.local.json");
-    }
-    if (process.platform === "win32") {
-      return path.join(process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming"), appDirName, "providers.local.json");
-    }
-    return path.join(process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config"), "locagens", "providers.local.json");
+    // Shared, version-controlled provider catalog (no secrets — API keys live
+    // only in the OS keychain). Committing this lets every clone pull the same
+    // providers, models, and pricing without re-entering them by hand.
+    return path.join(this.findWorkspaceRoot(), "config", "providers.json");
   }
 
   private loadConfiguration(configPathOverride?: string) {
-    const wsRoot = this.findWorkspaceRoot();
-    const localPath = configPathOverride || this.defaultConfigPath();
-    const legacyProjectPath = path.join(wsRoot, "providers.local.json");
-    const examplePath = path.join(wsRoot, "providers.example.json");
-    this.persistPath = localPath;
+    const configPath = configPathOverride || this.defaultConfigPath();
+    this.persistPath = configPath;
 
-    let configPath = "";
-    if (fs.existsSync(localPath)) {
-      configPath = localPath;
-      console.log(`[ProviderRegistry] Loading config from: ${localPath}`);
-    } else if (!configPathOverride && fs.existsSync(legacyProjectPath)) {
-      configPath = legacyProjectPath;
-      console.warn(`[ProviderRegistry] WARNING: Loading legacy project config from ${legacyProjectPath}. Save provider settings once to migrate secrets to ${localPath}.`);
-    } else if (fs.existsSync(examplePath)) {
-      configPath = examplePath;
-      console.warn(`[ProviderRegistry] WARNING: provider config not found at ${localPath}. Falling back to template: ${examplePath}`);
-    } else {
-      console.error(`[ProviderRegistry] ERROR: No provider configuration found at ${localPath} or ${examplePath}`);
+    if (!fs.existsSync(configPath)) {
+      console.warn(`[ProviderRegistry] No provider config at ${configPath}. Add a provider in Settings to create it.`);
       return;
     }
+    console.log(`[ProviderRegistry] Loading config from: ${configPath}`);
 
     try {
       const rawData = fs.readFileSync(configPath, "utf-8");
@@ -120,7 +102,7 @@ export class ProviderRegistry {
       if (parsed && parsed.providers) {
         this.configs = this.hydrateConfigs(parsed.providers);
       }
-      this.agentPresets = (parsed && parsed.agentPresets) || this.loadExampleAgentPresets(wsRoot);
+      this.agentPresets = (parsed && parsed.agentPresets) || {};
       if (parsed?.providers && this.shouldMigrateInlineApiKeys(parsed.providers)) {
         this.persist();
       }
@@ -154,17 +136,6 @@ export class ProviderRegistry {
       value: option.value || option.id,
       budgetTokens: option.budgetTokens
     };
-  }
-
-  private loadExampleAgentPresets(wsRoot: string): Record<string, AgentPresetBlock> {
-    const examplePath = path.join(wsRoot, "providers.example.json");
-    if (!fs.existsSync(examplePath)) return {};
-    try {
-      const parsed = JSON.parse(fs.readFileSync(examplePath, "utf-8")) as ConfigSchema;
-      return parsed.agentPresets || {};
-    } catch {
-      return {};
-    }
   }
 
   /**
@@ -411,10 +382,12 @@ export class ProviderRegistry {
           models: block.models,
           modelSettings: this.safeModelSettings(block)
         };
+        // API keys NEVER touch the JSON. When a key exists and secure storage is
+        // available it goes to the OS keychain and only a (non-secret) reference
+        // pointer is persisted. Without secure storage the key is simply not
+        // persisted (e.g. Windows support is handled separately, later).
         if (block.apiKey && this.secretStore.supportsSecurePersistence) {
           persisted.apiKeyRef = this.secretStore.set(id, block.apiKey);
-        } else if (block.apiKey) {
-          persisted.apiKey = block.apiKey;
         }
         return [id, persisted];
       })

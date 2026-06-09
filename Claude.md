@@ -123,8 +123,8 @@ apps/
 packages/
   shared/src/index.ts          Shared TS contracts (Run, RunMessage, events, ...)
 
-providers.example.json         Template (committed)
-providers.local.json           Real credentials (git-ignored, never committed)
+config/providers.json          Shared provider/model/pricing catalog (committed; NO secrets)
+providers.local.json           Legacy local config (git-ignored; superseded by config/providers.json)
 locagens.db                    Local SQLite file (git-ignored)
 ```
 
@@ -149,21 +149,23 @@ presentational and communicate via props/emits.
 
 ## Provider Configuration
 
-Provider settings are read from local config outside the project by default. API
-keys are stored in macOS Keychain when available; the JSON config keeps only an
-`apiKeyRef`.
+Provider settings live in a **committed, version-controlled catalog** so every
+clone shares the same providers, models, and pricing without re-entering them:
 
 ```txt
-providers.example.json   (template, committed)
-~/Library/Application Support/Locagens/providers.local.json   (provider config on macOS)
+config/providers.json   (committed; providers + models + modelSettings + agentPresets — NO secrets)
 ```
 
-`LOCAGENS_PROVIDER_CONFIG_PATH` can override the local config path. A legacy
-project-level `providers.local.json` is still read as a fallback so existing
-setups can migrate by saving provider settings once.
+`LOCAGENS_PROVIDER_CONFIG_PATH` can override this path (used by tests). API keys
+are **never written to the JSON**: on macOS the key is stored in the Keychain and
+the file keeps only a non-secret `apiKeyRef` pointer (`macos-keychain:<id>`),
+which is deterministic from the provider id and therefore portable across
+machines (each machine holds its own Keychain entry). Where secure storage is
+unavailable (e.g. Windows — handled later) the key is simply not persisted.
 
-Provider secrets do not live in the JSON config on macOS. Public provider
-metadata must not include secrets.
+So a fresh clone gets the full catalog from `config/providers.json`; each
+developer only enters their own API keys once (saved to the Keychain, not the
+file). Public provider metadata must never include secrets.
 
 `GET /api/providers` returns only safe metadata:
 
@@ -178,7 +180,7 @@ The local settings API returns editable config, but `GET /api/providers/config`
 must not return raw API keys. It uses a preserve marker so the frontend can edit
 other provider fields without receiving or re-posting the existing secret.
 
-`providers.local.json` may also define an `agentPresets` block: named pairings
+`config/providers.json` may also define an `agentPresets` block: named pairings
 with an **architect** model, a **coder** model, `maxSubAgents`, and optionally a
 **utility** model. `GET /api/agent-presets` returns this as safe metadata (only
 provider ids + model names, already public). `PUT /api/agent-presets` saves the
@@ -607,7 +609,8 @@ Failed runs keep their messages; the error is stored in `error_message`.
 ## Security Rules
 
 ```txt
-Never commit real API keys (providers.local.json is ignored).
+API keys NEVER touch any JSON file. config/providers.json is committed and keyless;
+  keys live only in the OS keychain (referenced by a non-secret apiKeyRef pointer).
 Never return provider secrets from public metadata endpoints.
 Only the trusted local settings API should read or save full provider config.
 Never log secrets.

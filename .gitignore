@@ -42,6 +42,8 @@ vite.config.*.mtime-*
 !.env.template
 
 # agent-bridge local provider config
+# NOTE: config/providers.json is the shared, committed catalog (keyless — API
+# keys live only in the OS keychain) and is intentionally NOT ignored.
 
 providers.local.json
 providers.*.local.json

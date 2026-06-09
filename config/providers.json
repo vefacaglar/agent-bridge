@@ -1,0 +1,251 @@
+{
+  "providers": {
+    "openai": {
+      "type": "openai-compatible",
+      "displayName": "OpenAI",
+      "baseUrl": "https://api.openai.com/v1",
+      "models": [
+        "gpt-5.5"
+      ],
+      "modelSettings": {},
+      "apiKeyRef": "macos-keychain:openai"
+    },
+    "anthropic": {
+      "type": "anthropic",
+      "displayName": "Anthropic",
+      "baseUrl": "https://api.anthropic.com",
+      "models": [
+        "claude-sonnet-4-6",
+        "claude-opus-4-8",
+        "claude-haiku-4-5-20251001"
+      ],
+      "modelSettings": {},
+      "apiKeyRef": "macos-keychain:anthropic"
+    },
+    "opencode": {
+      "type": "openai-compatible",
+      "displayName": "OpenCode",
+      "baseUrl": "https://opencode.ai/zen/go/v1",
+      "models": [
+        "minimax-m3",
+        "minimax-m2.7",
+        "minimax-m2.5",
+        "kimi-k2.6",
+        "kimi-k2.5",
+        "glm-5.1",
+        "glm-5",
+        "deepseek-v4-pro",
+        "deepseek-v4-flash",
+        "mimo-v2-pro",
+        "mimo-v2-omni",
+        "mimo-v2.5-pro",
+        "mimo-v2.5",
+        "hy3-preview"
+      ],
+      "modelSettings": {},
+      "apiKeyRef": "macos-keychain:opencode"
+    },
+    "commandcode": {
+      "type": "openai-compatible",
+      "displayName": "CommandCode",
+      "baseUrl": "https://api.commandcode.ai/provider/v1",
+      "models": [
+        "moonshotai/Kimi-K2.6",
+        "zai-org/GLM-5.1",
+        "MiniMaxAI/MiniMax-M3",
+        "deepseek/deepseek-v4-pro",
+        "deepseek/deepseek-v4-flash",
+        "Qwen/Qwen3.6-Max-Preview",
+        "Qwen/Qwen3.6-Plus",
+        "Qwen/Qwen3.7-Max",
+        "Qwen/Qwen3.7-Plus",
+        "stepfun/Step-3.7-Flash",
+        "xiaomi/mimo-v2.5-pro",
+        "xiaomi/mimo-v2.5",
+        "nvidia/nemotron-3-ultra-550b-a55b"
+      ],
+      "modelSettings": {
+        "deepseek/deepseek-v4-pro": {
+          "reasoning": {
+            "style": "openai-chat",
+            "options": [
+              {
+                "id": "low",
+                "label": "Low",
+                "value": "low"
+              },
+              {
+                "id": "medium",
+                "label": "Medium",
+                "value": "medium"
+              },
+              {
+                "id": "high",
+                "label": "High",
+                "value": "high"
+              }
+            ]
+          },
+          "reasoningEfforts": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "deepseek/deepseek-v4-flash": {
+          "reasoning": {
+            "style": "openai-chat",
+            "options": [
+              {
+                "id": "low",
+                "label": "Low",
+                "value": "low"
+              },
+              {
+                "id": "medium",
+                "label": "Medium",
+                "value": "medium"
+              },
+              {
+                "id": "high",
+                "label": "High",
+                "value": "high"
+              }
+            ]
+          },
+          "reasoningEfforts": [
+            "low",
+            "medium",
+            "high"
+          ]
+        }
+      },
+      "apiKeyRef": "macos-keychain:commandcode"
+    },
+    "xiaomitokenplan": {
+      "type": "openai-compatible",
+      "displayName": "Xiaomi",
+      "baseUrl": "https://token-plan-sgp.xiaomimimo.com/v1",
+      "models": [
+        "mimo-v2.5",
+        "mimo-v2.5-pro"
+      ],
+      "modelSettings": {
+        "mimo-v2.5": {
+          "reasoning": {
+            "style": "openai-chat",
+            "options": [
+              {
+                "id": "low",
+                "label": "Low",
+                "value": "low"
+              },
+              {
+                "id": "medium",
+                "label": "Medium",
+                "value": "medium"
+              },
+              {
+                "id": "high",
+                "label": "High",
+                "value": "high"
+              }
+            ]
+          },
+          "reasoningEfforts": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "mimo-v2.5-pro": {
+          "reasoning": {
+            "style": "openai-chat",
+            "options": [
+              {
+                "id": "low",
+                "label": "Low",
+                "value": "low"
+              },
+              {
+                "id": "medium",
+                "label": "Medium",
+                "value": "medium"
+              },
+              {
+                "id": "high",
+                "label": "High",
+                "value": "high"
+              }
+            ]
+          },
+          "reasoningEfforts": [
+            "low",
+            "medium",
+            "high"
+          ]
+        }
+      },
+      "apiKeyRef": "macos-keychain:xiaomitokenplan"
+    },
+    "opencode-go-anthropic": {
+      "type": "anthropic",
+      "displayName": "Opencode go anthropic",
+      "baseUrl": "https://opencode.ai/zen/go",
+      "models": [
+        "qwen3.7-max",
+        "qwen3.7-plus",
+        "qwen3.6-max",
+        "qwen3.6-plus"
+      ],
+      "modelSettings": {},
+      "apiKeyRef": "macos-keychain:opencode-go-anthropic"
+    }
+  },
+  "agentPresets": {
+    "minimax-m3-mimo-v25": {
+      "displayName": "minimax m3 to mimo v2.5",
+      "architect": {
+        "providerId": "commandcode",
+        "model": "MiniMaxAI/MiniMax-M3"
+      },
+      "coder": {
+        "providerId": "commandcode",
+        "model": "xiaomi/mimo-v2.5"
+      },
+      "maxSubAgents": 3,
+      "utility": {
+        "providerId": "commandcode",
+        "model": "nvidia/nemotron-3-ultra-550b-a55b"
+      },
+      "fallback": true
+    },
+    "deepseek-v4-pro-to-flash": {
+      "displayName": "Deepseek pro plan",
+      "architect": {
+        "providerId": "commandcode",
+        "model": "deepseek/deepseek-v4-pro",
+        "reasoningEffort": "high"
+      },
+      "coder": {
+        "providerId": "commandcode",
+        "model": "deepseek/deepseek-v4-flash",
+        "reasoningEffort": "low"
+      },
+      "maxSubAgents": 3,
+      "fallback": true
+    },
+    "qwenplan": {
+      "displayName": "qwenplan",
+      "architect": {
+        "providerId": "opencode-go-anthropic",
+        "model": "qwen3.7-max"
+      },
+      "coder": {
+        "providerId": "opencode",
+        "model": "deepseek-v4-flash"
+      },
+      "maxSubAgents": 3
+    }
+  }
+}
