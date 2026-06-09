@@ -347,8 +347,8 @@ onUnmounted(() => {
     class="app-shell"
     :class="{
       'sidebar-collapsed': isSidebarCollapsed,
-      'panel-available': hasSidePanelContent,
-      'panel-open': sidePanelOpen,
+      'panel-available': hasSidePanelContent && !showUsageLogsPage,
+      'panel-open': sidePanelOpen && !showUsageLogsPage,
       'is-resizing': isResizing,
       'window-resizing': isWindowResizing
     }"

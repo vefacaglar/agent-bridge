@@ -242,6 +242,17 @@ function getHitRateClass(rate: number): string {
       >
         Clear Filters
       </button>
+      <button 
+        class="refresh-btn" 
+        @click="loadLogs" 
+        :disabled="isLoading"
+        title="Refresh Logs"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" :class="{ 'spinning': isLoading }">
+          <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+        </svg>
+        <span>Refresh</span>
+      </button>
     </div>
 
     <!-- Table Container -->
@@ -739,6 +750,35 @@ function getHitRateClass(rate: number): string {
 .page-btn:disabled {
   opacity: 0.35;
   cursor: not-allowed;
+}
+
+.refresh-btn {
+  background: var(--control-bg);
+  border: 1px solid var(--control-border);
+  color: var(--text);
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 0.84rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  margin-left: auto;
+}
+
+.refresh-btn:hover:not(:disabled) {
+  background: var(--control-bg-hover);
+  border-color: var(--control-border-focus);
+}
+
+.refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.spinning {
+  animation: spin 0.8s linear infinite;
 }
 
 @keyframes spin {
