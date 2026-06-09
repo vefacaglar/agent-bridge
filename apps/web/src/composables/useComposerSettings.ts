@@ -2,18 +2,18 @@ import { computed, ref, watch, nextTick, type Ref } from 'vue';
 import type { ProviderMetadata, AgentPreset, ReasoningOption, ProviderModelSettings, Run } from '@agent-bridge/shared';
 import { splitCombined } from '../lib/format';
 
-// Four modes are exposed: Chat (lightweight conversation — no proactive
-// workspace scanning, minimal context), Build (applies edits directly; the
-// backend's 'accept_edits' mode), Plan (planning via the plan panel) and
-// Full Access (autonomous — runs every tool, including commands, with NO
-// approval prompts; still confined to the project folder).
+// Three modes are exposed: Build (applies edits directly; the backend's
+// 'accept_edits' mode), Plan (planning via the plan panel) and Full Access
+// (autonomous — runs every tool, including commands, with NO approval prompts;
+// still confined to the project folder). 'chat' is a retired backend mode kept
+// in the type so older persisted runs still load/render — it is no longer
+// offered in the picker.
 export type ChatMode = 'chat' | 'accept_edits' | 'plan' | 'full_access';
 
 export const MODES_LIST = [
-  { id: 'chat', label: 'Chat', shortcut: '1' },
-  { id: 'accept_edits', label: 'Build', shortcut: '2' },
-  { id: 'plan', label: 'Plan', shortcut: '3' },
-  { id: 'full_access', label: 'Full Access', shortcut: '4' }
+  { id: 'accept_edits', label: 'Build', shortcut: '1' },
+  { id: 'plan', label: 'Plan', shortcut: '2' },
+  { id: 'full_access', label: 'Full Access', shortcut: '3' }
 ] as const;
 
 export interface ModelOption {
@@ -50,7 +50,7 @@ export function useComposerSettings(
   const selectedModelCombined = ref('');
   const selectedReasoningEffort = ref('default');
   const selectedPresetId = ref('');
-  const currentMode = ref<ChatMode>('chat');
+  const currentMode = ref<ChatMode>('accept_edits');
   const bypassPermissions = ref(false);
 
   let isLoadingSettings = false;
@@ -114,13 +114,15 @@ export function useComposerSettings(
           presetVal = localStorage.getItem('bm_last_used_selected_preset') || '';
         }
 
-        let modeVal: ChatMode = 'chat';
+        let modeVal: ChatMode = 'accept_edits';
         if (storedMode !== null) {
           modeVal = storedMode as ChatMode;
         } else if (runObj && runObj.mode) {
           modeVal = runObj.mode as ChatMode;
         } else {
-          modeVal = (localStorage.getItem('bm_last_used_current_mode') || 'chat') as ChatMode;
+          // Fresh start (no message ever sent): default to Build. Otherwise reuse
+          // the mode the user last SENT a message with (set in handleSendTask).
+          modeVal = (localStorage.getItem('bm_last_used_current_mode') || 'accept_edits') as ChatMode;
         }
 
         let bypassVal = false;
@@ -145,7 +147,7 @@ export function useComposerSettings(
         const lastUsedModel = localStorage.getItem('bm_last_used_selected_model') || localStorage.getItem('bm_selected_model') || '';
         const lastUsedReasoning = localStorage.getItem('bm_last_used_reasoning_effort') || 'default';
         const lastUsedPreset = localStorage.getItem('bm_last_used_selected_preset') || '';
-        const lastUsedMode = localStorage.getItem('bm_last_used_current_mode') || 'chat';
+        const lastUsedMode = localStorage.getItem('bm_last_used_current_mode') || 'accept_edits';
         const lastUsedBypass = localStorage.getItem('bm_last_used_bypass_permissions') === 'true';
 
         selectedModelCombined.value = storedModel !== null ? storedModel : lastUsedModel;

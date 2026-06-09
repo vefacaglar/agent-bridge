@@ -313,10 +313,9 @@ function handleDocumentClick(e: MouseEvent) {
 function handleKeyDown(e: KeyboardEvent) {
   if (!showModeMenu.value) return;
   const modeKeys: Record<string, ChatMode> = {
-    '1': 'chat',
-    '2': 'accept_edits',
-    '3': 'plan',
-    '4': 'full_access'
+    '1': 'accept_edits',
+    '2': 'plan',
+    '3': 'full_access'
   };
   if (modeKeys[e.key]) {
     e.preventDefault();
