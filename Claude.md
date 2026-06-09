@@ -229,6 +229,16 @@ so the orchestrator only ever sees the common `ToolCall` shape. The Anthropic
 adapter converts tool definitions to `input_schema`, assistant tool calls to
 `tool_use` blocks, and tool results to `tool_result` blocks on a user turn.
 
+**Reasoning conversion:** the UI only ever offers plain effort levels
+(low/medium/high…). Each model names/shapes its reasoning control differently, so
+`OpenAICompatibleProvider` converts the chosen effort into that model's official
+parameter via `reasoningWire.ts` (`openAiReasoningParams`) — e.g.
+`thinking_config:{mode:"on"}` (qwen-max), `thinking_preference:"enabled"`
+(deepseek-v4), `reasoning_mode:"high_effort"` (kimi-k2.6),
+`thinking_control:{enable:true}` (minimax-m3), `thinking_effort` (glm-5.1),
+`reasoning_scope` (mimo-v2.5-pro). Unlisted models fall back to plain
+`reasoning_effort`. Anthropic-typed endpoints keep `thinking:{budget_tokens}`.
+
 ---
 
 ## Orchestrator Rules

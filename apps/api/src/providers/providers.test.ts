@@ -6,6 +6,7 @@ import { PRESERVE_API_KEY_VALUE, ProviderRegistry } from "./ProviderRegistry.js"
 import { InMemoryProviderSecretStore } from "./ProviderSecretStore.js";
 import { OpenAICompatibleProvider } from "./OpenAICompatibleProvider.js";
 import { AnthropicProvider } from "./AnthropicProvider.js";
+import { openAiReasoningParams } from "./reasoningWire.js";
 
 // Mock config content
 const mockConfig = {
@@ -433,5 +434,26 @@ test("Provider Registry and Model Providers Unit Tests", async (t) => {
     assert.strictEqual(res.content, "Writing the file.");
     assert.strictEqual(res.toolCalls?.[0].function.name, "write_file");
     assert.deepStrictEqual(JSON.parse(res.toolCalls![0].function.arguments), { path: "a.txt", content: "hi" });
+  });
+
+  await t.test("reasoningWire - converts effort to each model's official parameter", () => {
+    const r = (value: string) => ({ style: "openai-chat" as const, value });
+
+    // gpt-5.x and unknown models use plain reasoning_effort.
+    assert.deepStrictEqual(openAiReasoningParams("gpt-5.5", r("medium")), { reasoning_effort: "medium" });
+    assert.deepStrictEqual(openAiReasoningParams("some-other-model", r("high")), { reasoning_effort: "high" });
+
+    // Vendor-specific shapes, including provider-prefixed names.
+    assert.deepStrictEqual(openAiReasoningParams("deepseek/deepseek-v4-pro", r("high")), { thinking_preference: "enabled" });
+    assert.deepStrictEqual(openAiReasoningParams("Qwen/Qwen3.7-Max", r("high")), { thinking_config: { mode: "on" } });
+    assert.deepStrictEqual(openAiReasoningParams("moonshotai/Kimi-K2.6", r("high")), { reasoning_mode: "high_effort" });
+    assert.deepStrictEqual(openAiReasoningParams("MiniMaxAI/MiniMax-M3", r("high")), { thinking_control: { enable: true } });
+
+    // Two-level models bucket low vs high.
+    assert.deepStrictEqual(openAiReasoningParams("zai-org/GLM-5.1", r("low")), { thinking_effort: "low" });
+    assert.deepStrictEqual(openAiReasoningParams("zai-org/GLM-5.1", r("high")), { thinking_effort: "high" });
+    assert.deepStrictEqual(openAiReasoningParams("xiaomi/mimo-v2.5-pro", r("low")), { reasoning_scope: "standard" });
+    assert.deepStrictEqual(openAiReasoningParams("xiaomi/mimo-v2.5-pro", r("high")), { reasoning_scope: "extensive" });
+    assert.deepStrictEqual(openAiReasoningParams("mimo-v2.5", r("high")), { reasoning_scope: "extensive" });
   });
 });

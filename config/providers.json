@@ -16,6 +16,23 @@
                 "outputRate": 15
               }
             ]
+          },
+          "reasoning": {
+            "style": "openai-chat",
+            "options": [
+              {
+                "id": "low",
+                "value": "low"
+              },
+              {
+                "id": "medium",
+                "value": "medium"
+              },
+              {
+                "id": "high",
+                "value": "high"
+              }
+            ]
           }
         }
       },
@@ -93,6 +110,15 @@
                 "outputRate": 2.7
               }
             ]
+          },
+          "reasoning": {
+            "style": "openai-chat",
+            "options": [
+              {
+                "id": "high",
+                "value": "high"
+              }
+            ]
           }
         },
         "minimax-m2.7": {
@@ -123,6 +149,15 @@
                 "outputRate": 3
               }
             ]
+          },
+          "reasoning": {
+            "style": "openai-chat",
+            "options": [
+              {
+                "id": "high",
+                "value": "high"
+              }
+            ]
           }
         },
         "kimi-k2.5": {
@@ -141,6 +176,19 @@
               {
                 "inputRate": 1,
                 "outputRate": 3
+              }
+            ]
+          },
+          "reasoning": {
+            "style": "openai-chat",
+            "options": [
+              {
+                "id": "low",
+                "value": "low"
+              },
+              {
+                "id": "high",
+                "value": "high"
               }
             ]
           }
@@ -163,6 +211,15 @@
                 "outputRate": 0.5
               }
             ]
+          },
+          "reasoning": {
+            "style": "openai-chat",
+            "options": [
+              {
+                "id": "high",
+                "value": "high"
+              }
+            ]
           }
         },
         "deepseek-v4-flash": {
@@ -173,6 +230,15 @@
                 "outputRate": 0.28
               }
             ]
+          },
+          "reasoning": {
+            "style": "openai-chat",
+            "options": [
+              {
+                "id": "high",
+                "value": "high"
+              }
+            ]
           }
         },
         "mimo-v2.5-pro": {
@@ -181,6 +247,19 @@
               {
                 "inputRate": 1.2,
                 "outputRate": 3.6
+              }
+            ]
+          },
+          "reasoning": {
+            "style": "openai-chat",
+            "options": [
+              {
+                "id": "low",
+                "value": "low"
+              },
+              {
+                "id": "high",
+                "value": "high"
               }
             ]
           }
@@ -223,18 +302,7 @@
             "style": "openai-chat",
             "options": [
               {
-                "id": "low",
-                "label": "Low",
-                "value": "low"
-              },
-              {
-                "id": "medium",
-                "label": "Medium",
-                "value": "medium"
-              },
-              {
                 "id": "high",
-                "label": "High",
                 "value": "high"
               }
             ]
@@ -258,18 +326,7 @@
             "style": "openai-chat",
             "options": [
               {
-                "id": "low",
-                "label": "Low",
-                "value": "low"
-              },
-              {
-                "id": "medium",
-                "label": "Medium",
-                "value": "medium"
-              },
-              {
                 "id": "high",
-                "label": "High",
                 "value": "high"
               }
             ]
@@ -296,6 +353,15 @@
                 "outputRate": 3
               }
             ]
+          },
+          "reasoning": {
+            "style": "openai-chat",
+            "options": [
+              {
+                "id": "high",
+                "value": "high"
+              }
+            ]
           }
         },
         "zai-org/GLM-5.1": {
@@ -304,6 +370,19 @@
               {
                 "inputRate": 1,
                 "outputRate": 3
+              }
+            ]
+          },
+          "reasoning": {
+            "style": "openai-chat",
+            "options": [
+              {
+                "id": "low",
+                "value": "low"
+              },
+              {
+                "id": "high",
+                "value": "high"
               }
             ]
           }
@@ -316,6 +395,15 @@
                 "outputRate": 2.7
               }
             ]
+          },
+          "reasoning": {
+            "style": "openai-chat",
+            "options": [
+              {
+                "id": "high",
+                "value": "high"
+              }
+            ]
           }
         },
         "Qwen/Qwen3.6-Max-Preview": {
@@ -324,6 +412,15 @@
               {
                 "inputRate": 1.2,
                 "outputRate": 3.6
+              }
+            ]
+          },
+          "reasoning": {
+            "style": "openai-chat",
+            "options": [
+              {
+                "id": "high",
+                "value": "high"
               }
             ]
           }
@@ -344,6 +441,15 @@
               {
                 "inputRate": 1.2,
                 "outputRate": 3.6
+              }
+            ]
+          },
+          "reasoning": {
+            "style": "openai-chat",
+            "options": [
+              {
+                "id": "high",
+                "value": "high"
               }
             ]
           }
@@ -376,6 +482,19 @@
                 "outputRate": 3.6
               }
             ]
+          },
+          "reasoning": {
+            "style": "openai-chat",
+            "options": [
+              {
+                "id": "low",
+                "value": "low"
+              },
+              {
+                "id": "high",
+                "value": "high"
+              }
+            ]
           }
         },
         "nvidia/nemotron-3-ultra-550b-a55b": {
@@ -401,50 +520,16 @@
         "mimo-v2.5-pro"
       ],
       "modelSettings": {
-        "mimo-v2.5": {
-          "reasoning": {
-            "style": "openai-chat",
-            "options": [
-              {
-                "id": "low",
-                "label": "Low",
-                "value": "low"
-              },
-              {
-                "id": "medium",
-                "label": "Medium",
-                "value": "medium"
-              },
-              {
-                "id": "high",
-                "label": "High",
-                "value": "high"
-              }
-            ]
-          },
-          "reasoningEfforts": [
-            "low",
-            "medium",
-            "high"
-          ]
-        },
         "mimo-v2.5-pro": {
           "reasoning": {
             "style": "openai-chat",
             "options": [
               {
                 "id": "low",
-                "label": "Low",
                 "value": "low"
               },
               {
-                "id": "medium",
-                "label": "Medium",
-                "value": "medium"
-              },
-              {
                 "id": "high",
-                "label": "High",
                 "value": "high"
               }
             ]
@@ -459,6 +544,29 @@
               {
                 "inputRate": 1.2,
                 "outputRate": 3.6
+              }
+            ]
+          }
+        },
+        "mimo-v2.5": {
+          "reasoning": {
+            "style": "openai-chat",
+            "options": [
+              {
+                "id": "low",
+                "value": "low"
+              },
+              {
+                "id": "high",
+                "value": "high"
+              }
+            ]
+          },
+          "pricing": {
+            "tiers": [
+              {
+                "inputRate": 0.4,
+                "outputRate": 1.2
               }
             ]
           }

@@ -1,6 +1,7 @@
 import type { CompletionRequest, CompletionResponse } from "@agent-bridge/shared";
 import type { ModelProvider } from "./ModelProvider.js";
 import { DEFAULT_MAX_TOKENS } from "./ModelProvider.js";
+import { openAiReasoningParams } from "./reasoningWire.js";
 
 // Max time to wait with no response data before aborting. Reset on every chunk,
 // so a model that keeps streaming (e.g. long reasoning) is never cut off.
@@ -121,7 +122,9 @@ export class OpenAICompatibleProvider implements ModelProvider {
     };
 
     if (request.reasoning?.style === "openai-chat" && request.reasoning.value) {
-      body.reasoning_effort = request.reasoning.value;
+      // Each model names/shapes its reasoning control differently; the adapter
+      // converts the chosen effort to that model's official parameter.
+      Object.assign(body, openAiReasoningParams(request.model, request.reasoning));
     }
 
     if (request.tools && request.tools.length > 0) {
