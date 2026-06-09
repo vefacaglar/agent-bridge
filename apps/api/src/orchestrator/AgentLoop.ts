@@ -30,6 +30,13 @@ export interface AgentRunOptions {
    */
   idleNudge?: string;
   maxIdleNudges?: number;
+  /**
+   * When the architect delegates tasks and then tries to end the run without
+   * verifying the results (no read_file/inspect calls after delegation), this
+   * nudge is injected to remind it to verify. Capped at maxPostDelegationNudges.
+   */
+  postDelegationNudge?: string;
+  maxPostDelegationNudges?: number;
 }
 
 /**
@@ -94,6 +101,12 @@ export class AgentLoop {
     // nudges we've already spent (see AgentRunOptions.idleNudge).
     let toolCallsMade = 0;
     let nudgesUsed = 0;
+    // Tracks delegation state for post-delegation verification nudges.
+    let lastToolWasDelegation = false;
+    let postDelegationNudgesUsed = 0;
+    let verifiedAfterDelegation = false;
+    let filesToVerify: string[] = [];
+    let filesVerified: Set<string> = new Set();
 
     let completionDone = false;
     while (!completionDone) {
@@ -217,6 +230,42 @@ export class AgentLoop {
             tool_call_id: tc.id,
             name: tc.function.name
           });
+
+          // Track delegation state for post-delegation verification nudge.
+          const toolName = tc.function?.name;
+          if (toolName === "delegate_tasks") {
+            lastToolWasDelegation = true;
+            verifiedAfterDelegation = false;
+            // Extract files to verify from the delegation result
+            try {
+              const delegationResult = JSON.parse(result);
+              if (Array.isArray(delegationResult._files_to_verify)) {
+                filesToVerify = delegationResult._files_to_verify;
+                filesVerified = new Set();
+              }
+            } catch {
+              // If parsing fails, skip tracking
+            }
+          } else if (toolName === "read_file" || toolName === "list_directory" || toolName === "search_files") {
+            verifiedAfterDelegation = true;
+            // Track which specific file was verified
+            if (toolName === "read_file" && filesToVerify.length > 0) {
+              try {
+                const args = JSON.parse(tc.function?.arguments || "{}");
+                if (typeof args.path === "string") {
+                  const baseOf = (p: string) => p.split("/").pop() ?? p;
+                  const verifiedBase = baseOf(args.path);
+                  for (const f of filesToVerify) {
+                    if (baseOf(f) === verifiedBase) {
+                      filesVerified.add(f);
+                    }
+                  }
+                }
+              } catch {
+                // If parsing fails, skip tracking
+              }
+            }
+          }
         }
       } else if (
         opts.idleNudge &&
@@ -229,6 +278,30 @@ export class AgentLoop {
         nudgesUsed++;
         currentMessages.push({ role: "assistant", content: response.content || "" });
         currentMessages.push({ role: "user", content: opts.idleNudge });
+      } else if (
+        opts.postDelegationNudge &&
+        lastToolWasDelegation &&
+        !verifiedAfterDelegation &&
+        postDelegationNudgesUsed < (opts.maxPostDelegationNudges ?? 0)
+      ) {
+        // The architect delegated but did not verify the results at all.
+        postDelegationNudgesUsed++;
+        currentMessages.push({ role: "assistant", content: response.content || "" });
+        currentMessages.push({ role: "user", content: opts.postDelegationNudge });
+      } else if (
+        opts.postDelegationNudge &&
+        lastToolWasDelegation &&
+        verifiedAfterDelegation &&
+        filesToVerify.length > 0 &&
+        filesVerified.size < filesToVerify.length &&
+        postDelegationNudgesUsed < (opts.maxPostDelegationNudges ?? 0)
+      ) {
+        // The architect verified SOME but not ALL files.
+        postDelegationNudgesUsed++;
+        const remaining = filesToVerify.filter(f => !filesVerified.has(f));
+        const completenessNudge = `You verified ${filesVerified.size}/${filesToVerify.length} files. Please also verify: ${remaining.join(", ")} before marking tasks complete.`;
+        currentMessages.push({ role: "assistant", content: response.content || "" });
+        currentMessages.push({ role: "user", content: completenessNudge });
       } else {
         completionDone = true;
       }

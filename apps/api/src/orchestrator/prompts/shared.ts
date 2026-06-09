@@ -90,8 +90,14 @@ export function delegationBlock(delegation: DelegationContext): string {
 - Example: delegate_tasks({ tasks: [{ title: "Remove scaffold files", instructions: "Run: rm -rf pkg/* .env.example Makefile. Then list the directory to confirm they are gone." }] }).
 - Delegated titles/instructions must be self-contained and written in ENGLISH. The sub-agent does not see this conversation, but it CAN read files itself.
 - Keep instructions SHORT: describe what to change and cite file paths. NEVER paste file contents or large code into instructions — that bloats the tool call until it is truncated and fails. Point to the file; the coder reads it.
-- Set parallel=true only for disjoint files. After results, verify changed files and delegate fixes if needed.
-- You own the live <task_list>: seed it from the plan or your delegation breakdown, re-output it each reply, and mark a step '- [x]' when its coder sub-agent returns. Sub-agents do not keep the list.`;
+- Set parallel=true only for disjoint files.
+- POST-DELEGATION VERIFICATION (MANDATORY): After EVERY delegate_tasks call returns, you MUST:
+  1. Read each file the coder says it changed (use read_file for each one).
+  2. Confirm the changes match your intent — correct logic, no missing pieces, no regressions.
+  3. If anything is wrong, delegate a fix immediately.
+  4. Only mark a task as done in your <task_list> AFTER you have verified its output.
+  Skipping verification is forbidden. If you delegate but do not verify, the work is considered incomplete.
+- You own the live <task_list>: seed it from the plan or your delegation breakdown, re-output it each reply, and mark a step '- [x]' only AFTER verifying the coder's output. Sub-agents do not keep the list.`;
 
   if (delegation.utilityModel) {
     block += `

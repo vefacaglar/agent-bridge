@@ -4,6 +4,22 @@ import { buildCoderSystemPrompt, buildUtilitySystemPrompt, getModeStrategy } fro
 import { WORKSPACE_TOOLS, UTILITY_TOOLS } from "./workspaceTools.js";
 import type { AgentLoop, Delegator } from "./AgentLoop.js";
 
+/**
+ * Common framework/library tokens that look like file paths (extension match)
+ * but are prose mentions, not files. Excluded when scanning coder summaries for
+ * files to verify. Compared lowercased against the matched token's basename.
+ */
+const NON_FILE_TOKENS = new Set([
+  "node.js",
+  "vue.js",
+  "react.js",
+  "next.js",
+  "nuxt.js",
+  "express.js",
+  "three.js",
+  "d3.js"
+]);
+
 /** One execution attempt for a delegated task: a model paired with its toolset. */
 interface SubAgentTier {
   providerId: string;
@@ -143,6 +159,20 @@ export class DelegationCoordinator implements Delegator {
       return JSON.stringify({ success: false, error: "No valid tasks to delegate (each task needs non-empty instructions)." });
     }
 
+    // Collect file paths from task args (each task may have a `files` array)
+    const filesToVerify: string[] = [];
+    if (Array.isArray(args.tasks)) {
+      for (const t of args.tasks) {
+        if (t && Array.isArray(t.files)) {
+          for (const f of t.files) {
+            if (typeof f === "string" && f.trim()) {
+              filesToVerify.push(f.trim());
+            }
+          }
+        }
+      }
+    }
+
     const coderMeta = this.registry.getSafeMetadata().find(p => p.id === run.coderProviderId);
     const coderDisplayName = coderMeta ? coderMeta.displayName : run.coderProviderId;
     const parallel = !!args.parallel && tasks.length > 1;
@@ -179,7 +209,49 @@ export class DelegationCoordinator implements Delegator {
       }
     }
 
-    return JSON.stringify({ success: true, parallel, results });
+    // Scan each result's summary for additional file paths
+    const fileExtPattern = /[\w\-./]+\.\w{1,5}/g;
+    const sourceExts =
+      /\.(ts|js|vue|go|json|tsx|jsx|css|scss|sass|less|md|py|rb|rs|java|kt|swift|yaml|yml|toml|xml|sh|bash|zsh|fish|env|gitignore|editorconfig|prettierrc|eslintrc|npmrc|nvmrc)$/i;
+    for (const r of results) {
+      if (r.summary) {
+        const matches = r.summary.match(fileExtPattern);
+        if (matches) {
+          for (const m of matches) {
+            const basename = (m.split("/").pop() ?? m).toLowerCase();
+            if (sourceExts.test(m) && !NON_FILE_TOKENS.has(basename)) {
+              filesToVerify.push(m);
+            }
+          }
+        }
+      }
+    }
+
+    // Deduplicate
+    const uniqueFilesToVerify = [...new Set(filesToVerify)];
+
+    // Sub-agent success check — scan summaries for error keywords
+    const errorKeywords = /\b(error|failed|could not|unable|exception|bug|broken|crash|regression)\b/i;
+    const warnings: string[] = [];
+    for (const r of results) {
+      if (r.summary && errorKeywords.test(r.summary)) {
+        warnings.push(`Task "${r.title}" may have issues — review the summary carefully.`);
+      }
+    }
+
+    return JSON.stringify({
+      success: true,
+      parallel,
+      results,
+      _verification_required: true,
+      _files_to_verify: uniqueFilesToVerify,
+      _reminder:
+        "You MUST now read_file each file listed in _files_to_verify to confirm the changes are correct before marking any task complete. If changes are wrong, delegate a fix.",
+      _parallel_advice: !parallel && tasks.length > 1
+        ? `You ran ${tasks.length} tasks sequentially. If they touch disjoint files, use parallel: true next time for faster execution.`
+        : undefined,
+      _warnings: warnings.length > 0 ? warnings : undefined
+    });
   }
 
   /**
@@ -267,6 +339,13 @@ export class DelegationCoordinator implements Delegator {
       }
     }
 
-    return JSON.stringify({ success: true, parallel, results });
+    return JSON.stringify({
+      success: true,
+      parallel,
+      results,
+      _verification_required: false,
+      _reminder:
+        "Review the utility results above and proceed with implementation if the information is sufficient."
+    });
   }
 }

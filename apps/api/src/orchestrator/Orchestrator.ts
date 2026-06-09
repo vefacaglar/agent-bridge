@@ -231,6 +231,10 @@ export class Orchestrator {
             : "You ended your turn without calling any tool, but there is an approved plan to implement and you have not started yet. Do not merely announce that you will begin — use the workspace tools NOW to implement the first step(s). Only stop without a tool call if the work is genuinely already complete, and then say so explicitly.")
         : undefined;
 
+      const postDelegationNudge = delegation
+        ? "You delegated tasks to a coder but did not verify the results. You MUST now use read_file to inspect each file the coder changed, confirm correctness, and delegate fixes if needed. Only then can you mark the task complete and finish."
+        : undefined;
+
       const finalText = await this.agentLoop.run(runId, run, [...initialMessages], {
         providerId: run.providerId,
         providerDisplayName: run.providerDisplayName,
@@ -240,7 +244,9 @@ export class Orchestrator {
         tools,
         agentRole: delegation ? "planner" : undefined,
         idleNudge,
-        maxIdleNudges: idleNudge ? 1 : 0
+        maxIdleNudges: idleNudge ? 1 : 0,
+        postDelegationNudge,
+        maxPostDelegationNudges: postDelegationNudge ? 1 : 0
       });
 
       await this.messages.emitStatus(runId, "done");
