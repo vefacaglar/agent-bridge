@@ -47,6 +47,9 @@ interface AgentPresetBlock {
 interface ConfigSchema {
   providers: Record<string, PersistedProviderConfigBlock>;
   agentPresets?: Record<string, AgentPresetBlock>;
+  // User-overlay only: ids of predefined entries the user removed (tombstones).
+  removedProviders?: string[];
+  removedPresets?: string[];
 }
 
 export class ProviderRegistry {
@@ -56,6 +59,14 @@ export class ProviderRegistry {
   private configPathOverride?: string;
   private persistPath = "";
   private secretStore: ProviderSecretStore;
+  // Two-layer config: a read-only predefined base (committed/bundled) plus a
+  // writable user overlay (custom providers + edits + tombstones) that survives
+  // app updates. The overlay is only active when LOCAGENS_PROVIDER_USER_CONFIG_PATH
+  // is set; otherwise the registry uses a single file (dev + tests).
+  private userConfigPath?: string;
+  private baseConfigs: Record<string, ProviderConfigBlock> = {};
+  private baseAgentPresets: Record<string, AgentPresetBlock> = {};
+  private baseKeyRefIds: Set<string> = new Set();
 
   constructor(configPathOverride?: string, secretStore: ProviderSecretStore = new MacOSKeychainProviderSecretStore()) {
     this.configPathOverride = configPathOverride;
@@ -87,27 +98,65 @@ export class ProviderRegistry {
   }
 
   private loadConfiguration(configPathOverride?: string) {
-    const configPath = configPathOverride || this.defaultConfigPath();
-    this.persistPath = configPath;
+    const basePath = configPathOverride || this.defaultConfigPath();
+    this.userConfigPath = process.env.LOCAGENS_PROVIDER_USER_CONFIG_PATH || undefined;
+    // Saves go to the user overlay when present, else straight to the base file.
+    this.persistPath = this.userConfigPath || basePath;
 
-    if (!fs.existsSync(configPath)) {
-      console.warn(`[ProviderRegistry] No provider config at ${configPath}. Add a provider in Settings to create it.`);
-      return;
+    // 1. Predefined base layer (committed/bundled, read-only at runtime).
+    const base = this.readConfigFile(basePath);
+    this.baseConfigs = this.hydrateConfigs(base.providers || {});
+    this.baseAgentPresets = base.agentPresets || {};
+    this.baseKeyRefIds = new Set(
+      Object.entries(base.providers || {}).filter(([, b]) => !!b.apiKeyRef).map(([id]) => id)
+    );
+    if (Object.keys(this.baseConfigs).length) {
+      console.log(`[ProviderRegistry] Loaded predefined catalog from: ${basePath}`);
+    } else {
+      console.warn(`[ProviderRegistry] No predefined catalog at ${basePath}.`);
     }
-    console.log(`[ProviderRegistry] Loading config from: ${configPath}`);
 
+    // 2. Writable user overlay layer (custom providers + edits + tombstones).
+    const removedProviders = new Set<string>();
+    const removedPresets = new Set<string>();
+    let overlayProviders: Record<string, ProviderConfigBlock> = {};
+    let overlayPresets: Record<string, AgentPresetBlock> = {};
+    if (this.userConfigPath) {
+      const user = this.readConfigFile(this.userConfigPath);
+      overlayProviders = this.hydrateConfigs(user.providers || {});
+      overlayPresets = user.agentPresets || {};
+      (user.removedProviders || []).forEach(id => removedProviders.add(id));
+      (user.removedPresets || []).forEach(id => removedPresets.add(id));
+      console.log(`[ProviderRegistry] Loaded user overlay from: ${this.userConfigPath}`);
+    }
+
+    // 3. Merge: base minus tombstones, then user overrides/additions win by id.
+    this.configs = {};
+    for (const [id, block] of Object.entries(this.baseConfigs)) {
+      if (!removedProviders.has(id)) this.configs[id] = block;
+    }
+    Object.assign(this.configs, overlayProviders);
+
+    this.agentPresets = {};
+    for (const [id, preset] of Object.entries(this.baseAgentPresets)) {
+      if (!removedPresets.has(id)) this.agentPresets[id] = preset;
+    }
+    Object.assign(this.agentPresets, overlayPresets);
+
+    // Single-file mode only: migrate any legacy inline keys into the keychain.
+    if (!this.userConfigPath && this.shouldMigrateInlineApiKeys(base.providers || {})) {
+      this.persist();
+    }
+  }
+
+  /** Reads + parses a config file, returning an empty schema if missing/invalid. */
+  private readConfigFile(filePath: string): ConfigSchema {
     try {
-      const rawData = fs.readFileSync(configPath, "utf-8");
-      const parsed = JSON.parse(rawData) as ConfigSchema;
-      if (parsed && parsed.providers) {
-        this.configs = this.hydrateConfigs(parsed.providers);
-      }
-      this.agentPresets = (parsed && parsed.agentPresets) || {};
-      if (parsed?.providers && this.shouldMigrateInlineApiKeys(parsed.providers)) {
-        this.persist();
-      }
+      if (!fs.existsSync(filePath)) return { providers: {} };
+      return JSON.parse(fs.readFileSync(filePath, "utf-8")) as ConfigSchema;
     } catch (err: any) {
-      console.error(`[ProviderRegistry] Failed to parse configuration file at ${configPath}:`, err.message);
+      console.error(`[ProviderRegistry] Failed to parse configuration file at ${filePath}:`, err.message);
+      return { providers: {} };
     }
   }
 
@@ -360,21 +409,75 @@ export class ProviderRegistry {
     return clean;
   }
 
-  /** Writes the current providers + agentPresets back to providers.local.json. */
+  /** Persists config: a user overlay when active, else the single base file. */
   private persist() {
+    if (this.userConfigPath) {
+      this.persistUserOverlay();
+      return;
+    }
     const payload: ConfigSchema = {
-      providers: this.toPersistedConfigs(),
+      providers: this.toPersistedConfigs(this.configs),
       // Persist an explicit empty object so deleting all presets does not fall
       // back to the template presets on the next reload.
       agentPresets: this.agentPresets
     };
-    fs.mkdirSync(path.dirname(this.persistPath), { recursive: true });
-    fs.writeFileSync(this.persistPath, JSON.stringify(payload, null, 2), "utf-8");
+    this.writeConfigFile(this.persistPath, payload);
   }
 
-  private toPersistedConfigs(): Record<string, PersistedProviderConfigBlock> {
+  /**
+   * Writes ONLY the user layer: custom providers, edits to predefined ones, and
+   * tombstones for removed predefined entries. The predefined base file is never
+   * touched, so app updates can refresh it while user data survives. Keys for
+   * untouched predefined providers are kept in the keychain (the base file's
+   * apiKeyRef still points there).
+   */
+  private persistUserOverlay() {
+    const overlay: Record<string, ProviderConfigBlock> = {};
+    for (const [id, block] of Object.entries(this.configs)) {
+      if (this.isUnchangedPredefined(id, block)) {
+        // Not forked into the overlay; just keep its key current in the keychain.
+        if (block.apiKey && this.secretStore.supportsSecurePersistence) {
+          this.secretStore.set(id, block.apiKey);
+        }
+      } else {
+        overlay[id] = block;
+      }
+    }
+    const overlayPresets: Record<string, AgentPresetBlock> = {};
+    for (const [id, preset] of Object.entries(this.agentPresets)) {
+      const base = this.baseAgentPresets[id];
+      if (!base || JSON.stringify(base) !== JSON.stringify(preset)) overlayPresets[id] = preset;
+    }
+    const payload: ConfigSchema = {
+      providers: this.toPersistedConfigs(overlay),
+      agentPresets: overlayPresets,
+      removedProviders: Object.keys(this.baseConfigs).filter(id => !(id in this.configs)),
+      removedPresets: Object.keys(this.baseAgentPresets).filter(id => !(id in this.agentPresets))
+    };
+    this.writeConfigFile(this.persistPath, payload);
+  }
+
+  /** True if a provider is a predefined entry the user has not modified. */
+  private isUnchangedPredefined(id: string, block: ProviderConfigBlock): boolean {
+    const base = this.baseConfigs[id];
+    if (!base) return false; // user-added custom provider
+    // A key added where the base referenced none must be tracked in the overlay.
+    if (block.apiKey && !this.baseKeyRefIds.has(id)) return false;
+    const shape = (b: ProviderConfigBlock) => JSON.stringify({
+      type: b.type, displayName: b.displayName, baseUrl: b.baseUrl,
+      models: b.models, modelSettings: this.safeModelSettings(b)
+    });
+    return shape(block) === shape(base);
+  }
+
+  private writeConfigFile(filePath: string, payload: ConfigSchema) {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), "utf-8");
+  }
+
+  private toPersistedConfigs(configs: Record<string, ProviderConfigBlock>): Record<string, PersistedProviderConfigBlock> {
     return Object.fromEntries(
-      Object.entries(this.configs).map(([id, block]) => {
+      Object.entries(configs).map(([id, block]) => {
         const persisted: PersistedProviderConfigBlock = {
           type: block.type,
           displayName: block.displayName,

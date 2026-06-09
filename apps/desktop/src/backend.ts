@@ -1,13 +1,11 @@
 import { utilityProcess, type UtilityProcess } from "electron";
-import fs from "node:fs";
-import path from "node:path";
 import {
   backendScript,
   bundledProviderConfig,
   dbPath,
   dbWriterBinary,
-  providerConfigPath,
   settingsPath,
+  userProviderConfig,
 } from "./paths";
 
 let child: UtilityProcess | null = null;
@@ -15,9 +13,10 @@ let child: UtilityProcess | null = null;
 /**
  * Env passed to the forked backend. The settings file is the source of truth
  * for the port; PORT is passed too as a belt-and-suspenders default. DB lives
- * next to settings in the env-specific data dir. The provider catalog is pinned
- * to a writable copy in the data dir (seeded from the bundled default) because
- * the packaged app has no repo workspace for the backend's own default to find.
+ * next to settings in the env-specific data dir. Provider config is two-layer:
+ * the predefined catalog is read straight from the read-only bundle (refreshed
+ * on every app update), while the user's own providers/edits go to a writable
+ * overlay in the data dir that updates never touch.
  */
 function backendEnv(port: number): Record<string, string> {
   return {
@@ -26,32 +25,14 @@ function backendEnv(port: number): Record<string, string> {
     LOCAGENS_SETTINGS_PATH: settingsPath(),
     LOCAGENS_DB_PATH: dbPath(),
     LOCAGENS_DB_WRITER_PATH: dbWriterBinary(),
-    LOCAGENS_PROVIDER_CONFIG_PATH: providerConfigPath(),
+    LOCAGENS_PROVIDER_CONFIG_PATH: bundledProviderConfig(),
+    LOCAGENS_PROVIDER_USER_CONFIG_PATH: userProviderConfig(),
   };
-}
-
-/**
- * Copies the bundled provider catalog into the writable data dir on first run.
- * Never overwrites an existing user copy (which may hold their own edits).
- */
-function seedProviderConfig(): void {
-  const dest = providerConfigPath();
-  if (fs.existsSync(dest)) return;
-  const src = bundledProviderConfig();
-  try {
-    if (fs.existsSync(src)) {
-      fs.mkdirSync(path.dirname(dest), { recursive: true });
-      fs.copyFileSync(src, dest);
-    }
-  } catch {
-    // Best-effort seed; the backend still starts (just with no providers yet).
-  }
 }
 
 /** Forks the bundled backend as a child process (prod). */
 export function startBackend(port: number): void {
   if (child) return;
-  seedProviderConfig();
   child = utilityProcess.fork(backendScript(), [], {
     env: backendEnv(port),
     stdio: "pipe",

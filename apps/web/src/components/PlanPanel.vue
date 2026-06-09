@@ -9,6 +9,7 @@ import ReasoningPanel from './ReasoningPanel.vue';
 import ThemedButton from './ThemedButton.vue';
 
 const props = defineProps<{
+  runId?: string | null;
   plan: Plan | null;
   changes?: WorkspaceChange[];
   agents?: AgentSummary[];
@@ -55,6 +56,7 @@ type PanelTab = StaticTab | `file:${string}`;
 
 const activeTab = ref<PanelTab>('plan');
 const openFileTabs = ref<string[]>([]);
+const isSwitchingRun = ref(false);
 
 const plan = ref<Plan | null>(null);
 const changes = ref<WorkspaceChange[]>([]);
@@ -101,6 +103,7 @@ const activeDiffRows = computed(() => activeChange.value ? changeDiffRows(active
 watch(
   () => [plan.value?.id, agents.value.length, changes.value.length] as const,
   () => {
+    if (isSwitchingRun.value) return;
     openFileTabs.value = openFileTabs.value.filter(id => changes.value.some(c => c.id === id));
     if (tabs.value.some(tab => tab.id === activeTab.value)) return;
     activeTab.value = plan.value ? 'plan' : agents.value.length ? 'agents' : 'review';
@@ -111,13 +114,19 @@ watch(
 watch(
   () => agents.value.length,
   (count, previous) => {
-    if (count > 0 && previous === 0) activeTab.value = 'agents';
+    console.log(`[PlanPanel] watch agents.length: count=${count}, previous=${previous}, isSwitchingRun=${isSwitchingRun.value}`);
+    if (isSwitchingRun.value) return;
+    if (count > 0 && previous === 0) {
+      console.log(`[PlanPanel] watch agents.length trigger AUTO-SWITCH to agents`);
+      activeTab.value = 'agents';
+    }
   }
 );
 
 watch(
   () => plan.value?.version,
   (newVer, oldVer) => {
+    if (isSwitchingRun.value) return;
     if (newVer !== undefined && oldVer !== undefined && newVer !== oldVer) {
       activeTab.value = 'plan';
     }
@@ -125,6 +134,7 @@ watch(
 );
 
 function openFile(change: WorkspaceChange) {
+  loadedState.value = null; // Clear loadedState on user action
   if (!openFileTabs.value.includes(change.id)) {
     openFileTabs.value.push(change.id);
   }
@@ -132,6 +142,7 @@ function openFile(change: WorkspaceChange) {
 }
 
 function closeFileTab(id: string) {
+  loadedState.value = null; // Clear loadedState on user action
   openFileTabs.value = openFileTabs.value.filter(x => x !== id);
   if (activeTab.value === `file:${id}`) {
     activeTab.value = changes.value.length ? 'review' : 'plan';
@@ -178,6 +189,159 @@ function compactNumber(value: number): string {
 // Inline accordion collapse states
 const expandedTranscripts = ref<Record<string, boolean>>({});
 const expandedReasoning = ref<Record<string, boolean>>({});
+
+const loadedState = ref<{
+  activeTab: PanelTab;
+  openFileTabs: string[];
+  expandedTranscripts: Record<string, boolean>;
+  expandedReasoning: Record<string, boolean>;
+} | null>(null);
+
+function saveCurrentState() {
+  console.log(`[PlanPanel] saveCurrentState: runId=${props.runId}, activeTab=${activeTab.value}, loadedState=${loadedState.value ? 'exists' : 'null'}`);
+  if (!props.runId || loadedState.value) return;
+  const state = {
+    activeTab: activeTab.value,
+    openFileTabs: openFileTabs.value,
+    expandedTranscripts: expandedTranscripts.value,
+    expandedReasoning: expandedReasoning.value
+  };
+  console.log(`[PlanPanel] persisting state to localStorage runPanelState:${props.runId}:`, state);
+  localStorage.setItem(`runPanelState:${props.runId}`, JSON.stringify(state));
+}
+
+function loadRunState(id: string | null | undefined) {
+  console.log(`[PlanPanel] loadRunState: id=${id}`);
+  let loadedActiveTab: PanelTab = 'plan';
+  let loadedOpenFileTabs: string[] = [];
+  let loadedTranscripts: Record<string, boolean> = {};
+  let loadedReasoning: Record<string, boolean> = {};
+
+  if (id) {
+    const stored = localStorage.getItem(`runPanelState:${id}`);
+    console.log(`[PlanPanel] loadRunState stored raw content:`, stored);
+    if (stored) {
+      try {
+        const state = JSON.parse(stored);
+        if (state.activeTab) loadedActiveTab = state.activeTab;
+        if (Array.isArray(state.openFileTabs)) loadedOpenFileTabs = state.openFileTabs;
+        if (state.expandedTranscripts) loadedTranscripts = state.expandedTranscripts;
+        if (state.expandedReasoning) loadedReasoning = state.expandedReasoning;
+      } catch (e) {
+        console.error('Failed to parse stored run state', e);
+      }
+    }
+  }
+
+  // Save to loadedState so we can re-apply it once the actual data loads
+  loadedState.value = {
+    activeTab: loadedActiveTab,
+    openFileTabs: loadedOpenFileTabs,
+    expandedTranscripts: loadedTranscripts,
+    expandedReasoning: loadedReasoning
+  };
+  console.log(`[PlanPanel] loadRunState loadedState populated:`, loadedState.value);
+
+  // Filter open file tabs based on current changes
+  const currentChanges = props.changes ?? [];
+  loadedOpenFileTabs = loadedOpenFileTabs.filter(fileId => currentChanges.some(c => c.id === fileId));
+
+  // Update refs immediately for responsiveness
+  openFileTabs.value = loadedOpenFileTabs;
+  expandedTranscripts.value = loadedTranscripts;
+  expandedReasoning.value = loadedReasoning;
+
+  // Validate activeTab against current tabs
+  const validTabIds: PanelTab[] = [];
+  if (props.plan) validTabIds.push('plan');
+  if (props.agents?.length) validTabIds.push('agents');
+  if (props.changes?.length) validTabIds.push('review');
+  for (const fileId of loadedOpenFileTabs) {
+    validTabIds.push(`file:${fileId}`);
+  }
+
+  console.log(`[PlanPanel] loadRunState validTabIds:`, validTabIds, 'loadedActiveTab:', loadedActiveTab);
+  if (validTabIds.includes(loadedActiveTab)) {
+    activeTab.value = loadedActiveTab;
+  } else {
+    activeTab.value = props.plan ? 'plan' : (props.agents?.length ? 'agents' : 'review');
+  }
+  console.log(`[PlanPanel] loadRunState activeTab.value set to:`, activeTab.value);
+}
+
+watch(
+  () => props.runId,
+  async (newId) => {
+    console.log(`[PlanPanel] watch props.runId triggered: newId=${newId}`);
+    isSwitchingRun.value = true;
+    loadRunState(newId);
+    await nextTick();
+    isSwitchingRun.value = false;
+
+    // Safety fallback: clear loadedState if watchers didn't trigger
+    setTimeout(() => {
+      if (loadedState.value) {
+        console.log(`[PlanPanel] watch props.runId safety timeout cleared loadedState`);
+        loadedState.value = null;
+      }
+    }, 10000);
+  },
+  { immediate: true }
+);
+
+watch(
+  [activeTab, openFileTabs, expandedTranscripts, expandedReasoning],
+  () => {
+    saveCurrentState();
+  },
+  { deep: true }
+);
+
+// Re-apply loaded state once the asynchronous plan/agents/changes data finishes loading
+watch(
+  () => [plan.value, changes.value, agents.value] as const,
+  async () => {
+    console.log(`[PlanPanel] watch plan/changes/agents triggered: loadedState exists=${!!loadedState.value}`);
+    if (!loadedState.value) return;
+
+    // Wait for auto-tab-switching watchers to finish their updates
+    await nextTick();
+
+    if (!loadedState.value) return;
+
+    const state = loadedState.value;
+    console.log(`[PlanPanel] watch plan/changes/agents re-applying loadedState:`, state);
+    
+    // Filter open file tabs based on the actual loaded changes
+    const actualOpenFileTabs = state.openFileTabs.filter(fileId => 
+      changes.value.some(c => c.id === fileId)
+    );
+    
+    openFileTabs.value = actualOpenFileTabs;
+    expandedTranscripts.value = state.expandedTranscripts;
+    expandedReasoning.value = state.expandedReasoning;
+    
+    // Construct valid tab IDs based on the loaded data
+    const validTabIds: PanelTab[] = [];
+    if (plan.value) validTabIds.push('plan');
+    if (agents.value.length) validTabIds.push('agents');
+    if (changes.value.length) validTabIds.push('review');
+    for (const fileId of actualOpenFileTabs) {
+      validTabIds.push(`file:${fileId}`);
+    }
+    
+    console.log(`[PlanPanel] watch plan/changes/agents validation: validTabIds=`, validTabIds, 'target=', state.activeTab);
+    if (validTabIds.includes(state.activeTab)) {
+      activeTab.value = state.activeTab;
+    } else {
+      activeTab.value = plan.value ? 'plan' : (agents.value.length ? 'agents' : 'review');
+    }
+    console.log(`[PlanPanel] watch plan/changes/agents activeTab set to:`, activeTab.value);
+    
+    loadedState.value = null;
+  }
+);
+
 const panelBody = ref<HTMLElement | null>(null);
 const stickyBottomThreshold = 24;
 
@@ -246,6 +410,7 @@ function thoughtFor(child: any): string {
 }
 
 function expandAgentTranscript(agentId: string) {
+  loadedState.value = null; // Clear loadedState on user action
   activeTab.value = 'agents';
   expandedTranscripts.value[agentId] = true;
   nextTick(() => {
@@ -255,6 +420,7 @@ function expandAgentTranscript(agentId: string) {
 }
 
 function selectTab(tab: PanelTab) {
+  loadedState.value = null; // Clear loadedState on user action
   activeTab.value = tab;
 }
 
@@ -275,7 +441,7 @@ defineExpose({
           type="button"
           class="panel-tab"
           :class="{ active: activeTab === tab.id }"
-          @click="activeTab = tab.id"
+          @click="selectTab(tab.id)"
         >
           <span>{{ tab.label }}</span>
           <span
@@ -430,7 +596,7 @@ defineExpose({
                   :thought="thoughtFor(child)"
                   :tool-calls="child.toolCalls"
                   :tool-responses="child.toolResponses"
-                  @open-plan="activeTab = 'plan'"
+                  @open-plan="selectTab('plan')"
                 />
 
                 <div

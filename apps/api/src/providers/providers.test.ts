@@ -456,4 +456,64 @@ test("Provider Registry and Model Providers Unit Tests", async (t) => {
     assert.deepStrictEqual(openAiReasoningParams("xiaomi/mimo-v2.5-pro", r("high")), { reasoning_scope: "extensive" });
     assert.deepStrictEqual(openAiReasoningParams("mimo-v2.5", r("high")), { reasoning_scope: "extensive" });
   });
+
+  await t.test("ProviderRegistry - user overlay: edits/additions persist separately and survive base updates", () => {
+    const basePath = path.join(process.cwd(), "providers.base-temp.json");
+    const userPath = path.join(process.cwd(), "providers.user-temp.json");
+    const cleanup = () => [basePath, userPath].forEach(p => fs.existsSync(p) && fs.unlinkSync(p));
+    cleanup();
+
+    // Predefined catalog (read-only base) with two providers.
+    fs.writeFileSync(basePath, JSON.stringify({
+      providers: {
+        "predef-a": { type: "openai-compatible", displayName: "Predef A", baseUrl: "http://a", models: ["m1"] },
+        "predef-b": { type: "openai-compatible", displayName: "Predef B", baseUrl: "http://b", models: ["m2"] }
+      }
+    }));
+
+    const prevEnv = process.env.LOCAGENS_PROVIDER_USER_CONFIG_PATH;
+    process.env.LOCAGENS_PROVIDER_USER_CONFIG_PATH = userPath;
+    try {
+      const reg = new ProviderRegistry(basePath, new InMemoryProviderSecretStore());
+      // Both predefined providers visible, no overlay file yet.
+      assert.deepStrictEqual(Object.keys(reg.getEditableConfigs()).sort(), ["predef-a", "predef-b"]);
+
+      // User: add a custom provider, edit predef-a (extra model), delete predef-b.
+      reg.saveConfigs({
+        "predef-a": { type: "openai-compatible", displayName: "Predef A", baseUrl: "http://a", apiKey: "", models: ["m1", "m1b"] },
+        "custom-x": { type: "openai-compatible", displayName: "Custom X", baseUrl: "http://x", apiKey: "", models: ["mx"] }
+        // predef-b omitted => deleted
+      } as any);
+
+      // Base file untouched.
+      const baseAfter = JSON.parse(fs.readFileSync(basePath, "utf-8"));
+      assert.deepStrictEqual(Object.keys(baseAfter.providers).sort(), ["predef-a", "predef-b"]);
+      assert.deepStrictEqual(baseAfter.providers["predef-a"].models, ["m1"]);
+
+      // User overlay holds only the fork (predef-a edited + custom-x) and a tombstone.
+      const overlay = JSON.parse(fs.readFileSync(userPath, "utf-8"));
+      assert.deepStrictEqual(Object.keys(overlay.providers).sort(), ["custom-x", "predef-a"]);
+      assert.deepStrictEqual(overlay.removedProviders, ["predef-b"]);
+
+      // Simulate an app update that adds predef-c to the base catalog.
+      fs.writeFileSync(basePath, JSON.stringify({
+        providers: {
+          "predef-a": { type: "openai-compatible", displayName: "Predef A", baseUrl: "http://a", models: ["m1"] },
+          "predef-b": { type: "openai-compatible", displayName: "Predef B", baseUrl: "http://b", models: ["m2"] },
+          "predef-c": { type: "openai-compatible", displayName: "Predef C", baseUrl: "http://c", models: ["m3"] }
+        }
+      }));
+
+      const reg2 = new ProviderRegistry(basePath, new InMemoryProviderSecretStore());
+      const ids = Object.keys(reg2.getEditableConfigs()).sort();
+      // custom survives, predef-b stays deleted, new predef-c flows in from update.
+      assert.deepStrictEqual(ids, ["custom-x", "predef-a", "predef-c"]);
+      // The user's edit to predef-a (extra model) is preserved over the base.
+      assert.deepStrictEqual(reg2.getEditableConfigs()["predef-a"].models, ["m1", "m1b"]);
+    } finally {
+      if (prevEnv === undefined) delete process.env.LOCAGENS_PROVIDER_USER_CONFIG_PATH;
+      else process.env.LOCAGENS_PROVIDER_USER_CONFIG_PATH = prevEnv;
+      cleanup();
+    }
+  });
 });

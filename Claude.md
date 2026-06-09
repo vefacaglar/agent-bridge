@@ -163,6 +163,17 @@ which is deterministic from the provider id and therefore portable across
 machines (each machine holds its own Keychain entry). Where secure storage is
 unavailable (e.g. Windows — handled later) the key is simply not persisted.
 
+**Two layers (predefined base + user overlay).** When
+`LOCAGENS_PROVIDER_USER_CONFIG_PATH` is set, `ProviderRegistry` loads a read-only
+predefined catalog (the committed/bundled `config/providers.json`) and merges a
+writable **user overlay** on top (by provider/preset id). The overlay holds the
+user's custom providers, their edits to predefined entries, and removal tombstones
+(`removedProviders`/`removedPresets`); saves write ONLY the overlay, never the base.
+This means an app update can refresh the predefined catalog while the user's own
+providers survive. In the packaged desktop app the base is the bundled resource
+and the overlay lives at `<userData>/providers.user.json`. With no overlay env set
+(dev + tests) the registry uses the single base file and writes back to it.
+
 So a fresh clone gets the full catalog from `config/providers.json`; each
 developer only enters their own API keys once (saved to the Keychain, not the
 file). Public provider metadata must never include secrets.

@@ -146,7 +146,7 @@ const currentTaskList = computed<string | null>(() => {
 // as the assistant creates a plan, edits workspace files, or starts sub-agents.
 // Closing it collapses every panel tab until the user re-opens a thread link or
 // switches chats.
-const sidePanelCollapsed = ref(localStorage.getItem('sidePanelCollapsed') === 'true');
+const sidePanelCollapsed = ref(true);
 const agentSummaryLinks = computed(() => collectAgentSummaryLinks(groupedMessages.value, isRunning.value));
 const hasWorkspaceChanges = computed(() => hasWorkspaceChangeSignals(sidePanelMessages.value));
 const workspaceChanges = computed(() =>
@@ -185,21 +185,29 @@ watch([hasSidePanelContent, sidePanelOpen], ([hasContent, isOpen]) => {
   }, SIDE_PANEL_TRANSITION_MS);
 }, { immediate: true });
 
-// Watch and persist sidePanelCollapsed changes on desktop
+// Watch and persist sidePanelCollapsed changes on desktop, keyed by activeRunId
 watch(sidePanelCollapsed, (val) => {
-  if (window.innerWidth > 760) {
-    localStorage.setItem('sidePanelCollapsed', val ? 'true' : 'false');
+  if (window.innerWidth > 760 && activeRunId.value) {
+    localStorage.setItem(`sidePanelCollapsed:${activeRunId.value}`, val ? 'true' : 'false');
   }
 });
 
 // Reset the collapsed state when switching chats using the stored preference, but keep it collapsed on mobile.
-watch(activeRunId, () => {
+watch(activeRunId, (newId) => {
   if (window.innerWidth <= 760) {
     sidePanelCollapsed.value = true;
+  } else if (newId) {
+    const stored = localStorage.getItem(`sidePanelCollapsed:${newId}`);
+    if (stored !== null) {
+      sidePanelCollapsed.value = stored === 'true';
+    } else {
+      // Default to expanded (false) for a chat if no preference is saved yet
+      sidePanelCollapsed.value = false;
+    }
   } else {
-    sidePanelCollapsed.value = localStorage.getItem('sidePanelCollapsed') === 'true';
+    sidePanelCollapsed.value = true;
   }
-});
+}, { immediate: true });
 
 // Automatically re-open the panel if it was closed and the assistant revises the plan (only on desktop).
 watch(
@@ -512,6 +520,7 @@ onUnmounted(() => {
     <PlanPanel
       ref="planPanelRef"
       v-if="sidePanelOpen && !showUsageLogsPage"
+      :run-id="activeRunId"
       :isOpen="sidePanelOpen && !showUsageLogsPage"
       :plan="currentPlan"
       :changes="workspaceChanges"

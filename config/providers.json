@@ -13,7 +13,8 @@
             "tiers": [
               {
                 "inputRate": 5,
-                "outputRate": 15
+                "outputRate": 40,
+                "cacheReadRate": 0.5
               }
             ]
           },
@@ -33,7 +34,8 @@
                 "value": "high"
               }
             ]
-          }
+          },
+          "contextLimit": 400000
         }
       },
       "apiKeyRef": "macos-keychain:openai"
@@ -53,27 +55,33 @@
             "tiers": [
               {
                 "inputRate": 3,
-                "outputRate": 15
+                "outputRate": 15,
+                "cacheReadRate": 0.3,
+                "cacheWriteRate": 3.75
               }
             ]
-          }
+          },
+          "contextLimit": 1000000
         },
         "claude-opus-4-8": {
           "pricing": {
             "tiers": [
               {
-                "inputRate": 15,
-                "outputRate": 75
+                "inputRate": 5,
+                "outputRate": 25,
+                "cacheReadRate": 0.5,
+                "cacheWriteRate": 6.25
               }
             ]
-          }
+          },
+          "contextLimit": 1000000
         },
         "claude-haiku-4-5-20251001": {
           "pricing": {
             "tiers": [
               {
-                "inputRate": 0.25,
-                "outputRate": 1.25
+                "inputRate": 1,
+                "outputRate": 5
               }
             ]
           }
@@ -106,8 +114,15 @@
           "pricing": {
             "tiers": [
               {
-                "inputRate": 0.9,
-                "outputRate": 2.7
+                "inputRate": 0.3,
+                "outputRate": 1.2,
+                "upToInputTokens": 512000,
+                "cacheReadRate": 0.06
+              },
+              {
+                "inputRate": 0.6,
+                "outputRate": 2.4,
+                "cacheReadRate": 0.12
               }
             ]
           },
@@ -119,34 +134,42 @@
                 "value": "high"
               }
             ]
-          }
+          },
+          "contextLimit": 1000000
         },
         "minimax-m2.7": {
           "pricing": {
             "tiers": [
               {
-                "inputRate": 0.6,
-                "outputRate": 1.8
+                "inputRate": 0.3,
+                "outputRate": 1.2,
+                "cacheReadRate": 0.06,
+                "cacheWriteRate": 0.375
               }
             ]
-          }
+          },
+          "contextLimit": 204800
         },
         "minimax-m2.5": {
           "pricing": {
             "tiers": [
               {
                 "inputRate": 0.3,
-                "outputRate": 0.9
+                "outputRate": 1.2,
+                "cacheReadRate": 0.03,
+                "cacheWriteRate": 0.375
               }
             ]
-          }
+          },
+          "contextLimit": 204800
         },
         "kimi-k2.6": {
           "pricing": {
             "tiers": [
               {
-                "inputRate": 1,
-                "outputRate": 3
+                "inputRate": 0.95,
+                "outputRate": 4,
+                "cacheReadRate": 0.16
               }
             ]
           },
@@ -158,24 +181,28 @@
                 "value": "high"
               }
             ]
-          }
+          },
+          "contextLimit": 256000
         },
         "kimi-k2.5": {
           "pricing": {
             "tiers": [
               {
-                "inputRate": 0.8,
-                "outputRate": 2.4
+                "inputRate": 0.6,
+                "outputRate": 3,
+                "cacheReadRate": 0.1
               }
             ]
-          }
+          },
+          "contextLimit": 256000
         },
         "glm-5.1": {
           "pricing": {
             "tiers": [
               {
-                "inputRate": 1,
-                "outputRate": 3
+                "inputRate": 1.4,
+                "outputRate": 4.4,
+                "cacheReadRate": 0.26
               }
             ]
           },
@@ -191,24 +218,28 @@
                 "value": "high"
               }
             ]
-          }
+          },
+          "contextLimit": 200000
         },
         "glm-5": {
           "pricing": {
             "tiers": [
               {
-                "inputRate": 0.6,
-                "outputRate": 1.8
+                "inputRate": 1,
+                "outputRate": 3.2,
+                "cacheReadRate": 0.2
               }
             ]
-          }
+          },
+          "contextLimit": 200000
         },
         "deepseek-v4-pro": {
           "pricing": {
             "tiers": [
               {
-                "inputRate": 0.3,
-                "outputRate": 0.5
+                "inputRate": 0.435,
+                "outputRate": 0.87,
+                "cacheReadRate": 0.003625
               }
             ]
           },
@@ -220,14 +251,16 @@
                 "value": "high"
               }
             ]
-          }
+          },
+          "contextLimit": 1000000
         },
         "deepseek-v4-flash": {
           "pricing": {
             "tiers": [
               {
                 "inputRate": 0.14,
-                "outputRate": 0.28
+                "outputRate": 0.28,
+                "cacheReadRate": 0.0028
               }
             ]
           },
@@ -239,14 +272,24 @@
                 "value": "high"
               }
             ]
-          }
+          },
+          "contextLimit": 1000000
         },
         "mimo-v2.5-pro": {
           "pricing": {
             "tiers": [
               {
-                "inputRate": 1.2,
-                "outputRate": 3.6
+                "inputRate": 1,
+                "outputRate": 3,
+                "upToInputTokens": 256000,
+                "cacheReadRate": 0.2,
+                "cacheWriteRate": 0
+              },
+              {
+                "inputRate": 2,
+                "outputRate": 6,
+                "cacheReadRate": 0.4,
+                "cacheWriteRate": 0
               }
             ]
           },
@@ -262,7 +305,8 @@
                 "value": "high"
               }
             ]
-          }
+          },
+          "contextLimit": 1000000
         },
         "hy3-preview": {
           "pricing": {
@@ -272,7 +316,31 @@
                 "outputRate": 1.5
               }
             ]
-          }
+          },
+          "contextLimit": 256000
+        },
+        "mimo-v2-pro": {
+          "pricing": {
+            "tiers": [
+              {
+                "inputRate": 1,
+                "outputRate": 3,
+                "upToInputTokens": 256000,
+                "cacheReadRate": 0.2,
+                "cacheWriteRate": 0
+              },
+              {
+                "inputRate": 2,
+                "outputRate": 6,
+                "cacheReadRate": 0.4,
+                "cacheWriteRate": 0
+              }
+            ]
+          },
+          "contextLimit": 1000000
+        },
+        "mimo-v2.5": {
+          "contextLimit": 1000000
         }
       },
       "apiKeyRef": "macos-keychain:opencode"
@@ -315,11 +383,13 @@
           "pricing": {
             "tiers": [
               {
-                "inputRate": 0.3,
-                "outputRate": 0.5
+                "inputRate": 0.435,
+                "outputRate": 0.87,
+                "cacheReadRate": 0.003625
               }
             ]
-          }
+          },
+          "contextLimit": 1000000
         },
         "deepseek/deepseek-v4-flash": {
           "reasoning": {
@@ -340,17 +410,20 @@
             "tiers": [
               {
                 "inputRate": 0.14,
-                "outputRate": 0.28
+                "outputRate": 0.28,
+                "cacheReadRate": 0.0028
               }
             ]
-          }
+          },
+          "contextLimit": 1000000
         },
         "moonshotai/Kimi-K2.6": {
           "pricing": {
             "tiers": [
               {
-                "inputRate": 1,
-                "outputRate": 3
+                "inputRate": 0.95,
+                "outputRate": 4,
+                "cacheReadRate": 0.16
               }
             ]
           },
@@ -362,14 +435,16 @@
                 "value": "high"
               }
             ]
-          }
+          },
+          "contextLimit": 256000
         },
         "zai-org/GLM-5.1": {
           "pricing": {
             "tiers": [
               {
-                "inputRate": 1,
-                "outputRate": 3
+                "inputRate": 1.4,
+                "outputRate": 4.4,
+                "cacheReadRate": 0.26
               }
             ]
           },
@@ -385,14 +460,22 @@
                 "value": "high"
               }
             ]
-          }
+          },
+          "contextLimit": 200000
         },
         "MiniMaxAI/MiniMax-M3": {
           "pricing": {
             "tiers": [
               {
-                "inputRate": 0.9,
-                "outputRate": 2.7
+                "inputRate": 0.3,
+                "outputRate": 1.2,
+                "upToInputTokens": 512000,
+                "cacheReadRate": 0.06
+              },
+              {
+                "inputRate": 0.6,
+                "outputRate": 2.4,
+                "cacheReadRate": 0.12
               }
             ]
           },
@@ -404,7 +487,8 @@
                 "value": "high"
               }
             ]
-          }
+          },
+          "contextLimit": 1000000
         },
         "Qwen/Qwen3.6-Max-Preview": {
           "pricing": {
@@ -423,7 +507,8 @@
                 "value": "high"
               }
             ]
-          }
+          },
+          "contextLimit": 256000
         },
         "Qwen/Qwen3.6-Plus": {
           "pricing": {
@@ -433,7 +518,8 @@
                 "outputRate": 1.2
               }
             ]
-          }
+          },
+          "contextLimit": 1000000
         },
         "Qwen/Qwen3.7-Max": {
           "pricing": {
@@ -452,7 +538,8 @@
                 "value": "high"
               }
             ]
-          }
+          },
+          "contextLimit": 1000000
         },
         "Qwen/Qwen3.7-Plus": {
           "pricing": {
@@ -462,7 +549,8 @@
                 "outputRate": 1.2
               }
             ]
-          }
+          },
+          "contextLimit": 1000000
         },
         "stepfun/Step-3.7-Flash": {
           "pricing": {
@@ -472,14 +560,24 @@
                 "outputRate": 0.2
               }
             ]
-          }
+          },
+          "contextLimit": 256000
         },
         "xiaomi/mimo-v2.5-pro": {
           "pricing": {
             "tiers": [
               {
-                "inputRate": 1.2,
-                "outputRate": 3.6
+                "inputRate": 1,
+                "outputRate": 3,
+                "upToInputTokens": 256000,
+                "cacheReadRate": 0.2,
+                "cacheWriteRate": 0
+              },
+              {
+                "inputRate": 2,
+                "outputRate": 6,
+                "cacheReadRate": 0.4,
+                "cacheWriteRate": 0
               }
             ]
           },
@@ -495,7 +593,8 @@
                 "value": "high"
               }
             ]
-          }
+          },
+          "contextLimit": 1000000
         },
         "nvidia/nemotron-3-ultra-550b-a55b": {
           "pricing": {
@@ -506,7 +605,11 @@
                 "cacheReadRate": 0.2
               }
             ]
-          }
+          },
+          "contextLimit": 1000000
+        },
+        "xiaomi/mimo-v2.5": {
+          "contextLimit": 1000000
         }
       },
       "apiKeyRef": "macos-keychain:commandcode"
@@ -542,11 +645,21 @@
           "pricing": {
             "tiers": [
               {
-                "inputRate": 1.2,
-                "outputRate": 3.6
+                "inputRate": 1,
+                "outputRate": 3,
+                "upToInputTokens": 256000,
+                "cacheReadRate": 0.2,
+                "cacheWriteRate": 0
+              },
+              {
+                "inputRate": 2,
+                "outputRate": 6,
+                "cacheReadRate": 0.4,
+                "cacheWriteRate": 0
               }
             ]
-          }
+          },
+          "contextLimit": 1000000
         },
         "mimo-v2.5": {
           "reasoning": {
@@ -569,7 +682,8 @@
                 "outputRate": 1.2
               }
             ]
-          }
+          },
+          "contextLimit": 1000000
         }
       },
       "apiKeyRef": "macos-keychain:xiaomitokenplan"
@@ -593,7 +707,8 @@
                 "outputRate": 3.6
               }
             ]
-          }
+          },
+          "contextLimit": 1000000
         },
         "qwen3.7-plus": {
           "pricing": {
@@ -603,7 +718,8 @@
                 "outputRate": 1.2
               }
             ]
-          }
+          },
+          "contextLimit": 1000000
         },
         "qwen3.6-max": {
           "pricing": {
@@ -623,7 +739,8 @@
                 "outputRate": 1.2
               }
             ]
-          }
+          },
+          "contextLimit": 1000000
         }
       },
       "apiKeyRef": "macos-keychain:opencode-go-anthropic"

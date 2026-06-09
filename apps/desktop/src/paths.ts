@@ -31,15 +31,15 @@ export function dbPath(): string {
 }
 
 /**
- * Writable provider catalog for the current environment. In prod it lives in the
- * user data dir (seeded on first run from the bundled default below); the backend
- * reads/writes here so provider edits persist outside the read-only app bundle.
+ * Writable user overlay: the user's custom providers, their edits to predefined
+ * ones, and removal tombstones. Lives in the data dir so it survives app updates
+ * (the predefined base ships read-only in the bundle and is refreshed on update).
  */
-export function providerConfigPath(): string {
-  return path.join(dataDir(), "providers.json");
+export function userProviderConfig(): string {
+  return path.join(dataDir(), "providers.user.json");
 }
 
-/** The committed catalog bundled into the app (prod only, read-only resource). */
+/** The committed predefined catalog bundled into the app (prod, read-only). */
 export function bundledProviderConfig(): string {
   return path.join(process.resourcesPath, "config", "providers.json");
 }
