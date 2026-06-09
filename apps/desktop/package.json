@@ -6,7 +6,17 @@
   "scripts": {
     "build:main": "tsc -p tsconfig.json",
     "start": "pnpm run build:main && electron .",
-    "dist": "pnpm run build:main && electron-builder"
+    "dist": "pnpm run build:main && electron-builder --publish never"
+  },
+  "description": "Locagens — local AI agent workspace",
+  "author": "Locagens (https://github.com/vefacaglar/locagens)",
+  "homepage": "https://github.com/vefacaglar/locagens",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vefacaglar/locagens.git"
+  },
+  "bugs": {
+    "url": "https://github.com/vefacaglar/locagens/issues"
   },
   "devDependencies": {
     "@types/node": "^22.19.19",
