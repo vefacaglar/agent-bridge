@@ -1,5 +1,5 @@
 import type { Run, RunMessage, ChatMessage } from "@agent-bridge/shared";
-import { RunRepository, MessageRepository, PlanRepository, MemoryRepository, UsageLogRepository } from "../database/repositories.js";
+import type { IRunRepository, IMessageRepository, IPlanRepository, IMemoryRepository, IUsageLogRepository } from "../database/repositories.js";
 import { ProviderRegistry } from "../providers/ProviderRegistry.js";
 import { eventBus } from "./eventBus.js";
 import { buildSystemPrompt, formatMemoryContext, formatActivePlan, getModeStrategy } from "./systemPrompt.js";
@@ -32,12 +32,12 @@ export class Orchestrator {
   private delegation: DelegationCoordinator;
 
   constructor(
-    private runRepo: RunRepository,
-    private messageRepo: MessageRepository,
+    private runRepo: IRunRepository,
+    private messageRepo: IMessageRepository,
     private registry: ProviderRegistry,
-    private planRepo: PlanRepository,
-    private memoryRepo: MemoryRepository,
-    private usageLogRepo: UsageLogRepository
+    private planRepo: IPlanRepository,
+    private memoryRepo: IMemoryRepository,
+    private usageLogRepo: IUsageLogRepository
   ) {
     this.messages = new RunMessageStream(this.runRepo, this.messageRepo);
     this.permissions = new PermissionCoordinator(this.activeRuns, this.messages);

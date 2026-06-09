@@ -9,7 +9,7 @@ import type { OrchestratorToolContext } from "./tools/index.js";
 import type { RunMessageStream } from "./RunMessageStream.js";
 import type { PermissionCoordinator } from "./PermissionCoordinator.js";
 import { randomId } from "./ids.js";
-import type { UsageLogRepository } from "../database/repositories.js";
+import type { IUsageLogRepository } from "../database/repositories.js";
 import { calculateCost } from "./pricing.js";
 
 /** The model + toolset + prompt a single agent loop runs with. */
@@ -78,7 +78,7 @@ export class AgentLoop {
     private permissions: PermissionCoordinator,
     private toolContext: OrchestratorToolContext,
     private registry: ProviderRegistry,
-    private usageLogRepo: UsageLogRepository
+    private usageLogRepo: IUsageLogRepository
   ) {}
 
   /** Wires the delegation handler. Called once during orchestrator setup. */

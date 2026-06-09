@@ -56,9 +56,9 @@ test("Orchestrator Integration Tests", async (t) => {
 
   await t.test("Orchestrator - runs single model completion", async () => {
     const registry = new ProviderRegistry(testConfigPath);
-    const runRepo = new RunRepository();
-    const messageRepo = new MessageRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository(), new UsageLogRepository());
+    const runRepo = new RunRepository(db);
+    const messageRepo = new MessageRepository(db);
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(db), new MemoryRepository(db), new UsageLogRepository(db));
 
     const runId = "run-test-123";
     const runData: Run = {
@@ -120,9 +120,9 @@ test("Orchestrator Integration Tests", async (t) => {
 
   await t.test("Orchestrator - runs tool call write_file and saves results", async () => {
     const registry = new ProviderRegistry(testConfigPath);
-    const runRepo = new RunRepository();
-    const messageRepo = new MessageRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository(), new UsageLogRepository());
+    const runRepo = new RunRepository(db);
+    const messageRepo = new MessageRepository(db);
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(db), new MemoryRepository(db), new UsageLogRepository(db));
 
     const runId = "run-test-tool-call";
     const runData: Run = {
@@ -206,9 +206,9 @@ test("Orchestrator Integration Tests", async (t) => {
 
   await t.test("Orchestrator - injects mode instructions into system prompt", async () => {
     const registry = new ProviderRegistry(testConfigPath);
-    const runRepo = new RunRepository();
-    const messageRepo = new MessageRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository(), new UsageLogRepository());
+    const runRepo = new RunRepository(db);
+    const messageRepo = new MessageRepository(db);
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(db), new MemoryRepository(db), new UsageLogRepository(db));
 
     const runId = "run-test-mode-prompt";
     const runData: Run = {
@@ -346,9 +346,9 @@ test("Orchestrator Integration Tests", async (t) => {
 
   await t.test("Orchestrator - pauses for permissions in ask_permissions mode and resumes on approval", async () => {
     const registry = new ProviderRegistry(testConfigPath);
-    const runRepo = new RunRepository();
-    const messageRepo = new MessageRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository(), new UsageLogRepository());
+    const runRepo = new RunRepository(db);
+    const messageRepo = new MessageRepository(db);
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(db), new MemoryRepository(db), new UsageLogRepository(db));
 
     const runId = "run-test-perm-ask";
     const runData: Run = {
@@ -429,9 +429,9 @@ test("Orchestrator Integration Tests", async (t) => {
 
   await t.test("Orchestrator - allow_run stops gating every later tool call in the run", async () => {
     const registry = new ProviderRegistry(testConfigPath);
-    const runRepo = new RunRepository();
-    const messageRepo = new MessageRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository(), new UsageLogRepository());
+    const runRepo = new RunRepository(db);
+    const messageRepo = new MessageRepository(db);
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(db), new MemoryRepository(db), new UsageLogRepository(db));
 
     const runId = "run-test-allow-run";
     const runData: Run = {
@@ -496,9 +496,9 @@ test("Orchestrator Integration Tests", async (t) => {
 
   await t.test("Orchestrator - runs tool call read_file and list_directory successfully", async () => {
     const registry = new ProviderRegistry(testConfigPath);
-    const runRepo = new RunRepository();
-    const messageRepo = new MessageRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository(), new UsageLogRepository());
+    const runRepo = new RunRepository(db);
+    const messageRepo = new MessageRepository(db);
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(db), new MemoryRepository(db), new UsageLogRepository(db));
 
     const runId = "run-test-read-list";
     const tempDir = path.join(process.cwd(), "temp_test_dir");
@@ -601,9 +601,9 @@ test("Orchestrator Integration Tests", async (t) => {
 
   await t.test("Orchestrator - delegate_tasks runs coder sub-agents sequentially", async () => {
     const registry = new ProviderRegistry(testConfigPath);
-    const runRepo = new RunRepository();
-    const messageRepo = new MessageRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository(), new UsageLogRepository());
+    const runRepo = new RunRepository(db);
+    const messageRepo = new MessageRepository(db);
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(db), new MemoryRepository(db), new UsageLogRepository(db));
 
     const runId = "run-test-delegate";
     const runData: Run = {
@@ -695,9 +695,9 @@ test("Orchestrator Integration Tests", async (t) => {
 
   await t.test("Orchestrator - architect sees mutating tools as traps and is redirected to delegate_tasks", async () => {
     const registry = new ProviderRegistry(testConfigPath);
-    const runRepo = new RunRepository();
-    const messageRepo = new MessageRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository(), new UsageLogRepository());
+    const runRepo = new RunRepository(db);
+    const messageRepo = new MessageRepository(db);
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(db), new MemoryRepository(db), new UsageLogRepository(db));
 
     const runId = "run-test-trap";
     const runData: Run = {
@@ -769,10 +769,10 @@ test("Orchestrator Integration Tests", async (t) => {
 
   await t.test("Orchestrator - idle architect with an approved plan gets one nudge before finishing", async () => {
     const registry = new ProviderRegistry(testConfigPath);
-    const runRepo = new RunRepository();
-    const messageRepo = new MessageRepository();
-    const planRepo = new PlanRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, planRepo, new MemoryRepository(), new UsageLogRepository());
+    const runRepo = new RunRepository(db);
+    const messageRepo = new MessageRepository(db);
+    const planRepo = new PlanRepository(db);
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, planRepo, new MemoryRepository(db), new UsageLogRepository(db));
 
     const runId = "run-test-idle-nudge";
     const runData: Run = {
@@ -827,9 +827,9 @@ test("Orchestrator Integration Tests", async (t) => {
 
   await t.test("Orchestrator - delegate_to_utility runs a utility sub-agent", async () => {
     const registry = new ProviderRegistry(testConfigPath);
-    const runRepo = new RunRepository();
-    const messageRepo = new MessageRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository(), new UsageLogRepository());
+    const runRepo = new RunRepository(db);
+    const messageRepo = new MessageRepository(db);
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(db), new MemoryRepository(db), new UsageLogRepository(db));
 
     const runId = "run-test-utility";
     const runData: Run = {
@@ -913,9 +913,9 @@ test("Orchestrator Integration Tests", async (t) => {
 
   await t.test("Orchestrator - plan mode blocks mutating/command tools even if the model calls them", async () => {
     const registry = new ProviderRegistry(testConfigPath);
-    const runRepo = new RunRepository();
-    const messageRepo = new MessageRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository(), new UsageLogRepository());
+    const runRepo = new RunRepository(db);
+    const messageRepo = new MessageRepository(db);
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(db), new MemoryRepository(db), new UsageLogRepository(db));
 
     const runId = "run-test-plan-block";
     const blockedFilePath = path.join(process.cwd(), "test_plan_blocked.json");
@@ -988,9 +988,9 @@ test("Orchestrator Integration Tests", async (t) => {
 
   await t.test("Orchestrator - delegate_tasks clamps to at most 3 sub-agents", async () => {
     const registry = new ProviderRegistry(testConfigPath);
-    const runRepo = new RunRepository();
-    const messageRepo = new MessageRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository(), new UsageLogRepository());
+    const runRepo = new RunRepository(db);
+    const messageRepo = new MessageRepository(db);
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(db), new MemoryRepository(db), new UsageLogRepository(db));
 
     const runId = "run-test-delegate-clamp";
     await runRepo.create({
@@ -1052,9 +1052,9 @@ test("Orchestrator Integration Tests", async (t) => {
 
   await t.test("Orchestrator - delegate_tasks supports 3 parallel sub-agents writing the same run", async () => {
     const registry = new ProviderRegistry(testConfigPath);
-    const runRepo = new RunRepository();
-    const messageRepo = new MessageRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository(), new UsageLogRepository());
+    const runRepo = new RunRepository(db);
+    const messageRepo = new MessageRepository(db);
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(db), new MemoryRepository(db), new UsageLogRepository(db));
 
     const runId = "run-test-delegate-parallel";
     await runRepo.create({
@@ -1137,10 +1137,10 @@ test("Orchestrator Integration Tests", async (t) => {
 
   await t.test("Orchestrator - remember saves a memory and later runs inject it", async () => {
     const registry = new ProviderRegistry(testConfigPath);
-    const runRepo = new RunRepository();
-    const messageRepo = new MessageRepository();
-    const memoryRepo = new MemoryRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), memoryRepo, new UsageLogRepository());
+    const runRepo = new RunRepository(db);
+    const messageRepo = new MessageRepository(db);
+    const memoryRepo = new MemoryRepository(db);
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(db), memoryRepo, new UsageLogRepository(db));
 
     const projectPath = process.cwd();
     const runId = "run-test-remember";
@@ -1241,9 +1241,9 @@ test("Orchestrator Integration Tests", async (t) => {
 
   await t.test("Orchestrator - architect is blocked from executing delete_file directly when preset is active", async () => {
     const registry = new ProviderRegistry(testConfigPath);
-    const runRepo = new RunRepository();
-    const messageRepo = new MessageRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository(), new UsageLogRepository());
+    const runRepo = new RunRepository(db);
+    const messageRepo = new MessageRepository(db);
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(db), new MemoryRepository(db), new UsageLogRepository(db));
 
     const runId = "run-test-architect-blocked";
     await runRepo.create({
@@ -1326,11 +1326,11 @@ test("Orchestrator Integration Tests", async (t) => {
   });
 
   await t.test("UsageLogRepository - creates and retrieves usage logs", async () => {
-    const usageLogRepo = new UsageLogRepository();
+    const usageLogRepo = new UsageLogRepository(db);
     const runId = "run-test-logging-db";
 
     // Setup a dummy run first to satisfy foreign key constraint
-    const runRepo = new RunRepository();
+    const runRepo = new RunRepository(db);
     await runRepo.create({
       id: runId,
       title: "Test Logging Run",

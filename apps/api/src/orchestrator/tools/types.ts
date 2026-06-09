@@ -1,6 +1,6 @@
 import type { Run, UserQuestion } from "@agent-bridge/shared";
 import type { ModeStrategy, ToolDef } from "../prompts/index.js";
-import type { RunRepository, PlanRepository, MemoryRepository } from "../../database/repositories.js";
+import type { IRunRepository, IPlanRepository, IMemoryRepository } from "../../database/repositories.js";
 import type { eventBus } from "../eventBus.js";
 
 /** The user's reply to an ask_user_question request, aligned to the questions order. */
@@ -16,9 +16,9 @@ export interface QuestionAnswerInput {
  * user answer) that ask_user_question needs — nothing more.
  */
 export interface OrchestratorToolContext {
-  runRepo: RunRepository;
-  planRepo: PlanRepository;
-  memoryRepo: MemoryRepository;
+  runRepo: IRunRepository;
+  planRepo: IPlanRepository;
+  memoryRepo: IMemoryRepository;
   eventBus: typeof eventBus;
   /** Pauses the run and waits for the user's answer (QuestionCoordinator). */
   requestUserAnswer(runId: string, questions: UserQuestion[]): Promise<QuestionAnswerInput>;

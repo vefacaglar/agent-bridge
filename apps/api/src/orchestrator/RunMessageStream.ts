@@ -1,5 +1,5 @@
 import type { Run, RunStatus, RunMessage } from "@agent-bridge/shared";
-import type { RunRepository, MessageRepository } from "../database/repositories.js";
+import type { IRunRepository, IMessageRepository } from "../database/repositories.js";
 import { eventBus } from "./eventBus.js";
 
 /**
@@ -20,8 +20,8 @@ export class RunMessageStream {
   private pendingDbWrites = new Set<Promise<unknown>>();
 
   constructor(
-    private runRepo: RunRepository,
-    private messageRepo: MessageRepository
+    private runRepo: IRunRepository,
+    private messageRepo: IMessageRepository
   ) {}
 
   /** Registers an in-flight DB write so flushAll can await it later. */

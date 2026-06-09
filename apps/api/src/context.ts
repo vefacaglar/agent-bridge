@@ -1,6 +1,22 @@
 import path from "node:path";
 import { ProviderRegistry } from "./providers/ProviderRegistry.js";
-import { RunRepository, MessageRepository, ProjectRepository, PermissionRepository, PlanRepository, MemoryRepository, UsageLogRepository } from "./database/repositories.js";
+import { db } from "./database/db.js";
+import {
+  RunRepository,
+  MessageRepository,
+  ProjectRepository,
+  PermissionRepository,
+  PlanRepository,
+  MemoryRepository,
+  UsageLogRepository,
+  IRunRepository,
+  IMessageRepository,
+  IProjectRepository,
+  IPermissionRepository,
+  IPlanRepository,
+  IMemoryRepository,
+  IUsageLogRepository
+} from "./database/repositories.js";
 import { Orchestrator } from "./orchestrator/Orchestrator.js";
 import { AppSettingsStore } from "./config/AppSettingsStore.js";
 
@@ -10,13 +26,13 @@ import { AppSettingsStore } from "./config/AppSettingsStore.js";
  */
 export interface AppContext {
   registry: ProviderRegistry;
-  runRepo: RunRepository;
-  messageRepo: MessageRepository;
-  projectRepo: ProjectRepository;
-  permissionRepo: PermissionRepository;
-  planRepo: PlanRepository;
-  memoryRepo: MemoryRepository;
-  usageLogRepo: UsageLogRepository;
+  runRepo: IRunRepository;
+  messageRepo: IMessageRepository;
+  projectRepo: IProjectRepository;
+  permissionRepo: IPermissionRepository;
+  planRepo: IPlanRepository;
+  memoryRepo: IMemoryRepository;
+  usageLogRepo: IUsageLogRepository;
   orchestrator: Orchestrator;
   settingsStore: AppSettingsStore;
   defaultProjectPath: string;
@@ -24,13 +40,13 @@ export interface AppContext {
 
 export function createAppContext(): AppContext {
   const registry = new ProviderRegistry();
-  const runRepo = new RunRepository();
-  const messageRepo = new MessageRepository();
-  const projectRepo = new ProjectRepository();
-  const permissionRepo = new PermissionRepository();
-  const planRepo = new PlanRepository();
-  const memoryRepo = new MemoryRepository();
-  const usageLogRepo = new UsageLogRepository();
+  const runRepo = new RunRepository(db);
+  const messageRepo = new MessageRepository(db);
+  const projectRepo = new ProjectRepository(db);
+  const permissionRepo = new PermissionRepository(db);
+  const planRepo = new PlanRepository(db);
+  const memoryRepo = new MemoryRepository(db);
+  const usageLogRepo = new UsageLogRepository(db);
   const orchestrator = new Orchestrator(runRepo, messageRepo, registry, planRepo, memoryRepo, usageLogRepo);
   const settingsStore = new AppSettingsStore();
 
