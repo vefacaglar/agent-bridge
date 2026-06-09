@@ -479,7 +479,7 @@ function getHitRateClass(rate: number): string {
 /* Table Container */
 .table-container {
   flex: 1;
-  overflow-y: auto;
+  overflow: auto;
   background: var(--surface-elevated);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius);
@@ -490,9 +490,51 @@ function getHitRateClass(rate: number): string {
 
 .logs-table {
   width: 100%;
+  min-width: 1000px;
+  table-layout: fixed;
   border-collapse: collapse;
   text-align: left;
   font-size: 0.86rem;
+}
+
+.col-date {
+  width: 150px;
+}
+
+.col-run-id {
+  width: 80px;
+}
+
+.col-role {
+  width: 80px;
+}
+
+.col-provider {
+  width: 90px;
+}
+
+.col-model {
+  width: 160px;
+}
+
+.col-input-tokens {
+  width: 100px;
+}
+
+.col-output-tokens {
+  width: 90px;
+}
+
+.col-hit-rate {
+  width: 80px;
+}
+
+.col-duration {
+  width: 80px;
+}
+
+.col-cost {
+  width: 90px;
 }
 
 .logs-table th {
@@ -514,6 +556,15 @@ function getHitRateClass(rate: number): string {
   border-bottom: 1px solid var(--border-soft);
   color: var(--text);
   vertical-align: middle;
+  white-space: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.logs-table td::-webkit-scrollbar {
+  display: none; /* Chrome, Safari and Opera */
 }
 
 .log-row {
@@ -597,7 +648,8 @@ function getHitRateClass(rate: number): string {
 
 .token-cache {
   font-size: 0.72rem;
-  display: block;
+  display: inline-block;
+  margin-left: 6px;
 }
 
 .font-success {
