@@ -1,4 +1,4 @@
-import type { Run, RunMessage, RunStatus, Project, PermissionRule, Plan, PlanTask, Memory, MemoryScope, MemoryCategory } from "@agent-bridge/shared";
+import type { Run, RunMessage, RunStatus, Project, PermissionRule, Plan, PlanTask, Memory, MemoryScope, MemoryCategory, UsageLog } from "@agent-bridge/shared";
 import { db, runDbWrite } from "./db.js";
 
 
@@ -475,3 +475,48 @@ export class MemoryRepository {
     await runDbWrite({ op: "memory.clear" }, () => db.prepare("DELETE FROM memory").run());
   }
 }
+
+export class UsageLogRepository {
+  async create(log: UsageLog): Promise<void> {
+    const stmt = db.prepare(`
+      INSERT INTO usage_logs (
+        run_id, agent_role, provider_id, model,
+        input_tokens, output_tokens, cache_read_tokens, cache_write_tokens,
+        cache_hit_rate, cost, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    await runDbWrite({ op: "usage_logs.create", args: { log } }, () => stmt.run(
+      log.runId,
+      log.agentRole || null,
+      log.providerId,
+      log.model,
+      log.inputTokens,
+      log.outputTokens,
+      log.cacheReadTokens,
+      log.cacheWriteTokens,
+      log.cacheHitRate,
+      log.cost,
+      log.createdAt
+    ));
+  }
+
+  listByRunId(runId: string): UsageLog[] {
+    const stmt = db.prepare("SELECT * FROM usage_logs WHERE run_id = ? ORDER BY created_at ASC");
+    const rows = stmt.all(runId) as any[];
+    return rows.map((row) => ({
+      id: row.id,
+      runId: row.run_id,
+      agentRole: row.agent_role || undefined,
+      providerId: row.provider_id,
+      model: row.model,
+      inputTokens: row.input_tokens,
+      outputTokens: row.output_tokens,
+      cacheReadTokens: row.cache_read_tokens,
+      cacheWriteTokens: row.cache_write_tokens,
+      cacheHitRate: row.cache_hit_rate,
+      cost: row.cost,
+      createdAt: row.created_at
+    }));
+  }
+}
+

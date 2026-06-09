@@ -1,6 +1,6 @@
 import path from "node:path";
 import { ProviderRegistry } from "./providers/ProviderRegistry.js";
-import { RunRepository, MessageRepository, ProjectRepository, PermissionRepository, PlanRepository, MemoryRepository } from "./database/repositories.js";
+import { RunRepository, MessageRepository, ProjectRepository, PermissionRepository, PlanRepository, MemoryRepository, UsageLogRepository } from "./database/repositories.js";
 import { Orchestrator } from "./orchestrator/Orchestrator.js";
 import { AppSettingsStore } from "./config/AppSettingsStore.js";
 
@@ -16,6 +16,7 @@ export interface AppContext {
   permissionRepo: PermissionRepository;
   planRepo: PlanRepository;
   memoryRepo: MemoryRepository;
+  usageLogRepo: UsageLogRepository;
   orchestrator: Orchestrator;
   settingsStore: AppSettingsStore;
   defaultProjectPath: string;
@@ -29,7 +30,8 @@ export function createAppContext(): AppContext {
   const permissionRepo = new PermissionRepository();
   const planRepo = new PlanRepository();
   const memoryRepo = new MemoryRepository();
-  const orchestrator = new Orchestrator(runRepo, messageRepo, registry, planRepo, memoryRepo);
+  const usageLogRepo = new UsageLogRepository();
+  const orchestrator = new Orchestrator(runRepo, messageRepo, registry, planRepo, memoryRepo, usageLogRepo);
   const settingsStore = new AppSettingsStore();
 
   return {
@@ -40,6 +42,7 @@ export function createAppContext(): AppContext {
     permissionRepo,
     planRepo,
     memoryRepo,
+    usageLogRepo,
     orchestrator,
     settingsStore,
     defaultProjectPath: process.cwd()

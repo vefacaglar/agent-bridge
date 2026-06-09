@@ -1,5 +1,5 @@
 import type { Run, RunMessage, ChatMessage } from "@agent-bridge/shared";
-import { RunRepository, MessageRepository, PlanRepository, MemoryRepository } from "../database/repositories.js";
+import { RunRepository, MessageRepository, PlanRepository, MemoryRepository, UsageLogRepository } from "../database/repositories.js";
 import { ProviderRegistry } from "../providers/ProviderRegistry.js";
 import { eventBus } from "./eventBus.js";
 import { buildSystemPrompt, formatMemoryContext, formatActivePlan, getModeStrategy } from "./systemPrompt.js";
@@ -36,7 +36,8 @@ export class Orchestrator {
     private messageRepo: MessageRepository,
     private registry: ProviderRegistry,
     private planRepo: PlanRepository,
-    private memoryRepo: MemoryRepository
+    private memoryRepo: MemoryRepository,
+    private usageLogRepo: UsageLogRepository
   ) {
     this.messages = new RunMessageStream(this.runRepo, this.messageRepo);
     this.permissions = new PermissionCoordinator(this.activeRuns, this.messages);
@@ -53,7 +54,7 @@ export class Orchestrator {
     // The loop and the delegation handler reference each other (loop runs the
     // sub-agents; delegation dispatches from inside the loop), so wire the
     // delegator after both exist.
-    this.agentLoop = new AgentLoop(this.activeRuns, this.messages, this.permissions, this.toolContext, this.registry);
+    this.agentLoop = new AgentLoop(this.activeRuns, this.messages, this.permissions, this.toolContext, this.registry, this.usageLogRepo);
     this.delegation = new DelegationCoordinator(this.registry, this.agentLoop);
     this.agentLoop.setDelegator(this.delegation);
   }

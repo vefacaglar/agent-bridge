@@ -246,6 +246,28 @@ db.exec(`
 `);
 db.exec("CREATE INDEX IF NOT EXISTS idx_memory_scope_project ON memory(scope, project_path)");
 
+// Create Usage Logs Table.
+// Detailed logs of all LLM completions (token counts, cache hit rate, cost).
+db.exec(`
+  CREATE TABLE IF NOT EXISTS usage_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id TEXT NOT NULL,
+    agent_role TEXT,
+    provider_id TEXT NOT NULL,
+    model TEXT NOT NULL,
+    input_tokens INTEGER NOT NULL DEFAULT 0,
+    output_tokens INTEGER NOT NULL DEFAULT 0,
+    cache_read_tokens INTEGER NOT NULL DEFAULT 0,
+    cache_write_tokens INTEGER NOT NULL DEFAULT 0,
+    cache_hit_rate REAL NOT NULL DEFAULT 0.0,
+    cost REAL NOT NULL DEFAULT 0.0,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (run_id) REFERENCES runs(id)
+  );
+`);
+db.exec("CREATE INDEX IF NOT EXISTS idx_usage_logs_run ON usage_logs(run_id)");
+
+
 // Seed default project if empty
 const projectCount = db.prepare("SELECT count(*) as count FROM projects").get() as { count: number };
 if (projectCount.count === 0) {

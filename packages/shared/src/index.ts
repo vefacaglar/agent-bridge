@@ -322,3 +322,19 @@ export interface Memory {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface UsageLog {
+  id?: number;
+  runId: string;
+  agentRole?: string;
+  providerId: string;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  cacheHitRate: number;
+  cost: number;
+  createdAt: string;
+}
+

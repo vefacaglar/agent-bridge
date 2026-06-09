@@ -8,10 +8,11 @@ import { db } from "../database/db.js";
 process.env.NODE_ENV = "test";
 
 import { ProviderRegistry } from "../providers/ProviderRegistry.js";
-import { RunRepository, MessageRepository, PlanRepository, MemoryRepository } from "../database/repositories.js";
+import { RunRepository, MessageRepository, PlanRepository, MemoryRepository, UsageLogRepository } from "../database/repositories.js";
 import { Orchestrator } from "./Orchestrator.js";
 import { eventBus } from "./eventBus.js";
 import { buildCoderSystemPrompt, buildSystemPrompt, buildUtilitySystemPrompt } from "./systemPrompt.js";
+import { calculateCost } from "./pricing.js";
 import {
   ASK_QUESTION_TOOL,
   DELEGATE_TASKS_TOOL,
@@ -57,7 +58,7 @@ test("Orchestrator Integration Tests", async (t) => {
     const registry = new ProviderRegistry(testConfigPath);
     const runRepo = new RunRepository();
     const messageRepo = new MessageRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository());
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository(), new UsageLogRepository());
 
     const runId = "run-test-123";
     const runData: Run = {
@@ -121,7 +122,7 @@ test("Orchestrator Integration Tests", async (t) => {
     const registry = new ProviderRegistry(testConfigPath);
     const runRepo = new RunRepository();
     const messageRepo = new MessageRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository());
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository(), new UsageLogRepository());
 
     const runId = "run-test-tool-call";
     const runData: Run = {
@@ -207,7 +208,7 @@ test("Orchestrator Integration Tests", async (t) => {
     const registry = new ProviderRegistry(testConfigPath);
     const runRepo = new RunRepository();
     const messageRepo = new MessageRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository());
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository(), new UsageLogRepository());
 
     const runId = "run-test-mode-prompt";
     const runData: Run = {
@@ -347,7 +348,7 @@ test("Orchestrator Integration Tests", async (t) => {
     const registry = new ProviderRegistry(testConfigPath);
     const runRepo = new RunRepository();
     const messageRepo = new MessageRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository());
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository(), new UsageLogRepository());
 
     const runId = "run-test-perm-ask";
     const runData: Run = {
@@ -430,7 +431,7 @@ test("Orchestrator Integration Tests", async (t) => {
     const registry = new ProviderRegistry(testConfigPath);
     const runRepo = new RunRepository();
     const messageRepo = new MessageRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository());
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository(), new UsageLogRepository());
 
     const runId = "run-test-allow-run";
     const runData: Run = {
@@ -497,7 +498,7 @@ test("Orchestrator Integration Tests", async (t) => {
     const registry = new ProviderRegistry(testConfigPath);
     const runRepo = new RunRepository();
     const messageRepo = new MessageRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository());
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository(), new UsageLogRepository());
 
     const runId = "run-test-read-list";
     const tempDir = path.join(process.cwd(), "temp_test_dir");
@@ -602,7 +603,7 @@ test("Orchestrator Integration Tests", async (t) => {
     const registry = new ProviderRegistry(testConfigPath);
     const runRepo = new RunRepository();
     const messageRepo = new MessageRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository());
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository(), new UsageLogRepository());
 
     const runId = "run-test-delegate";
     const runData: Run = {
@@ -696,7 +697,7 @@ test("Orchestrator Integration Tests", async (t) => {
     const registry = new ProviderRegistry(testConfigPath);
     const runRepo = new RunRepository();
     const messageRepo = new MessageRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository());
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository(), new UsageLogRepository());
 
     const runId = "run-test-trap";
     const runData: Run = {
@@ -771,7 +772,7 @@ test("Orchestrator Integration Tests", async (t) => {
     const runRepo = new RunRepository();
     const messageRepo = new MessageRepository();
     const planRepo = new PlanRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, planRepo, new MemoryRepository());
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, planRepo, new MemoryRepository(), new UsageLogRepository());
 
     const runId = "run-test-idle-nudge";
     const runData: Run = {
@@ -828,7 +829,7 @@ test("Orchestrator Integration Tests", async (t) => {
     const registry = new ProviderRegistry(testConfigPath);
     const runRepo = new RunRepository();
     const messageRepo = new MessageRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository());
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository(), new UsageLogRepository());
 
     const runId = "run-test-utility";
     const runData: Run = {
@@ -914,7 +915,7 @@ test("Orchestrator Integration Tests", async (t) => {
     const registry = new ProviderRegistry(testConfigPath);
     const runRepo = new RunRepository();
     const messageRepo = new MessageRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository());
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository(), new UsageLogRepository());
 
     const runId = "run-test-plan-block";
     const blockedFilePath = path.join(process.cwd(), "test_plan_blocked.json");
@@ -989,7 +990,7 @@ test("Orchestrator Integration Tests", async (t) => {
     const registry = new ProviderRegistry(testConfigPath);
     const runRepo = new RunRepository();
     const messageRepo = new MessageRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository());
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository(), new UsageLogRepository());
 
     const runId = "run-test-delegate-clamp";
     await runRepo.create({
@@ -1053,7 +1054,7 @@ test("Orchestrator Integration Tests", async (t) => {
     const registry = new ProviderRegistry(testConfigPath);
     const runRepo = new RunRepository();
     const messageRepo = new MessageRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository());
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository(), new UsageLogRepository());
 
     const runId = "run-test-delegate-parallel";
     await runRepo.create({
@@ -1139,7 +1140,7 @@ test("Orchestrator Integration Tests", async (t) => {
     const runRepo = new RunRepository();
     const messageRepo = new MessageRepository();
     const memoryRepo = new MemoryRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), memoryRepo);
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), memoryRepo, new UsageLogRepository());
 
     const projectPath = process.cwd();
     const runId = "run-test-remember";
@@ -1242,7 +1243,7 @@ test("Orchestrator Integration Tests", async (t) => {
     const registry = new ProviderRegistry(testConfigPath);
     const runRepo = new RunRepository();
     const messageRepo = new MessageRepository();
-    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository());
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(), new MemoryRepository(), new UsageLogRepository());
 
     const runId = "run-test-architect-blocked";
     await runRepo.create({
@@ -1307,4 +1308,69 @@ test("Orchestrator Integration Tests", async (t) => {
     assert.match(result.error, /You are the ARCHITECT and cannot run/);
     assert.match(result.error, /delegate_tasks/);
   });
+
+  await t.test("Pricing - calculates cost correctly for known and unknown models", () => {
+    // Claude 3.5 Sonnet: input $3/M, output $15/M, cache read $0.3/M, cache write $3.75/M
+    const costSonnet = calculateCost("anthropic", "claude-3-5-sonnet", 10000, 2000, 5000, 1000);
+    const expectedSonnet = (10000 / 1000000 * 3.0) + (2000 / 1000000 * 15.0) + (5000 / 1000000 * 0.3) + (1000 / 1000000 * 3.75);
+    assert.strictEqual(costSonnet, expectedSonnet);
+
+    // Deepseek Chat: input $0.14/M, output $0.28/M
+    const costDeepseek = calculateCost("openai", "deepseek-chat", 10000, 2000, 5000);
+    const expectedDeepseek = (10000 / 1000000 * 0.14) + (2000 / 1000000 * 0.28) + (5000 / 1000000 * 0.014);
+    assert.strictEqual(costDeepseek, expectedDeepseek);
+
+    // Unknown model
+    const costUnknown = calculateCost("custom", "my-secret-model", 10000, 2000);
+    assert.strictEqual(costUnknown, 0.0);
+  });
+
+  await t.test("UsageLogRepository - creates and retrieves usage logs", async () => {
+    const usageLogRepo = new UsageLogRepository();
+    const runId = "run-test-logging-db";
+
+    // Setup a dummy run first to satisfy foreign key constraint
+    const runRepo = new RunRepository();
+    await runRepo.create({
+      id: runId,
+      title: "Test Logging Run",
+      task: "Test logging",
+      status: "created",
+      providerId: "test-provider",
+      providerDisplayName: "Test Provider",
+      model: "model-1",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
+
+    const logEntry = {
+      runId,
+      agentRole: "coder",
+      providerId: "anthropic",
+      model: "claude-3-5-sonnet",
+      inputTokens: 1000,
+      outputTokens: 500,
+      cacheReadTokens: 200,
+      cacheWriteTokens: 100,
+      cacheHitRate: 15,
+      cost: 0.012,
+      createdAt: new Date().toISOString()
+    };
+
+    await usageLogRepo.create(logEntry);
+
+    const logs = usageLogRepo.listByRunId(runId);
+    assert.strictEqual(logs.length, 1);
+    assert.strictEqual(logs[0].runId, runId);
+    assert.strictEqual(logs[0].agentRole, "coder");
+    assert.strictEqual(logs[0].providerId, "anthropic");
+    assert.strictEqual(logs[0].model, "claude-3-5-sonnet");
+    assert.strictEqual(logs[0].inputTokens, 1000);
+    assert.strictEqual(logs[0].outputTokens, 500);
+    assert.strictEqual(logs[0].cacheReadTokens, 200);
+    assert.strictEqual(logs[0].cacheWriteTokens, 100);
+    assert.strictEqual(logs[0].cacheHitRate, 15);
+    assert.strictEqual(logs[0].cost, 0.012);
+  });
 });
+

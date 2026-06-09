@@ -173,11 +173,39 @@ Durable facts the assistant remembers across sessions (set via the `remember` to
 
 ---
 
+## Table: `usage_logs`
+
+Detailed records of all LLM completions, including token counts, cache hits, and calculated costs.
+
+| Column | Type | Constraints | Notes |
+|---|---|---|---|
+| `id` | `INTEGER` | `PRIMARY KEY AUTOINCREMENT` | Auto-generated surrogate key |
+| `run_id` | `TEXT` | `NOT NULL` `FK → runs(id)` | Parent run |
+| `agent_role` | `TEXT` | nullable | Agent role (e.g., `planner`, `coder`, `utility`) |
+| `provider_id` | `TEXT` | `NOT NULL` | Provider identifier (e.g. `openai`, `anthropic`) |
+| `model` | `TEXT` | `NOT NULL` | Model name used for completion |
+| `input_tokens` | `INTEGER` | `NOT NULL` `DEFAULT 0` | Input / prompt tokens count |
+| `output_tokens` | `INTEGER` | `NOT NULL` `DEFAULT 0` | Output / completion tokens count |
+| `cache_read_tokens` | `INTEGER` | `NOT NULL` `DEFAULT 0` | Cache hit (read) tokens count |
+| `cache_write_tokens` | `INTEGER` | `NOT NULL` `DEFAULT 0` | Cache miss (written) tokens count |
+| `cache_hit_rate` | `REAL` | `NOT NULL` `DEFAULT 0.0` | Cache hit rate as percentage (0 to 100) |
+| `cost` | `REAL` | `NOT NULL` `DEFAULT 0.0` | Estimated cost of this call in USD |
+| `created_at` | `TEXT` | `NOT NULL` | ISO-8601 timestamp |
+
+**Indexes:**
+
+| Index name | On | Notes |
+|---|---|---|
+| `idx_usage_logs_run` | `usage_logs(run_id)` | Accelerates lookups of usage logs by run |
+
+---
+
 ## Relationship Summary
 
 ```
-runs ──┬── messages   (1:N via run_id)
-       ├── plans       (1:N via run_id)
+runs ──┬── messages     (1:N via run_id)
+       ├── plans        (1:N via run_id)
+       ├── usage_logs   (1:N via run_id)
        └── (implicitly referenced by permissions/memory via project_path)
 ```
 
@@ -193,6 +221,7 @@ runs ──┬── messages   (1:N via run_id)
 |---|---|---|
 | `plans` | `idx_plans_run` | `run_id` |
 | `memory` | `idx_memory_scope_project` | `scope, project_path` |
+| `usage_logs` | `idx_usage_logs_run` | `run_id` |
 
 ---
 

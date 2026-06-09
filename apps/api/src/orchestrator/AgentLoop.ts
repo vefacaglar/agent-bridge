@@ -9,6 +9,8 @@ import type { OrchestratorToolContext } from "./tools/index.js";
 import type { RunMessageStream } from "./RunMessageStream.js";
 import type { PermissionCoordinator } from "./PermissionCoordinator.js";
 import { randomId } from "./ids.js";
+import type { UsageLogRepository } from "../database/repositories.js";
+import { calculateCost } from "./pricing.js";
 
 /** The model + toolset + prompt a single agent loop runs with. */
 export interface AgentRunOptions {
@@ -75,7 +77,8 @@ export class AgentLoop {
     private messages: RunMessageStream,
     private permissions: PermissionCoordinator,
     private toolContext: OrchestratorToolContext,
-    private registry: ProviderRegistry
+    private registry: ProviderRegistry,
+    private usageLogRepo: UsageLogRepository
   ) {}
 
   /** Wires the delegation handler. Called once during orchestrator setup. */
@@ -176,6 +179,26 @@ export class AgentLoop {
         } catch {
           // Best-effort only; never let logging break a run.
         }
+
+        // Calculate cost using the pricing helper
+        const cost = calculateCost(opts.providerId, opts.model, fresh, u.outputTokens ?? 0, cacheRead, cacheWrite);
+
+        // Write to SQLite database usage_logs table asynchronously
+        this.usageLogRepo.create({
+          runId,
+          agentRole: opts.agentRole ?? "main",
+          providerId: opts.providerId,
+          model: opts.model,
+          inputTokens: fresh,
+          outputTokens: u.outputTokens ?? 0,
+          cacheReadTokens: cacheRead,
+          cacheWriteTokens: cacheWrite,
+          cacheHitRate: hitPct,
+          cost,
+          createdAt: new Date().toISOString()
+        }).catch(err => {
+          console.error(`[Database] Failed to write usage log to database: ${err.message}`);
+        });
       }
 
       const finalMsg: RunMessage = {
