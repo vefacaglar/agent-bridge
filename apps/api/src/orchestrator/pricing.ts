@@ -1,3 +1,5 @@
+import type { ModelPricing, PriceTier } from "@agent-bridge/shared";
+
 interface PriceRate {
   inputRate: number;      // USD per 1M tokens
   outputRate: number;     // USD per 1M tokens
@@ -132,7 +134,23 @@ function findRate(model: string): PriceRate | null {
 }
 
 /**
- * Computes the estimated cost of an LLM completion request in USD.
+ * Picks the pricing tier for a request by its total prompt (input) token count.
+ * Tiers are matched against the first whose `upToInputTokens` ceiling covers the
+ * prompt; the final open-ended tier (no ceiling) catches everything larger.
+ */
+function selectTier(tiers: PriceTier[], promptTokens: number): PriceTier | null {
+  if (!tiers.length) return null;
+  const sorted = [...tiers].sort((a, b) => (a.upToInputTokens ?? Infinity) - (b.upToInputTokens ?? Infinity));
+  for (const tier of sorted) {
+    if (tier.upToInputTokens === undefined || promptTokens <= tier.upToInputTokens) return tier;
+  }
+  return sorted[sorted.length - 1];
+}
+
+/**
+ * Computes the estimated cost of an LLM completion request in USD. When
+ * `pricing` (user-entered, possibly tiered) is supplied it takes precedence;
+ * otherwise the built-in fuzzy-matched pricing sheet is used as a fallback.
  */
 export function calculateCost(
   _providerId: string,
@@ -140,9 +158,26 @@ export function calculateCost(
   inputTokens: number,
   outputTokens: number,
   cacheReadTokens: number = 0,
-  cacheWriteTokens: number = 0
+  cacheWriteTokens: number = 0,
+  pricing?: ModelPricing | null
 ): number {
-  const rate = findRate(model);
+  let rate: PriceRate | null = null;
+
+  if (pricing?.tiers?.length) {
+    // Tier is chosen by the size of the prompt (all input-side tokens).
+    const promptTokens = inputTokens + cacheReadTokens + cacheWriteTokens;
+    const tier = selectTier(pricing.tiers, promptTokens);
+    if (tier) {
+      rate = {
+        inputRate: tier.inputRate,
+        outputRate: tier.outputRate,
+        cacheReadRate: tier.cacheReadRate,
+        cacheWriteRate: tier.cacheWriteRate
+      };
+    }
+  }
+
+  if (!rate) rate = findRate(model);
   if (!rate) {
     return 0.0;
   }

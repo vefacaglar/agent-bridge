@@ -1328,6 +1328,32 @@ test("Orchestrator Integration Tests", async (t) => {
     assert.strictEqual(costUnknown, 0.0);
   });
 
+  await t.test("Pricing - user-entered tiered pricing overrides the built-in sheet", () => {
+    // Gemini-style: <=250k prompt tokens cheaper, above it pricier. Tier is
+    // chosen by the request's total prompt (input + cache) tokens.
+    const pricing = {
+      tiers: [
+        { upToInputTokens: 250_000, inputRate: 1.0, outputRate: 4.0 },
+        { inputRate: 2.0, outputRate: 8.0 }
+      ]
+    };
+
+    // 100k prompt -> low tier
+    const low = calculateCost("custom", "gemini-x", 100_000, 1_000, 0, 0, pricing);
+    assert.strictEqual(low, (100_000 / 1e6 * 1.0) + (1_000 / 1e6 * 4.0));
+
+    // 300k prompt -> high tier (tier selection counts input + cache tokens)
+    const high = calculateCost("custom", "gemini-x", 200_000, 1_000, 100_000, 0, pricing);
+    assert.strictEqual(
+      high,
+      (200_000 / 1e6 * 2.0) + (1_000 / 1e6 * 8.0) + (100_000 / 1e6 * 0)
+    );
+
+    // User pricing wins even for a model that the built-in sheet would match.
+    const overrides = calculateCost("anthropic", "claude-3-5-sonnet", 1_000, 1_000, 0, 0, { tiers: [{ inputRate: 99, outputRate: 99 }] });
+    assert.strictEqual(overrides, (1_000 / 1e6 * 99) + (1_000 / 1e6 * 99));
+  });
+
   await t.test("UsageLogRepository - creates and retrieves usage logs", async () => {
     const usageLogRepo = new UsageLogRepository(db);
     const runId = "run-test-logging-db";

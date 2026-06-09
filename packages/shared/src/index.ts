@@ -47,8 +47,26 @@ export interface ModelReasoningSettings {
   reasoningEfforts?: ReasoningEffort[];
 }
 
+// One pricing band for a model. Rates are USD per 1,000,000 tokens. Models with
+// flat pricing use a single tier (no `upToInputTokens`). Tiered models (e.g.
+// Gemini-style "<=200k prompt one rate, >200k another") list several tiers; the
+// tier is chosen by the request's total prompt (input) token count.
+export interface PriceTier {
+  upToInputTokens?: number; // inclusive upper bound on prompt tokens; omit on the last/only tier (= no ceiling)
+  inputRate: number;        // USD per 1M input tokens
+  outputRate: number;       // USD per 1M output tokens
+  cacheReadRate?: number;   // USD per 1M cached-read tokens
+  cacheWriteRate?: number;  // USD per 1M cache-write tokens
+}
+
+export interface ModelPricing {
+  tiers: PriceTier[];
+}
+
 export interface ProviderModelSettings extends ModelReasoningSettings {
   reasoning?: ModelReasoningSettings;
+  contextLimit?: number;    // max context window in tokens (display/metadata)
+  pricing?: ModelPricing;   // user-entered cost rates; falls back to built-in sheet when absent
 }
 
 export interface ResolvedReasoningConfig {

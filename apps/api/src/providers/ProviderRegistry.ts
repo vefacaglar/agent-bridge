@@ -1,7 +1,7 @@
 import fs from "fs";
 import os from "node:os";
 import path from "path";
-import type { ProviderMetadata, AgentPreset, ModelReasoningSettings, ReasoningEffort, ReasoningOption, ReasoningStyle, ResolvedReasoningConfig } from "@agent-bridge/shared";
+import type { ProviderMetadata, AgentPreset, ModelReasoningSettings, ReasoningEffort, ReasoningOption, ReasoningStyle, ResolvedReasoningConfig, ModelPricing, PriceTier } from "@agent-bridge/shared";
 import type { ModelProvider } from "./ModelProvider.js";
 import { ProviderFactory } from "./ProviderFactory.js";
 import { MacOSKeychainProviderSecretStore, type ProviderSecretStore } from "./ProviderSecretStore.js";
@@ -18,6 +18,8 @@ interface ProviderConfigBlock {
 interface ModelSettingsBlock {
   reasoning?: ModelReasoningSettings;
   reasoningEfforts?: ReasoningEffort[];
+  contextLimit?: number;
+  pricing?: ModelPricing;
 }
 
 interface PersistedProviderConfigBlock extends Omit<ProviderConfigBlock, "apiKey"> {
@@ -306,10 +308,56 @@ export class ProviderRegistry {
       .filter(([model]) => modelSet.has(model))
       .map(([model, settings]) => {
         const reasoning = this.safeReasoningSettings(block.type, settings);
-        return [model, reasoning ? { reasoning, reasoningEfforts: reasoning.options?.map(option => option.id) } : {}] as const;
+        const pricing = this.safePricing(settings.pricing);
+        const contextLimit = this.safeContextLimit(settings.contextLimit);
+        const clean: ModelSettingsBlock = {};
+        if (reasoning) {
+          clean.reasoning = reasoning;
+          clean.reasoningEfforts = reasoning.options?.map(option => option.id);
+        }
+        if (pricing) clean.pricing = pricing;
+        if (contextLimit !== undefined) clean.contextLimit = contextLimit;
+        return [model, clean] as const;
       })
-      .filter(([, settings]) => (settings.reasoning?.options?.length ?? 0) > 0);
+      // Keep a model entry only if it carries at least one usable setting.
+      .filter(([, settings]) => (settings.reasoning?.options?.length ?? 0) > 0 || !!settings.pricing || settings.contextLimit !== undefined);
     return Object.fromEntries(entries);
+  }
+
+  /** Sanitizes user-entered pricing: drops invalid tiers and sorts by ceiling. */
+  private safePricing(pricing?: ModelPricing): ModelPricing | undefined {
+    if (!pricing || !Array.isArray(pricing.tiers)) return undefined;
+    const tiers = pricing.tiers
+      .map(tier => this.safePriceTier(tier))
+      .filter((tier): tier is PriceTier => !!tier)
+      .sort((a, b) => (a.upToInputTokens ?? Infinity) - (b.upToInputTokens ?? Infinity));
+    return tiers.length > 0 ? { tiers } : undefined;
+  }
+
+  private safePriceTier(tier: PriceTier): PriceTier | undefined {
+    const inputRate = Number(tier?.inputRate);
+    const outputRate = Number(tier?.outputRate);
+    if (!Number.isFinite(inputRate) || inputRate < 0 || !Number.isFinite(outputRate) || outputRate < 0) return undefined;
+    const clean: PriceTier = { inputRate, outputRate };
+    const ceiling = Number(tier.upToInputTokens);
+    if (Number.isFinite(ceiling) && ceiling > 0) clean.upToInputTokens = Math.floor(ceiling);
+    const cacheReadRate = Number(tier.cacheReadRate);
+    if (Number.isFinite(cacheReadRate) && cacheReadRate >= 0) clean.cacheReadRate = cacheReadRate;
+    const cacheWriteRate = Number(tier.cacheWriteRate);
+    if (Number.isFinite(cacheWriteRate) && cacheWriteRate >= 0) clean.cacheWriteRate = cacheWriteRate;
+    return clean;
+  }
+
+  private safeContextLimit(value?: number): number | undefined {
+    const n = Number(value);
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : undefined;
+  }
+
+  /** The user-entered pricing for a model, if any (else undefined => built-in sheet). */
+  resolvePricing(providerId: string, model: string): ModelPricing | undefined {
+    const block = this.configs[providerId];
+    if (!block) return undefined;
+    return this.safeModelSettings(block)[model]?.pricing;
   }
 
   private safeReasoningSettings(providerType: ProviderConfigBlock["type"], settings: ModelSettingsBlock): ModelReasoningSettings | undefined {

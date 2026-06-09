@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
-import type { ProviderModelSettings, ReasoningEffort, ReasoningOption, ReasoningStyle } from '@agent-bridge/shared';
+import type { ProviderModelSettings, ReasoningEffort, ReasoningOption, ReasoningStyle, PriceTier } from '@agent-bridge/shared';
 import { api } from '../../api/client';
 import { useCustomDialog } from '../../composables/useCustomDialog';
 import ThemedSelect from './ThemedSelect.vue';
@@ -54,10 +54,20 @@ const reasoningStyleChoices: { id: ReasoningStyle; label: string }[] = [
   { id: 'anthropic-budget', label: 'Anthropic thinking budget' }
 ];
 
+type PriceTierRow = {
+  upToInputTokens: number | null;
+  inputRate: number | null;
+  outputRate: number | null;
+  cacheReadRate: number | null;
+  cacheWriteRate: number | null;
+};
+
 type ModelRow = {
   name: string;
   reasoningStyle: ReasoningStyle;
   reasoningOptions: ReasoningOption[];
+  contextLimit: number | null;
+  pricingTiers: PriceTierRow[];
 };
 
 function defaultReasoningStyle(): ReasoningStyle {
@@ -65,7 +75,19 @@ function defaultReasoningStyle(): ReasoningStyle {
 }
 
 function emptyModelRow(name = ''): ModelRow {
-  return { name, reasoningStyle: defaultReasoningStyle(), reasoningOptions: [] };
+  return { name, reasoningStyle: defaultReasoningStyle(), reasoningOptions: [], contextLimit: null, pricingTiers: [] };
+}
+
+function emptyPriceTierRow(): PriceTierRow {
+  return { upToInputTokens: null, inputRate: null, outputRate: null, cacheReadRate: null, cacheWriteRate: null };
+}
+
+function addPricingTier(row: ModelRow) {
+  row.pricingTiers.push(emptyPriceTierRow());
+}
+
+function removePricingTier(row: ModelRow, index: number) {
+  row.pricingTiers.splice(index, 1);
 }
 
 
@@ -133,7 +155,14 @@ function modelRowFromSettings(name: string, settings?: ProviderModelSettings): M
   const options = reasoning?.options?.length
     ? reasoning.options.map(option => ({ ...option }))
     : (reasoning?.reasoningEfforts || []).map(id => defaultReasoningOption(style, id));
-  return { name, reasoningStyle: style, reasoningOptions: options };
+  const pricingTiers = (settings?.pricing?.tiers || []).map(tier => ({
+    upToInputTokens: tier.upToInputTokens ?? null,
+    inputRate: tier.inputRate ?? null,
+    outputRate: tier.outputRate ?? null,
+    cacheReadRate: tier.cacheReadRate ?? null,
+    cacheWriteRate: tier.cacheWriteRate ?? null
+  }));
+  return { name, reasoningStyle: style, reasoningOptions: options, contextLimit: settings?.contextLimit ?? null, pricingTiers };
 }
 
 function defaultReasoningOption(style: ReasoningStyle, id: ReasoningEffort): ReasoningOption {
@@ -160,6 +189,19 @@ function reasoningSummary(settings?: ProviderModelSettings): string {
     ? reasoning.options
     : (reasoning?.reasoningEfforts || []).map(id => defaultReasoningOption(reasoning?.style || defaultReasoningStyle(), id));
   return options.map(option => option.label || option.id).join(', ');
+}
+
+function pricingSummary(settings?: ProviderModelSettings): string {
+  const tiers = settings?.pricing?.tiers;
+  if (!tiers?.length) return '';
+  if (tiers.length === 1) return `$${tiers[0].inputRate}/$${tiers[0].outputRate} per 1M`;
+  return `${tiers.length} tiers`;
+}
+
+function contextSummary(settings?: ProviderModelSettings): string {
+  const limit = settings?.contextLimit;
+  if (!limit) return '';
+  return limit >= 1000 ? `${Math.round(limit / 1000)}k ctx` : `${limit} ctx`;
 }
 
 async function handleDeleteProvider() {
@@ -198,15 +240,36 @@ async function handleSave() {
     .map(row => ({
       name: row.name.trim(),
       reasoningStyle: row.reasoningStyle,
-      reasoningOptions: row.reasoningOptions
+      reasoningOptions: row.reasoningOptions,
+      contextLimit: row.contextLimit,
+      pricingTiers: row.pricingTiers
     }))
     .filter(row => row.name);
   const modelsArray = modelRows
     .map(row => row.name)
     .filter((model, index, arr) => arr.indexOf(model) === index);
   const modelSettings = Object.fromEntries(modelRows
-    .filter(row => row.reasoningOptions.length > 0)
-    .map(row => [row.name, { reasoning: { style: row.reasoningStyle, options: row.reasoningOptions } }]));
+    .map(row => {
+      const settings: Record<string, unknown> = {};
+      if (row.reasoningOptions.length > 0) {
+        settings.reasoning = { style: row.reasoningStyle, options: row.reasoningOptions };
+      }
+      if (row.contextLimit && row.contextLimit > 0) {
+        settings.contextLimit = row.contextLimit;
+      }
+      const tiers = row.pricingTiers
+        .filter(tier => tier.inputRate != null && tier.outputRate != null)
+        .map(tier => {
+          const clean: PriceTier = { inputRate: Number(tier.inputRate), outputRate: Number(tier.outputRate) };
+          if (tier.upToInputTokens != null && tier.upToInputTokens > 0) clean.upToInputTokens = Number(tier.upToInputTokens);
+          if (tier.cacheReadRate != null) clean.cacheReadRate = Number(tier.cacheReadRate);
+          if (tier.cacheWriteRate != null) clean.cacheWriteRate = Number(tier.cacheWriteRate);
+          return clean;
+        });
+      if (tiers.length > 0) settings.pricing = { tiers };
+      return [row.name, settings] as const;
+    })
+    .filter(([, settings]) => Object.keys(settings).length > 0));
 
   const currentBlock = editingProviderId.value ? configs.value[editingProviderId.value] : null;
   const trimmedApiKey = formApiKey.value.trim();
@@ -376,7 +439,50 @@ async function handleFetchModels() {
                   <input v-model.number="option.budgetTokens" type="number" min="1024" step="1024" />
                 </label>
               </div>
-              <button 
+
+              <div class="pricing-editor">
+                <div class="pricing-row context-row">
+                  <label class="pricing-field">
+                    <span>Context limit (tokens)</span>
+                    <input v-model.number="row.contextLimit" type="number" min="0" step="1000" placeholder="e.g. 1000000" />
+                  </label>
+                </div>
+
+                <div class="pricing-head">
+                  <span class="pricing-label">Pricing (USD per 1M tokens)</span>
+                  <span class="pricing-hint">Add multiple tiers for size-based rates (e.g. ≤250k vs &gt;250k). Leave the last tier's threshold blank.</span>
+                </div>
+
+                <div v-for="(tier, tIndex) in row.pricingTiers" :key="tIndex" class="pricing-row tier-row">
+                  <label class="pricing-field">
+                    <span>≤ prompt tokens</span>
+                    <input v-model.number="tier.upToInputTokens" type="number" min="0" step="1000" placeholder="∞ (last)" />
+                  </label>
+                  <label class="pricing-field">
+                    <span>Input</span>
+                    <input v-model.number="tier.inputRate" type="number" min="0" step="0.01" placeholder="0.00" />
+                  </label>
+                  <label class="pricing-field">
+                    <span>Output</span>
+                    <input v-model.number="tier.outputRate" type="number" min="0" step="0.01" placeholder="0.00" />
+                  </label>
+                  <label class="pricing-field">
+                    <span>Cache read</span>
+                    <input v-model.number="tier.cacheReadRate" type="number" min="0" step="0.01" placeholder="—" />
+                  </label>
+                  <label class="pricing-field">
+                    <span>Cache write</span>
+                    <input v-model.number="tier.cacheWriteRate" type="number" min="0" step="0.01" placeholder="—" />
+                  </label>
+                  <button type="button" class="danger-button tier-remove-btn" @click="removePricingTier(row, tIndex)" title="Remove tier">×</button>
+                </div>
+
+                <ThemedButton variant="secondary" size="sm" @click="addPricingTier(row)">
+                  {{ row.pricingTiers.length ? 'Add Pricing Tier' : 'Add Pricing' }}
+                </ThemedButton>
+              </div>
+
+              <button
                 type="button" 
                 class="danger-button delete-model-btn" 
                 @click="removeModelInput(index)"
@@ -448,6 +554,12 @@ async function handleFetchModels() {
             {{ model }}
             <template v-if="reasoningSummary(provider.modelSettings?.[model])">
               · effort: {{ reasoningSummary(provider.modelSettings?.[model]) }}
+            </template>
+            <template v-if="contextSummary(provider.modelSettings?.[model])">
+              · {{ contextSummary(provider.modelSettings?.[model]) }}
+            </template>
+            <template v-if="pricingSummary(provider.modelSettings?.[model])">
+              · {{ pricingSummary(provider.modelSettings?.[model]) }}
             </template>
           </span>
         </div>
@@ -670,6 +782,82 @@ async function handleFetchModels() {
   min-width: 96px;
   padding: 5px 7px;
   font-size: 0.75rem;
+}
+
+.pricing-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1 1 100%;
+  border-top: 1px dashed var(--border);
+  padding-top: 10px;
+  margin-top: 2px;
+}
+
+.pricing-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pricing-label {
+  font-size: 0.74rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.pricing-hint {
+  font-size: 0.68rem;
+  color: var(--faint);
+}
+
+.pricing-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.pricing-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  color: var(--faint);
+  font-size: 0.68rem;
+}
+
+.pricing-field input {
+  width: 110px;
+  min-width: 90px;
+  padding: 5px 7px;
+  font-size: 0.75rem;
+  background: var(--control-bg);
+  border: 1px solid var(--control-border);
+  border-radius: 6px;
+  color: var(--text);
+  outline: none;
+}
+
+.pricing-field input:focus {
+  border-color: var(--control-border-focus);
+}
+
+.tier-remove-btn {
+  height: 28px;
+  width: 28px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.tier-remove-btn:hover {
+  color: var(--danger);
+  background: var(--danger-soft);
+  border-color: var(--danger-border);
 }
 
 .delete-model-btn {

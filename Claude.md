@@ -184,6 +184,16 @@ with an **architect** model, a **coder** model, `maxSubAgents`, and optionally a
 provider ids + model names, already public). `PUT /api/agent-presets` saves the
 full set back via `ProviderRegistry.saveAgentPresets`. See "Agent Presets" below.
 
+Each provider's `modelSettings[model]` block (edited per model row in the
+Providers settings tab) may carry, besides `reasoning`, an optional
+`contextLimit` (max context window in tokens) and `pricing`. `pricing` is a list
+of `tiers` — `{ upToInputTokens?, inputRate, outputRate, cacheReadRate?,
+cacheWriteRate? }` (USD per 1M tokens). Flat-priced models use one tier; tiered
+models (e.g. a cheaper rate ≤250k prompt tokens, pricier above) list several and
+the tier is chosen by the request's total prompt token count.
+`ProviderRegistry.resolvePricing` feeds this to `calculateCost` (pricing.ts),
+which falls back to the built-in `PRICING_SHEET` when a model has no user pricing.
+
 ---
 
 ## Provider Adapter Rules

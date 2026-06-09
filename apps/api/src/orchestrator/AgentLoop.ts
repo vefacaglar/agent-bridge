@@ -194,8 +194,10 @@ export class AgentLoop {
           // Best-effort only; never let logging break a run.
         }
 
-        // Calculate cost using the pricing helper
-        const cost = calculateCost(opts.providerId, opts.model, fresh, u.outputTokens ?? 0, cacheRead, cacheWrite);
+        // Calculate cost using the pricing helper. User-entered per-model
+        // pricing (if any) overrides the built-in sheet and supports tiers.
+        const pricing = this.registry.resolvePricing(opts.providerId, opts.model);
+        const cost = calculateCost(opts.providerId, opts.model, fresh, u.outputTokens ?? 0, cacheRead, cacheWrite, pricing);
 
         // Write to SQLite database usage_logs table asynchronously
         this.usageLogRepo.create({
