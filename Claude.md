@@ -193,8 +193,11 @@ of `tiers` — `{ upToInputTokens?, inputRate, outputRate, cacheReadRate?,
 cacheWriteRate? }` (USD per 1M tokens). Flat-priced models use one tier; tiered
 models (e.g. a cheaper rate ≤250k prompt tokens, pricier above) list several and
 the tier is chosen by the request's total prompt token count.
-`ProviderRegistry.resolvePricing` feeds this to `calculateCost` (pricing.ts),
-which falls back to the built-in `PRICING_SHEET` when a model has no user pricing.
+`ProviderRegistry.resolvePricing` feeds this to `calculateCost` (pricing.ts).
+There is **no built-in pricing table and no name-based guessing**: a model with no
+configured pricing simply costs 0. Cost is computed locally from these rates and
+token usage (providers return token counts, never a dollar amount); it is stored
+per call in `usage_logs` at run time and not recomputed for past rows.
 
 ---
 

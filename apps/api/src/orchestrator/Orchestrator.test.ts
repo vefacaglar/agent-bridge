@@ -1312,25 +1312,23 @@ test("Orchestrator Integration Tests", async (t) => {
     assert.match(result.error, /delegate_tasks/);
   });
 
-  await t.test("Pricing - calculates cost correctly for known and unknown models", () => {
-    // Claude 3.5 Sonnet: input $3/M, output $15/M, cache read $0.3/M, cache write $3.75/M
-    const costSonnet = calculateCost("anthropic", "claude-3-5-sonnet", 10000, 2000, 5000, 1000);
-    const expectedSonnet = (10000 / 1000000 * 3.0) + (2000 / 1000000 * 15.0) + (5000 / 1000000 * 0.3) + (1000 / 1000000 * 3.75);
-    assert.strictEqual(costSonnet, expectedSonnet);
-
-    // Deepseek Chat: input $0.14/M, output $0.28/M
-    const costDeepseek = calculateCost("openai", "deepseek-chat", 10000, 2000, 5000);
-    const expectedDeepseek = (10000 / 1000000 * 0.14) + (2000 / 1000000 * 0.28) + (5000 / 1000000 * 0.014);
-    assert.strictEqual(costDeepseek, expectedDeepseek);
-
-    // Unknown model
-    const costUnknown = calculateCost("custom", "my-secret-model", 10000, 2000);
-    assert.strictEqual(costUnknown, 0.0);
+  await t.test("Pricing - cost is zero without user-entered pricing (no built-in table)", () => {
+    // There is no hardcoded pricing sheet and no name-based guessing: any model
+    // without configured pricing costs 0, regardless of how it is named.
+    assert.strictEqual(calculateCost(undefined, 10000, 2000, 5000, 1000), 0.0);
+    assert.strictEqual(calculateCost(null, 10000, 2000), 0.0);
+    assert.strictEqual(calculateCost({ tiers: [] }, 10000, 2000), 0.0);
   });
 
-  await t.test("Pricing - user-entered tiered pricing overrides the built-in sheet", () => {
-    // Gemini-style: <=250k prompt tokens cheaper, above it pricier. Tier is
-    // chosen by the request's total prompt (input + cache) tokens.
+  await t.test("Pricing - flat pricing computes from a single tier", () => {
+    const pricing = { tiers: [{ inputRate: 0.30, outputRate: 1.20, cacheReadRate: 0.06 }] };
+    const cost = calculateCost(pricing, 10_000, 2_000, 5_000, 0);
+    assert.strictEqual(cost, (10_000 / 1e6 * 0.30) + (2_000 / 1e6 * 1.20) + (5_000 / 1e6 * 0.06));
+  });
+
+  await t.test("Pricing - tiered pricing selects the tier by prompt size", () => {
+    // <=250k prompt tokens cheaper, above it pricier. Tier is chosen by the
+    // request's total prompt (input + cache) tokens.
     const pricing = {
       tiers: [
         { upToInputTokens: 250_000, inputRate: 1.0, outputRate: 4.0 },
@@ -1339,19 +1337,12 @@ test("Orchestrator Integration Tests", async (t) => {
     };
 
     // 100k prompt -> low tier
-    const low = calculateCost("custom", "gemini-x", 100_000, 1_000, 0, 0, pricing);
+    const low = calculateCost(pricing, 100_000, 1_000, 0, 0);
     assert.strictEqual(low, (100_000 / 1e6 * 1.0) + (1_000 / 1e6 * 4.0));
 
     // 300k prompt -> high tier (tier selection counts input + cache tokens)
-    const high = calculateCost("custom", "gemini-x", 200_000, 1_000, 100_000, 0, pricing);
-    assert.strictEqual(
-      high,
-      (200_000 / 1e6 * 2.0) + (1_000 / 1e6 * 8.0) + (100_000 / 1e6 * 0)
-    );
-
-    // User pricing wins even for a model that the built-in sheet would match.
-    const overrides = calculateCost("anthropic", "claude-3-5-sonnet", 1_000, 1_000, 0, 0, { tiers: [{ inputRate: 99, outputRate: 99 }] });
-    assert.strictEqual(overrides, (1_000 / 1e6 * 99) + (1_000 / 1e6 * 99));
+    const high = calculateCost(pricing, 200_000, 1_000, 100_000, 0);
+    assert.strictEqual(high, (200_000 / 1e6 * 2.0) + (1_000 / 1e6 * 8.0) + (100_000 / 1e6 * 0));
   });
 
   await t.test("UsageLogRepository - creates and retrieves usage logs", async () => {
