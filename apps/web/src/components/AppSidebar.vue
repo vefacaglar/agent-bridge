@@ -278,7 +278,9 @@ function onDeleteProject(path: string, event: Event) {
   margin-top: 4px;
 }
 
-.new-chat-action {
+.new-chat-action,
+.usage-logs-action,
+.settings-action {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -291,9 +293,6 @@ function onDeleteProject(path: string, event: Event) {
 .settings-action {
   margin-top: 4px;
   flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 
 .project-list {
