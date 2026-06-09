@@ -297,12 +297,12 @@ function getHitRateClass(rate: number): string {
               </a>
             </td>
             <td class="col-role">
-              <span class="role-badge" :class="log.agentRole">
+              <span class="role-text" :class="log.agentRole">
                 {{ log.agentRole }}
               </span>
             </td>
             <td class="col-provider">
-              <span class="provider-badge">{{ log.providerId }}</span>
+              <span class="provider-text">{{ log.providerId }}</span>
             </td>
             <td class="col-model font-mono">{{ log.model }}</td>
             <td class="col-input-tokens text-right font-mono">
@@ -569,40 +569,32 @@ function getHitRateClass(rate: number): string {
   color: var(--faint);
 }
 
-/* Badges */
-.role-badge,
-.provider-badge {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 12px;
+/* Role & Provider styling (no badges) */
+.role-text {
   font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
-.role-badge.main {
-  background: rgba(123, 216, 143, 0.08);
+.role-text.main {
   color: var(--executor);
-  border: 1px solid rgba(123, 216, 143, 0.18);
 }
 
-.role-badge.coder {
-  background: rgba(160, 160, 165, 0.08);
+.role-text.coder {
   color: var(--info);
-  border: 1px solid rgba(160, 160, 165, 0.18);
 }
 
-.role-badge.utility {
-  background: rgba(255, 209, 138, 0.08);
+.role-text.utility {
   color: var(--warning);
-  border: 1px solid rgba(255, 209, 138, 0.18);
 }
 
-.provider-badge {
-  background: rgba(255, 255, 255, 0.04);
+.provider-text {
   color: var(--muted);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 /* Tokens breakdown */
