@@ -46,7 +46,7 @@
   --danger: #ff8a80;
   --success: #7bd88f;
   --warning: #ffd18a;
-  --info: #ce93d8;
+  --info: #a0a0a5;
 
   /* Soft tints derived from the semantic colors, for buttons / chips that need a
      filled background while staying within the muted theme palette. */
@@ -222,9 +222,9 @@
   --perm-btn-green-bg: rgba(123, 216, 143, 0.08);
   --perm-btn-green-border: rgba(123, 216, 143, 0.15);
   --perm-btn-green-hover-bg: rgba(123, 216, 143, 0.15);
-  --perm-btn-blue-bg: rgba(206, 147, 216, 0.08);
-  --perm-btn-blue-border: rgba(206, 147, 216, 0.15);
-  --perm-btn-blue-hover-bg: rgba(206, 147, 216, 0.15);
+  --perm-btn-blue-bg: rgba(160, 160, 165, 0.08);
+  --perm-btn-blue-border: rgba(160, 160, 165, 0.15);
+  --perm-btn-blue-hover-bg: rgba(160, 160, 165, 0.15);
   --perm-btn-purple-bg: rgba(255, 209, 138, 0.08);
   --perm-btn-purple-border: rgba(255, 209, 138, 0.15);
   --perm-btn-purple-hover-bg: rgba(255, 209, 138, 0.15);

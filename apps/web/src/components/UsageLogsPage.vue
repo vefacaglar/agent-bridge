@@ -250,7 +250,8 @@ function getHitRateClass(rate: number): string {
             <th class="col-role">Role</th>
             <th class="col-provider">Provider</th>
             <th class="col-model">Model</th>
-            <th class="col-tokens">Tokens</th>
+            <th class="col-input-tokens text-right">Tokens (In)</th>
+            <th class="col-output-tokens text-right">Tokens (Out)</th>
             <th class="col-hit-rate">Cache Hit</th>
             <th class="col-cost text-right">Cost</th>
           </tr>
@@ -272,20 +273,14 @@ function getHitRateClass(rate: number): string {
               <span class="provider-badge">{{ log.providerId }}</span>
             </td>
             <td class="col-model font-mono">{{ log.model }}</td>
-            <td class="col-tokens">
-              <div class="token-breakdown">
-                <div>
-                  <span class="token-main" title="Input Tokens">{{ formatNumber(log.inputTokens) }}</span>
-                  <span class="token-lbl"> in</span>
-                  <span v-if="log.cacheReadTokens" class="token-cache font-success" title="Cached input tokens (Hit)">
-                    (+{{ formatNumber(log.cacheReadTokens) }} hit)
-                  </span>
-                </div>
-                <div>
-                  <span class="token-main" title="Output Tokens">{{ formatNumber(log.outputTokens) }}</span>
-                  <span class="token-lbl"> out</span>
-                </div>
-              </div>
+            <td class="col-input-tokens text-right font-mono">
+              <span>{{ formatNumber(log.inputTokens) }}</span>
+              <span v-if="log.cacheReadTokens" class="token-cache font-success" title="Cached input tokens (Hit)">
+                +{{ formatNumber(log.cacheReadTokens) }} hit
+              </span>
+            </td>
+            <td class="col-output-tokens text-right font-mono">
+              <span>{{ formatNumber(log.outputTokens) }}</span>
             </td>
             <td class="col-hit-rate">
               <span v-if="log.cacheHitRate !== undefined" class="hit-pct" :class="getHitRateClass(log.cacheHitRate)">
@@ -522,7 +517,7 @@ function getHitRateClass(rate: number): string {
 }
 
 .run-link:hover {
-  background: rgba(206, 147, 216, 0.12);
+  background: rgba(160, 160, 165, 0.12);
   text-decoration: underline;
 }
 
@@ -558,9 +553,9 @@ function getHitRateClass(rate: number): string {
 }
 
 .role-badge.coder {
-  background: rgba(206, 147, 216, 0.08);
+  background: rgba(160, 160, 165, 0.08);
   color: var(--info);
-  border: 1px solid rgba(206, 147, 216, 0.18);
+  border: 1px solid rgba(160, 160, 165, 0.18);
 }
 
 .role-badge.utility {
@@ -592,8 +587,8 @@ function getHitRateClass(rate: number): string {
 }
 
 .token-cache {
-  font-size: 0.76rem;
-  margin-left: 4px;
+  font-size: 0.72rem;
+  display: block;
 }
 
 .font-success {
