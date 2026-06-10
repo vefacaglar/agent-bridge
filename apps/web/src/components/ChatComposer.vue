@@ -33,6 +33,8 @@ const props = defineProps<{
   projectOptions?: { path: string; name: string }[];
   activeProjectPath?: string;
   messages?: any[];
+  runUsageLabel?: string | null;
+  runUsageTooltip?: string;
 }>();
 
 const emit = defineEmits<{
@@ -87,6 +89,47 @@ const contextTokens = computed(() => {
     }
   }
   return total;
+});
+
+const activePreset = computed(() => {
+  return props.agentPresets?.find(p => p.id === props.selectedPresetId) ?? null;
+});
+
+const effectiveModelCombined = computed(() => {
+  if (activePreset.value) {
+    const arch = activePreset.value.architect;
+    return `${arch.providerId}:${arch.model}`;
+  }
+  return props.selectedModel;
+});
+
+const activeModelOption = computed(() => {
+  return props.modelOptions.find(opt => opt.value === effectiveModelCombined.value);
+});
+
+const activeContextLimit = computed(() => {
+  return activeModelOption.value?.contextLimit;
+});
+
+function formatTokensCompact(num: number): string {
+  if (num >= 1000000) {
+    const val = num / 1000000;
+    const rounded = Math.round(val * 10) / 10;
+    return rounded % 1 === 0 ? `${Math.round(rounded)}m` : `${rounded}m`;
+  }
+  if (num >= 1000) {
+    return `${Math.round(num / 1000)}k`;
+  }
+  return String(num);
+}
+
+const formattedContext = computed(() => {
+  const current = contextTokens.value + draftTokens.value;
+  const limit = activeContextLimit.value;
+  if (limit) {
+    return `${formatTokensCompact(current)}/${formatTokensCompact(limit)}`;
+  }
+  return formatTokensCompact(current);
 });
 
 const canSend = computed(() => {
@@ -715,8 +758,14 @@ onBeforeUnmount(() => {
       <!-- Token info bar (placed outside the input box) -->
       <div class="composer-token-info">
         <span class="context-tokens" title="Total context (system prompt + history + draft) sent to model">
-          Context: {{ contextTokens + draftTokens }} tokens
+          Context: {{ formattedContext }}
         </span>
+        <template v-if="runUsageLabel">
+          <span class="info-separator">·</span>
+          <span class="composer-usage" :title="runUsageTooltip">
+            {{ runUsageLabel }}
+          </span>
+        </template>
       </div>
 
       <div v-if="hasQueuedMessage" class="queued-message-preview">
@@ -1206,6 +1255,16 @@ onBeforeUnmount(() => {
 .context-tokens {
   color: var(--composer-token-accent);
   font-weight: 500;
+}
+
+.info-separator {
+  margin: 0 6px;
+  color: var(--faint);
+  user-select: none;
+}
+
+.composer-usage {
+  color: var(--muted);
 }
 
 .queued-message-preview {

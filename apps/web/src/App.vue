@@ -435,7 +435,6 @@ onUnmounted(() => {
               <span class="breadcrumb-project">{{ currentProjectName }}</span>
               <span class="breadcrumb-separator">/</span>
               <span class="breadcrumb-chat-title">{{ visibleTitle }}</span>
-              <span v-if="runUsageLabel" class="breadcrumb-usage" :title="runUsageTooltip">{{ runUsageLabel }}</span>
             </div>
             
           </div>
@@ -502,6 +501,8 @@ onUnmounted(() => {
           :permission-request="pendingPermissionRequest"
           :question-request="pendingQuestionRequest"
           :messages="messages"
+          :run-usage-label="runUsageLabel"
+          :run-usage-tooltip="runUsageTooltip"
           @open-settings="handleOpenSettings"
           @send="chat.handleSendTask"
           @queue="chat.handleQueueTask"
@@ -757,14 +758,7 @@ onUnmounted(() => {
   min-width: 0;
 }
 
-.breadcrumb-usage {
-  margin-left: 12px;
-  color: var(--muted);
-  font-weight: 400;
-  font-size: 0.82rem;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
+/* Breadcrumb usage styling removed */
 
 /* Dialog Modal Custom Styling */
 .dialog-modal-card {
