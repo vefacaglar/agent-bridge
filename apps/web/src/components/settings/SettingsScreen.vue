@@ -19,6 +19,7 @@ const props = defineProps<{
   memoriesLoading: boolean;
   activeProjectPath: string;
   activeProjectName: string;
+  activeTab?: TabId;
 }>();
 
 const emit = defineEmits<{
@@ -31,6 +32,7 @@ const emit = defineEmits<{
   (e: 'update-memory', payload: { id: number; content: string }): void;
   (e: 'delete-memory', id: number): void;
   (e: 'clear-memories'): void;
+  (e: 'update:activeTab', value: TabId): void;
 }>();
 
 const TABS = [
@@ -42,11 +44,18 @@ const TABS = [
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
 
-const activeTab = ref<TabId>('permissions');
+const localActiveTab = ref<TabId>('permissions');
 const isSidebarCollapsed = ref(false);
 
+watch(() => props.activeTab, (newVal) => {
+  if (newVal) {
+    localActiveTab.value = newVal;
+  }
+}, { immediate: true });
+
 function selectTab(tabId: TabId) {
-  activeTab.value = tabId;
+  localActiveTab.value = tabId;
+  emit('update:activeTab', tabId);
   if (window.innerWidth <= 760) {
     isSidebarCollapsed.value = true;
   }
@@ -104,7 +113,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
               v-for="tab in TABS"
               :key="tab.id"
               class="settings-tab-btn"
-              :class="{ active: activeTab === tab.id }"
+              :class="{ active: localActiveTab === tab.id }"
               @click="selectTab(tab.id)"
             >
               {{ tab.label }}
@@ -137,7 +146,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
                 <div class="settings-breadcrumb">
                   <span class="breadcrumb-project">Settings</span>
                   <span class="breadcrumb-separator">/</span>
-                  <span class="breadcrumb-chat-title">{{ TABS.find(t => t.id === activeTab)?.label }}</span>
+                  <span class="breadcrumb-chat-title">{{ TABS.find(t => t.id === localActiveTab)?.label }}</span>
                 </div>
               </div>
             </div>
@@ -146,14 +155,14 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
           <section class="settings-scroll-area">
             <div class="settings-container-wrap">
               <PermissionsTab
-                v-if="activeTab === 'permissions'"
+                v-if="localActiveTab === 'permissions'"
                 :permissions="permissions"
                 :is-loading="isLoading"
                 @revoke="emit('revoke', $event)"
                 @clear-all="emit('clear-all')"
               />
               <MemoryTab
-                v-else-if="activeTab === 'memory'"
+                v-else-if="localActiveTab === 'memory'"
                 :memories="memories"
                 :is-loading="memoriesLoading"
                 :active-project-path="activeProjectPath"
@@ -164,18 +173,18 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
                 @clear-all="emit('clear-memories')"
               />
               <ProvidersTab
-                v-else-if="activeTab === 'providers'"
+                v-else-if="localActiveTab === 'providers'"
                 :providers-config="providersConfig"
                 :is-loading="providersConfigLoading"
                 @saved="emit('providers-saved')"
               />
               <AgentPresetsTab
-                v-else-if="activeTab === 'agents'"
+                v-else-if="localActiveTab === 'agents'"
                 :providers="providers"
                 :presets="presets"
                 @saved="emit('presets-saved')"
               />
-              <ServerTab v-else-if="activeTab === 'server'" />
+              <ServerTab v-else-if="localActiveTab === 'server'" />
             </div>
           </section>
         </main>

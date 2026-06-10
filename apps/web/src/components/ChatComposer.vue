@@ -5,7 +5,7 @@ import { useCustomDialog } from '../composables/useCustomDialog';
 const { showAlert } = useCustomDialog();
 import type { PermissionDecision } from '../api/client';
 import type { MessageGroup } from '../lib/messageGroups';
-import { MODES_LIST, type ChatMode, type ModelOption } from '../composables/useComposerSettings';
+import { MODES_LIST, REASONING_EFFORTS, type ChatMode, type ModelOption } from '../composables/useComposerSettings';
 import type { AgentPreset } from '@agent-bridge/shared';
 import ConfirmationCard from './ConfirmationCard.vue';
 import PermissionCard from './PermissionCard.vue';
@@ -49,6 +49,7 @@ const emit = defineEmits<{
   (e: 'permission-decision', decision: PermissionDecision): void;
   (e: 'question-answer', payload: { selections: string[][]; notes: string[] }): void;
   (e: 'select-project', path: string): void;
+  (e: 'open-settings', tab?: string): void;
 }>();
 
 const textarea = ref<HTMLTextAreaElement | null>(null);
@@ -227,6 +228,263 @@ function selectModel(value: string) {
   showModelMenu.value = false;
 }
 
+// --- Redesigned Model Selector State & Logic ---
+const searchQuery = ref('');
+const searchInputRef = ref<HTMLInputElement | null>(null);
+const scrollContainerRef = ref<HTMLElement | null>(null);
+const collapsedProviders = ref<Record<string, boolean>>({});
+const favoriteModels = ref<string[]>([]);
+
+onMounted(() => {
+  const stored = localStorage.getItem('bm_favorite_models');
+  if (stored) {
+    try {
+      favoriteModels.value = JSON.parse(stored);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+});
+
+function toggleFavorite(val: string) {
+  const idx = favoriteModels.value.indexOf(val);
+  if (idx > -1) {
+    favoriteModels.value.splice(idx, 1);
+  } else {
+    favoriteModels.value.push(val);
+  }
+  localStorage.setItem('bm_favorite_models', JSON.stringify(favoriteModels.value));
+}
+
+function isStarred(val: string): boolean {
+  return favoriteModels.value.includes(val);
+}
+
+function toggleProviderCollapse(providerId: string) {
+  collapsedProviders.value[providerId] = !collapsedProviders.value[providerId];
+}
+
+function isProviderCollapsed(providerId: string): boolean {
+  return !!collapsedProviders.value[providerId];
+}
+
+function formatContextLimit(limit?: number): string {
+  if (!limit) return '';
+  if (limit >= 1000000) {
+    return `${Math.round(limit / 1000000)}M`;
+  }
+  if (limit >= 1000) {
+    return `${Math.round(limit / 1000)}K`;
+  }
+  return String(limit);
+}
+
+function formatModelName(modelId: string): string {
+  let name = modelId.includes('/') ? modelId.split('/').pop()! : modelId;
+  const lowerName = name.toLowerCase();
+  
+  if (lowerName === 'claude-sonnet-4-6') return 'Claude Sonnet 4.6';
+  if (lowerName === 'claude-opus-4-8') return 'Claude Opus 4.8';
+  if (lowerName === 'claude-haiku-4-5-20251001') return 'Claude Haiku 4.5';
+  if (lowerName === 'deepseek-v4-pro') return 'DeepSeek V4 Pro';
+  if (lowerName === 'deepseek-v4-flash') return 'DeepSeek V4 Flash';
+  if (lowerName === 'deepseek-chat') return 'DeepSeek Chat';
+  if (lowerName === 'deepseek-reasoner') return 'DeepSeek Reasoner';
+
+  name = name.replace(/^claude-/i, 'Claude ');
+  name = name.replace(/^deepseek-/i, 'DeepSeek ');
+  name = name.replace(/^gpt-/i, 'GPT-');
+  name = name.replace(/^glm-/i, 'GLM ');
+  name = name.replace(/^kimi-/i, 'Kimi ');
+  name = name.replace(/^minimax-/i, 'MiniMax ');
+  name = name.replace(/^mimo-/i, 'Mimo ');
+  name = name.replace(/-/g, ' ');
+
+  return name.split(' ').map(word => {
+    if (!word) return '';
+    if (word === word.toUpperCase() && word.length > 1) return word;
+    return word.charAt(0).toUpperCase() + word.slice(1);
+  }).join(' ');
+}
+
+function getReasoningDesc(id: string): string {
+  const descriptions: Record<string, string> = {
+    default: 'Use provider default configuration',
+    none: 'Disable thinking/reasoning completely',
+    minimal: 'Minimal reasoning tokens and budget',
+    low: 'Low reasoning overhead',
+    medium: 'Balanced thinking depth',
+    high: 'High reasoning depth',
+    xhigh: 'Extra high reasoning depth',
+    max: 'Maximum reasoning depth'
+  };
+  return descriptions[id] || 'Reasoning parameter';
+}
+
+interface ProviderGroup {
+  providerId: string;
+  providerDisplayName: string;
+  models: ModelOption[];
+}
+
+const groupedModels = computed<ProviderGroup[]>(() => {
+  const groups: Record<string, ProviderGroup> = {};
+  const query = searchQuery.value.trim().toLowerCase();
+
+  const filtered = props.modelOptions.filter(opt => {
+    if (!query) return true;
+    return (
+      opt.model.toLowerCase().includes(query) ||
+      opt.label.toLowerCase().includes(query) ||
+      opt.providerId.toLowerCase().includes(query)
+    );
+  });
+
+  for (const option of filtered) {
+    const providerId = option.providerId;
+    const providerDisplayName = option.label.split(' / ')[0] || providerId;
+    if (!groups[providerId]) {
+      groups[providerId] = {
+        providerId,
+        providerDisplayName,
+        models: []
+      };
+    }
+    groups[providerId].models.push(option);
+  }
+
+  // Also auto-expand providers if there is search query
+  if (query) {
+    for (const pid of Object.keys(groups)) {
+      collapsedProviders.value[pid] = false;
+    }
+  }
+
+  return Object.values(groups).sort((a, b) => {
+    const nameA = a.providerDisplayName.toLowerCase();
+    const nameB = b.providerDisplayName.toLowerCase();
+    if (nameA.includes('deepseek') && !nameB.includes('deepseek')) return -1;
+    if (!nameA.includes('deepseek') && nameB.includes('deepseek')) return 1;
+    if (nameA.includes('opencode') && !nameB.includes('opencode')) return -1;
+    if (!nameA.includes('opencode') && nameB.includes('opencode')) return 1;
+    return a.providerDisplayName.localeCompare(b.providerDisplayName);
+  });
+});
+
+interface NavigableItem {
+  type: 'action' | 'model';
+  id: string;
+  label: string;
+  option?: ModelOption;
+}
+
+const navigableItems = computed<NavigableItem[]>(() => {
+  const items: NavigableItem[] = [];
+  items.push({
+    type: 'action',
+    id: 'add-provider',
+    label: '+ Add new provider'
+  });
+
+  for (const group of groupedModels.value) {
+    if (!isProviderCollapsed(group.providerId)) {
+      for (const model of group.models) {
+        items.push({
+          type: 'model',
+          id: model.value,
+          label: model.model,
+          option: model
+        });
+      }
+    }
+  }
+  return items;
+});
+
+const focusedIndex = ref(0);
+
+function isItemFocused(id: string): boolean {
+  const item = navigableItems.value[focusedIndex.value];
+  return item ? item.id === id : false;
+}
+
+function setFocusedItem(id: string) {
+  const idx = navigableItems.value.findIndex(item => item.id === id);
+  if (idx > -1) {
+    focusedIndex.value = idx;
+  }
+}
+
+watch(searchQuery, () => {
+  focusedIndex.value = navigableItems.value.length > 1 ? 1 : 0;
+});
+
+function scrollToFocusedItem() {
+  nextTick(() => {
+    const container = scrollContainerRef.value;
+    if (!container) return;
+    const focusedEl = container.querySelector('.focused');
+    if (!focusedEl) return;
+    
+    const containerTop = container.scrollTop;
+    const containerBottom = containerTop + container.clientHeight;
+    const elemTop = (focusedEl as HTMLElement).offsetTop;
+    const elemBottom = elemTop + (focusedEl as HTMLElement).offsetHeight;
+
+    if (elemTop < containerTop) {
+      container.scrollTop = elemTop;
+    } else if (elemBottom > containerBottom) {
+      container.scrollTop = elemBottom - container.clientHeight;
+    }
+  });
+}
+
+function cycleReasoningEffort(option: ModelOption, direction: number) {
+  if (!option.reasoningOptions || option.reasoningOptions.length === 0) return;
+  
+  const options = [
+    { id: 'default', label: 'Default' },
+    ...option.reasoningOptions.map(opt => ({
+      id: opt.id,
+      label: opt.label || REASONING_EFFORTS.find(x => x.id === opt.id)?.label || opt.id
+    }))
+  ];
+
+  if (props.selectedModel !== option.value) {
+    emit('update:selectedModel', option.value);
+  }
+
+  const currentIndex = options.findIndex(x => x.id === props.selectedReasoningEffort);
+  const nextIndex = (Math.max(0, currentIndex) + direction + options.length) % options.length;
+  emit('update:selectedReasoningEffort', options[nextIndex].id);
+}
+
+function handleAddProvider() {
+  emit('open-settings', 'providers');
+  showModelMenu.value = false;
+}
+
+function handleManagePresets() {
+  emit('open-settings', 'agents');
+  showPresetMenu.value = false;
+}
+
+watch(showModelMenu, async (open) => {
+  if (open) {
+    searchQuery.value = '';
+    await nextTick();
+    searchInputRef.value?.focus();
+    
+    const activeIdx = navigableItems.value.findIndex(item => item.type === 'model' && item.id === props.selectedModel);
+    if (activeIdx > -1) {
+      focusedIndex.value = activeIdx;
+      scrollToFocusedItem();
+    } else {
+      focusedIndex.value = navigableItems.value.length > 1 ? 1 : 0;
+    }
+  }
+});
+
 const activeReasoningLabel = computed(() =>
   props.reasoningEffortOptions.find(x => x.id === props.selectedReasoningEffort)?.label ?? 'Default'
 );
@@ -255,6 +513,48 @@ function selectPreset(value: string) {
 }
 
 const showProjectMenu = ref(false);
+
+// Ensure only one dropdown menu is open at a time
+watch(showModeMenu, (val) => {
+  if (val) {
+    showModelMenu.value = false;
+    showReasoningMenu.value = false;
+    showPresetMenu.value = false;
+    showProjectMenu.value = false;
+  }
+});
+watch(showModelMenu, (val) => {
+  if (val) {
+    showModeMenu.value = false;
+    showReasoningMenu.value = false;
+    showPresetMenu.value = false;
+    showProjectMenu.value = false;
+  }
+});
+watch(showReasoningMenu, (val) => {
+  if (val) {
+    showModeMenu.value = false;
+    showModelMenu.value = false;
+    showPresetMenu.value = false;
+    showProjectMenu.value = false;
+  }
+});
+watch(showPresetMenu, (val) => {
+  if (val) {
+    showModeMenu.value = false;
+    showModelMenu.value = false;
+    showReasoningMenu.value = false;
+    showProjectMenu.value = false;
+  }
+});
+watch(showProjectMenu, (val) => {
+  if (val) {
+    showModeMenu.value = false;
+    showModelMenu.value = false;
+    showReasoningMenu.value = false;
+    showPresetMenu.value = false;
+  }
+});
 
 const activeProjectName = computed(() => {
   const current = props.projectOptions?.find(p => p.path === props.activeProjectPath);
@@ -311,15 +611,74 @@ function handleDocumentClick(e: MouseEvent) {
 }
 
 function handleKeyDown(e: KeyboardEvent) {
-  if (!showModeMenu.value) return;
-  const modeKeys: Record<string, ChatMode> = {
-    '1': 'accept_edits',
-    '2': 'plan',
-    '3': 'full_access'
-  };
-  if (modeKeys[e.key]) {
-    e.preventDefault();
-    selectMode(modeKeys[e.key]);
+  // 1. If mode menu is open:
+  if (showModeMenu.value) {
+    const modeKeys: Record<string, ChatMode> = {
+      '1': 'accept_edits',
+      '2': 'plan',
+      '3': 'full_access'
+    };
+    if (modeKeys[e.key]) {
+      e.preventDefault();
+      selectMode(modeKeys[e.key]);
+    }
+    return;
+  }
+
+  // 2. If model menu is open:
+  if (showModelMenu.value) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      showModelMenu.value = false;
+    } else if (e.key === 'Tab') {
+      e.preventDefault();
+      showModelMenu.value = false;
+      if (hasPresets.value) {
+        showPresetMenu.value = true;
+      }
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (navigableItems.value.length > 0) {
+        focusedIndex.value = (focusedIndex.value + 1) % navigableItems.value.length;
+        scrollToFocusedItem();
+      }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (navigableItems.value.length > 0) {
+        focusedIndex.value = (focusedIndex.value - 1 + navigableItems.value.length) % navigableItems.value.length;
+        scrollToFocusedItem();
+      }
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const item = navigableItems.value[focusedIndex.value];
+      if (item) {
+        if (item.type === 'action' && item.id === 'add-provider') {
+          handleAddProvider();
+        } else if (item.type === 'model' && item.option) {
+          selectModel(item.option.value);
+        }
+      }
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      const item = navigableItems.value[focusedIndex.value];
+      if (item && item.type === 'model' && item.option) {
+        e.preventDefault();
+        cycleReasoningEffort(item.option, e.key === 'ArrowRight' ? 1 : -1);
+      }
+    }
+    return;
+  }
+
+  // 3. If preset menu is open:
+  if (showPresetMenu.value) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      showPresetMenu.value = false;
+    } else if (e.key === 'Tab') {
+      e.preventDefault();
+      showPresetMenu.value = false;
+      showModelMenu.value = true;
+    }
+    return;
   }
 }
 
@@ -510,22 +869,65 @@ onBeforeUnmount(() => {
               {{ activePresetLabel }}
             </button>
             <div v-if="showPresetMenu" class="model-dropdown-list preset-dropdown-list">
-              <div
-                class="model-dropdown-item"
-                :class="{ active: !selectedPresetId }"
-                @click.stop="selectPreset('')"
+              <!-- Manage presets button -->
+              <button
+                class="add-provider-btn"
+                @click.stop="handleManagePresets"
               >
-                <span class="model-name-text">Single model</span>
+                <svg class="plus-icon" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <circle cx="12" cy="12" r="3"/>
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+                Manage presets
+              </button>
+
+              <div class="preset-section-header">
+                AGENT CONFIGURATIONS
               </div>
-              <div
-                v-for="preset in agentPresets"
-                :key="preset.id"
-                class="model-dropdown-item"
-                :class="{ active: selectedPresetId === preset.id }"
-                @click.stop="selectPreset(preset.id)"
-              >
-                <span class="model-name-text">{{ preset.displayName }}</span>
-                <span class="preset-sub">{{ preset.architect.model }} → {{ preset.coder.model }}</span>
+
+              <!-- Scrollable presets list -->
+              <div class="models-list-scroll">
+                <!-- Single Model option -->
+                <div
+                  class="preset-item-row"
+                  :class="{ active: !selectedPresetId }"
+                  @click.stop="selectPreset('')"
+                >
+                  <span class="preset-name-wrap">
+                    <svg class="preset-icon" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                      <circle cx="12" cy="12" r="10"/>
+                      <circle cx="12" cy="12" r="4"/>
+                    </svg>
+                    Single model
+                  </span>
+                  <span class="preset-desc">No delegation</span>
+                </div>
+
+                <!-- Preset Options -->
+                <div
+                  v-for="preset in agentPresets"
+                  :key="preset.id"
+                  class="preset-item-row"
+                  :class="{ active: selectedPresetId === preset.id }"
+                  @click.stop="selectPreset(preset.id)"
+                >
+                  <div class="preset-info-col">
+                    <span class="preset-name-wrap">
+                      <svg class="preset-icon" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                        <circle cx="9" cy="7" r="4"/>
+                        <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                      </svg>
+                      {{ preset.displayName }}
+                    </span>
+                    <span class="preset-flow-desc">
+                      {{ formatModelName(preset.architect.model) }}
+                      <span class="preset-flow-arrow">→</span>
+                      {{ formatModelName(preset.coder.model) }}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -542,14 +944,149 @@ onBeforeUnmount(() => {
               {{ selectedPresetIsActive ? 'Architect: preset' : activeModelDisplayName }}
             </button>
             <div v-if="showModelMenu && !selectedPresetIsActive" class="model-dropdown-list">
-              <div
-                v-for="option in modelOptions"
-                :key="option.value"
-                class="model-dropdown-item"
-                :class="{ active: selectedModel === option.value }"
-                @click.stop="selectModel(option.value)"
+              <!-- Add new provider button -->
+              <button
+                class="add-provider-btn"
+                :class="{ focused: isItemFocused('add-provider') }"
+                @click.stop="handleAddProvider"
+                @mouseenter="setFocusedItem('add-provider')"
               >
-                <span class="model-name-text">{{ option.label }}</span>
+                <svg class="plus-icon" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Add new provider
+              </button>
+
+              <!-- Search input -->
+              <div class="search-input-wrap">
+                <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input
+                  ref="searchInputRef"
+                  v-model="searchQuery"
+                  type="text"
+                  placeholder="Search models"
+                  class="model-search-input"
+                  @click.stop
+                />
+              </div>
+
+              <!-- Models List scroll container -->
+              <div class="models-list-scroll" ref="scrollContainerRef">
+                <div
+                  v-for="group in groupedModels"
+                  :key="group.providerId"
+                  class="provider-group"
+                >
+                  <div class="provider-group-header" @click.stop="toggleProviderCollapse(group.providerId)">
+                    <span class="provider-name-wrap">
+                      <!-- Inline custom SVGs for providers -->
+                      <svg v-if="group.providerId.includes('deepseek')" class="provider-logo" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 21.5c-4.5-2.5-7.5-6.5-7.5-11.5 0-3.5 2.5-6 6-6s6 2.5 6 6c0 5-3 9-6.5 11.5Z"/>
+                        <path d="M7 9.5c0-.8.7-1.5 1.5-1.5s1.5.7 1.5 1.5"/>
+                      </svg>
+                      <svg v-else-if="group.providerId.includes('opencode')" class="provider-logo" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                        <line x1="9" y1="9" x2="15" y2="15"/>
+                        <line x1="15" y1="9" x2="9" y2="15"/>
+                      </svg>
+                      <svg v-else-if="group.providerId.includes('openai')" class="provider-logo" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                        <path d="M2 12h20"/>
+                      </svg>
+                      <svg v-else-if="group.providerId.includes('anthropic')" class="provider-logo" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 20l8-16 8 16"/>
+                        <path d="M6 16h12"/>
+                      </svg>
+                      <svg v-else-if="group.providerId.includes('google')" class="provider-logo" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                      </svg>
+                      <svg v-else class="provider-logo" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="11" width="18" height="10" rx="2"/>
+                        <circle cx="12" cy="5" r="2"/>
+                        <path d="M12 7v4"/>
+                        <line x1="8" y1="16" x2="8" y2="16"/>
+                        <line x1="16" y1="16" x2="16" y2="16"/>
+                      </svg>
+                      {{ group.providerDisplayName.toUpperCase() }}
+                    </span>
+                    <svg
+                      class="chevron-icon"
+                      :class="{ collapsed: isProviderCollapsed(group.providerId) }"
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="10"
+                      height="10"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2.5"
+                    >
+                      <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                  </div>
+
+                  <div v-if="!isProviderCollapsed(group.providerId)" class="provider-models-list">
+                    <div
+                      v-for="option in group.models"
+                      :key="option.value"
+                      class="model-item-row"
+                      :class="{
+                        active: selectedModel === option.value,
+                        focused: isItemFocused(option.value)
+                      }"
+                      @click.stop="selectModel(option.value)"
+                      @mouseenter="setFocusedItem(option.value)"
+                    >
+                      <span class="model-name-text">
+                        {{ formatModelName(option.model) }}
+                        <span class="model-context-badge" v-if="option.contextLimit">
+                          {{ formatContextLimit(option.contextLimit) }}
+                        </span>
+                      </span>
+
+                      <span
+                        v-if="option.reasoningOptions && option.reasoningOptions.length > 0 && (selectedModel === option.value || isItemFocused(option.value))"
+                        class="model-thinking-label"
+                      >
+                        Thinking: {{ selectedModel === option.value ? activeReasoningLabel : 'Default' }}
+                      </span>
+
+                      <button
+                        class="star-btn"
+                        :class="{ starred: isStarred(option.value) }"
+                        @click.stop="toggleFavorite(option.value)"
+                        title="Toggle favorite"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="12"
+                          height="12"
+                          viewBox="0 0 24 24"
+                          :fill="isStarred(option.value) ? 'currentColor' : 'none'"
+                          stroke="currentColor"
+                          stroke-width="2.2"
+                        >
+                          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div v-if="groupedModels.length === 0" class="empty-search-state">
+                  No models found
+                </div>
+              </div>
+
+              <!-- Footer bar -->
+              <div class="model-dropdown-footer">
+                <span><span class="footer-key">↑</span><span class="footer-key">↓</span> navigate</span>
+                <span><span class="footer-key">Tab</span> switch agent</span>
+                <span><span class="footer-key">←</span><span class="footer-key">→</span> thinking</span>
               </div>
             </div>
           </div>
@@ -564,14 +1101,27 @@ onBeforeUnmount(() => {
               {{ activeReasoningLabel }}
             </button>
             <div v-if="showReasoningMenu" class="model-dropdown-list reasoning-dropdown-list">
-              <div
-                v-for="option in reasoningEffortOptions"
-                :key="option.id"
-                class="model-dropdown-item"
-                :class="{ active: selectedReasoningEffort === option.id }"
-                @click.stop="selectReasoningEffort(option.id)"
-              >
-                <span class="model-name-text">{{ option.label }}</span>
+              <div class="preset-section-header">
+                REASONING EFFORT
+              </div>
+              <div class="models-list-scroll">
+                <div
+                  v-for="option in reasoningEffortOptions"
+                  :key="option.id"
+                  class="preset-item-row"
+                  :class="{ active: selectedReasoningEffort === option.id }"
+                  @click.stop="selectReasoningEffort(option.id)"
+                >
+                  <div class="preset-info-col">
+                    <span class="preset-name-wrap">
+                      <span class="reasoning-dot" :class="option.id"></span>
+                      {{ option.label }}
+                    </span>
+                    <span class="preset-flow-desc" style="padding-left: 14px;">
+                      {{ getReasoningDesc(option.id) }}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -1008,53 +1558,245 @@ onBeforeUnmount(() => {
   position: absolute;
   bottom: calc(100% + 8px);
   right: 0;
-  width: max-content;
-  min-width: 280px;
-  max-width: 460px;
-  max-height: 280px;
-  overflow-y: auto;
-  background: var(--composer-dropdown-bg);
-  border: 1px solid var(--composer-dropdown-border);
-  border-radius: 10px;
-  box-shadow: 0 12px 30px var(--composer-dropdown-shadow);
-  z-index: 1000;
-  padding: 6px;
+  width: 335px;
+  height: 380px;
+  max-height: 80vh;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  background: var(--composer-dropdown-bg);
+  border: 1px solid var(--composer-dropdown-border);
+  border-radius: 12px;
+  box-shadow: 0 20px 45px var(--composer-dropdown-shadow);
+  z-index: 1000;
+  overflow: hidden;
+  padding: 0;
+  animation: menuAppear 0.15s ease-out;
 }
 
-.model-dropdown-item {
+.add-provider-btn {
+  width: calc(100% - 16px);
+  margin: 8px 8px 4px 8px;
   display: flex;
   align-items: center;
-  height: 42px;
-  padding: 0 14px;
+  gap: 8px;
+  height: 32px;
+  padding: 0 10px;
+  background: transparent;
+  border: 1px solid transparent;
   border-radius: 6px;
   color: var(--muted);
-  font-size: 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.add-provider-btn:hover,
+.add-provider-btn.focused {
+  background: var(--attachment-pill-bg);
+  color: var(--text);
+  border-color: var(--control-border);
+}
+
+.plus-icon {
+  opacity: 0.75;
+}
+
+.search-input-wrap {
+  position: relative;
+  margin: 4px 8px 8px 8px;
+  flex-shrink: 0;
+}
+
+.search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--faint);
+  pointer-events: none;
+}
+
+.model-search-input {
+  width: 100%;
+  height: 34px;
+  padding: 0 12px 0 32px;
+  background: var(--control-bg);
+  border: 1px solid var(--control-border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 0.82rem;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.model-search-input:focus {
+  border-color: var(--control-border-focus);
+  background: var(--control-bg-focus);
+  box-shadow: 0 0 0 1px var(--composer-input-focus-border-shadow);
+}
+
+.models-list-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 8px 8px 8px;
+  scrollbar-width: thin;
+}
+
+.provider-group {
+  margin-top: 10px;
+}
+
+.provider-group:first-child {
+  margin-top: 4px;
+}
+
+.provider-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: var(--faint);
+  user-select: none;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.provider-group-header:hover {
+  background: var(--attachment-pill-bg);
+  color: var(--muted);
+}
+
+.provider-name-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.provider-logo {
+  opacity: 0.8;
+  flex-shrink: 0;
+}
+
+.chevron-icon {
+  transition: transform 0.2s ease;
+  opacity: 0.6;
+}
+
+.chevron-icon.collapsed {
+  transform: rotate(-90deg);
+}
+
+.model-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 36px;
+  padding: 0 8px 0 10px;
+  margin-top: 2px;
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 0.82rem;
   cursor: pointer;
   transition: all 0.15s ease;
-  min-width: 0;
+  user-select: none;
 }
 
-.model-name-text {
-  display: block;
-  width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  line-height: normal;
-  text-align: left;
-}
-
-.model-dropdown-item:hover {
+.model-item-row:hover,
+.model-item-row.focused {
   background: var(--attachment-pill-bg);
   color: var(--text);
 }
 
-.model-dropdown-item.active {
+.model-item-row.active {
   color: var(--text);
   background: var(--composer-menu-active-bg);
+  font-weight: 500;
+}
+
+.model-name-text {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.model-context-badge {
+  font-size: 0.72rem;
+  color: var(--faint);
+  font-weight: 400;
+}
+
+.model-thinking-label {
+  font-size: 0.72rem;
+  color: var(--faint);
+  margin-left: auto;
+  margin-right: 8px;
+  white-space: nowrap;
+}
+
+.star-btn {
+  background: transparent;
+  border: none;
+  color: var(--faint);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.star-btn:hover {
+  color: var(--warning);
+  background: rgba(255, 193, 7, 0.1);
+}
+
+.star-btn.starred {
+  color: var(--warning);
+}
+
+.empty-search-state {
+  padding: 24px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--faint);
+  font-style: italic;
+}
+
+.model-dropdown-footer {
+  height: 28px;
+  background: var(--composer-queued-msg-bg);
+  border-top: 1px solid var(--composer-dropdown-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  font-size: 0.68rem;
+  color: var(--faint);
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.footer-key {
+  font-family: monospace;
+  background: var(--composer-menu-shortcut-bg);
+  border: 1px solid var(--composer-dropdown-border);
+  padding: 0px 4px;
+  margin: 0 2px;
+  border-radius: 3px;
+  color: var(--muted);
   font-weight: 600;
 }
 
@@ -1072,7 +1814,108 @@ onBeforeUnmount(() => {
 }
 
 .reasoning-dropdown-list {
-  min-width: 140px;
+  width: 260px !important;
+  height: auto !important;
+  max-height: 280px !important;
+}
+
+.reasoning-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--muted);
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.reasoning-dot.default { background: var(--text); }
+.reasoning-dot.none { background: var(--faint); }
+.reasoning-dot.minimal { background: #5bc0de; }
+.reasoning-dot.low { background: var(--success); }
+.reasoning-dot.medium { background: var(--warning); }
+.reasoning-dot.high { background: #f0ad4e; }
+.reasoning-dot.xhigh { background: #d9534f; }
+.reasoning-dot.max { background: var(--danger); }
+
+/* Redesigned Preset Dropdown List overrides */
+.preset-dropdown-list {
+  width: 290px !important;
+  height: auto !important;
+  max-height: 320px !important;
+}
+
+.preset-section-header {
+  padding: 6px 12px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--faint);
+  user-select: none;
+}
+
+.preset-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  margin-top: 2px;
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.preset-item-row:hover {
+  background: var(--attachment-pill-bg);
+  color: var(--text);
+}
+
+.preset-item-row.active {
+  color: var(--text);
+  background: var(--composer-menu-active-bg);
+  font-weight: 500;
+}
+
+.preset-name-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+
+.preset-icon {
+  opacity: 0.75;
+  flex-shrink: 0;
+}
+
+.preset-desc {
+  font-size: 0.72rem;
+  color: var(--faint);
+}
+
+.preset-info-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  width: 100%;
+}
+
+.preset-flow-desc {
+  font-size: 0.72rem;
+  color: var(--faint);
+  padding-left: 20px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+
+.preset-flow-arrow {
+  margin: 0 4px;
+  color: var(--faint);
 }
 
 .status-indicator-ring {

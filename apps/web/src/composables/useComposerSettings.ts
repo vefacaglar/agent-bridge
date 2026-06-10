@@ -22,6 +22,7 @@ export interface ModelOption {
   providerId: string;
   model: string;
   reasoningOptions: ReasoningOption[];
+  contextLimit?: number;
 }
 
 export const REASONING_EFFORTS = [
@@ -182,7 +183,8 @@ export function useComposerSettings(
           label: `${provider.displayName} / ${model}`,
           providerId: provider.id,
           model,
-          reasoningOptions: normalizedReasoningOptions(provider.modelSettings?.[model])
+          reasoningOptions: normalizedReasoningOptions(provider.modelSettings?.[model]),
+          contextLimit: provider.modelSettings?.[model]?.contextLimit
         });
       }
     }

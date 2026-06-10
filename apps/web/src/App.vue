@@ -58,6 +58,17 @@ import { useCustomDialog } from './composables/useCustomDialog';
 
 const { activeDialog } = useCustomDialog();
 
+const settingsTab = ref<'permissions' | 'memory' | 'providers' | 'agents' | 'server'>('permissions');
+
+async function handleOpenSettings(tab?: string) {
+  if (tab === 'permissions' || tab === 'memory' || tab === 'providers' || tab === 'agents' || tab === 'server') {
+    settingsTab.value = tab;
+  } else {
+    settingsTab.value = 'permissions';
+  }
+  await openSettings();
+}
+
 function handleEscape(e: KeyboardEvent) {
   if (e.key === 'Escape' && activeDialog.value) {
     activeDialog.value.resolve(false);
@@ -375,7 +386,7 @@ onUnmounted(() => {
       @select-project-and-new-chat="handleSelectProjectAndNewChat"
       @select-run="handleSelectRun"
       @delete-project="deleteProject"
-      @open-settings="openSettings"
+      @open-settings="handleOpenSettings"
       @toggle-sidebar="toggleSidebar"
       @open-usage-logs="showUsageLogsPage = true"
     />
@@ -472,6 +483,7 @@ onUnmounted(() => {
           :permission-request="pendingPermissionRequest"
           :question-request="pendingQuestionRequest"
           :messages="messages"
+          @open-settings="handleOpenSettings"
           @send="chat.handleSendTask"
           @queue="chat.handleQueueTask"
           @quick-reply="chat.sendQuickReply"
@@ -505,6 +517,7 @@ onUnmounted(() => {
             :project-options="projects.projectOptions.value"
             :active-project-path="projects.activeProjectPath.value"
             :messages="messages"
+            @open-settings="handleOpenSettings"
             @send="chat.handleSendTask"
             @queue="chat.handleQueueTask"
             @quick-reply="chat.sendQuickReply"
@@ -552,6 +565,7 @@ onUnmounted(() => {
     />
 
     <SettingsScreen
+      v-model:active-tab="settingsTab"
       :show="permissions.showSettings.value"
       :permissions="permissions.permissions.value"
       :is-loading="permissions.isLoading.value"
