@@ -1,6 +1,6 @@
 import { computed, ref, type ComputedRef, type Ref } from 'vue';
 import { tryOnScopeDispose } from '@vueuse/core';
-import type { ProviderMetadata, Run, RunMessage, RunStatus, Plan } from '@agent-bridge/shared';
+import type { ProviderMetadata, Run, RunMessage, RunStatus, Plan, RunUsageSummary } from '@agent-bridge/shared';
 import { api, type PermissionDecision } from '../api/client';
 import { ACTIVE_STATUSES } from '../lib/format';
 import { groupMessages, type MessageGroup } from '../lib/messageGroups';
@@ -52,6 +52,8 @@ export function useChatSession(options: ChatSessionOptions) {
   const activeRun = options.activeRun;
   const isRunning = ref(false);
   const currentPlan = ref<Plan | null>(null);
+  // Aggregated cost/token totals for the active run (shown in the chat header).
+  const runUsage = ref<RunUsageSummary | null>(null);
 
   const taskInput = ref('');
   const queuedTaskInput = ref('');
@@ -192,6 +194,7 @@ export function useChatSession(options: ChatSessionOptions) {
 
     await loadMessages(latestRun.id);
     currentPlan.value = await api.getRunPlan(latestRun.id);
+    await refreshRunUsage(latestRun.id);
     await hydratePendingRequest(latestRun.id);
 
     if (ACTIVE_STATUSES.includes(latestRun.status)) {
@@ -201,6 +204,16 @@ export function useChatSession(options: ChatSessionOptions) {
       isRunning.value = false;
     }
     requestFocus();
+  }
+
+  async function refreshRunUsage(runId: string) {
+    try {
+      const summary = await api.getRunUsage(runId);
+      if (activeRun.value?.id === runId) runUsage.value = summary;
+    } catch {
+      // Usage is informational only; never let it break run selection/teardown.
+      if (activeRun.value?.id === runId) runUsage.value = null;
+    }
   }
 
   async function hydratePendingRequest(runId: string) {
@@ -240,6 +253,7 @@ export function useChatSession(options: ChatSessionOptions) {
     activeRun.value = null;
     resetMessageSurfaces();
     currentPlan.value = null;
+    runUsage.value = null;
     taskInput.value = '';
     queuedTaskInput.value = '';
     requestFocus();
@@ -435,6 +449,7 @@ export function useChatSession(options: ChatSessionOptions) {
     eventSource = null;
     isRunning.value = false;
     loadRuns();
+    if (activeRun.value) refreshRunUsage(activeRun.value.id);
 
     if (options.sendQueuedMessage && queuedTaskInput.value.trim()) {
       // Capture + clear synchronously so a second finishEventStream call (e.g.
@@ -614,6 +629,7 @@ export function useChatSession(options: ChatSessionOptions) {
     activeRun,
     isRunning,
     currentPlan,
+    runUsage,
     taskInput,
     queuedTaskInput,
     focusSignal,

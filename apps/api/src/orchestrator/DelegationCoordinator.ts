@@ -1,7 +1,8 @@
 import type { Run, RunMessage, ReasoningEffort } from "@agent-bridge/shared";
 import type { ProviderRegistry } from "../providers/ProviderRegistry.js";
-import { buildCoderSystemPrompt, buildUtilitySystemPrompt, getModeStrategy } from "./systemPrompt.js";
-import { WORKSPACE_TOOLS, UTILITY_TOOLS } from "./workspaceTools.js";
+import type { IMemoryRepository } from "../database/repositories.js";
+import { buildCoderSystemPrompt, buildUtilitySystemPrompt, buildVerifierSystemPrompt, formatCoderMemoryContext, getModeStrategy } from "./systemPrompt.js";
+import { WORKSPACE_TOOLS, UTILITY_TOOLS, READONLY_TOOLS } from "./workspaceTools.js";
 import type { AgentLoop, Delegator } from "./AgentLoop.js";
 
 /**
@@ -35,6 +36,23 @@ function trimSummary(summary: string): string {
   return `${summary.slice(0, MAX_SUMMARY_CHARS)}\n…[truncated ${dropped} chars — the sub-agent's report was long. Verify the changed files if you need detail instead of asking it to repeat.]`;
 }
 
+/**
+ * Parses the coder's structured `FILES_CHANGED: ["a.ts","b.ts"]` line (the last
+ * one, if the model emits several). Returns null when absent or malformed so the
+ * caller can fall back to the heuristic prose scan.
+ */
+export function parseFilesChanged(summary: string): string[] | null {
+  const matches = [...summary.matchAll(/^\s*FILES_CHANGED:\s*(\[.*\])\s*$/gm)];
+  if (matches.length === 0) return null;
+  try {
+    const parsed = JSON.parse(matches[matches.length - 1][1]);
+    if (!Array.isArray(parsed)) return null;
+    return parsed.filter((f): f is string => typeof f === "string" && f.trim().length > 0).map(f => f.trim());
+  } catch {
+    return null;
+  }
+}
+
 /** One execution attempt for a delegated task: a model paired with its toolset. */
 interface SubAgentTier {
   providerId: string;
@@ -57,8 +75,18 @@ interface SubAgentTier {
 export class DelegationCoordinator implements Delegator {
   constructor(
     private registry: ProviderRegistry,
-    private agentLoop: AgentLoop
+    private agentLoop: AgentLoop,
+    private memoryRepo: IMemoryRepository
   ) {}
+
+  /** Condensed project memories injected into every coder prompt for this run. */
+  private coderProjectContext(run: Run): string {
+    try {
+      return formatCoderMemoryContext(this.memoryRepo.listForContext(run.projectPath));
+    } catch {
+      return ""; // memory is a quality booster, never a delegation blocker
+    }
+  }
 
   /** Resolves how many coder sub-agents this run may launch (preset-bound, 1..3). */
   maxSubAgentsFor(run: Run): number {
@@ -122,7 +150,7 @@ export class DelegationCoordinator implements Delegator {
   }
 
   /** Builds the architect "last resort" tier: the run's own model + full toolset. */
-  private architectTier(run: Run, task: { title: string }): SubAgentTier {
+  private architectTier(run: Run, task: { title: string }, projectContext?: string): SubAgentTier {
     return {
       providerId: run.providerId,
       providerDisplayName: run.providerDisplayName,
@@ -130,7 +158,7 @@ export class DelegationCoordinator implements Delegator {
       reasoningEffort: run.reasoningEffort,
       tools: [...WORKSPACE_TOOLS],
       agentRole: "coder",
-      systemPrompt: buildCoderSystemPrompt(run.projectName, run.projectPath, task.title),
+      systemPrompt: buildCoderSystemPrompt(run.projectName, run.projectPath, task.title, projectContext),
       agentName: `${task.title} (architect fallback)`
     };
   }
@@ -167,7 +195,8 @@ export class DelegationCoordinator implements Delegator {
       .slice(0, limit)
       .map((t: any, i: number) => ({
         title: typeof t.title === "string" && t.title.trim() ? t.title.trim() : `Subtask ${i + 1}`,
-        instructions: String(t.instructions)
+        instructions: String(t.instructions),
+        verify: t.verify === true
       }));
 
     if (tasks.length === 0) {
@@ -193,24 +222,32 @@ export class DelegationCoordinator implements Delegator {
     const parallel = !!args.parallel && tasks.length > 1;
 
     const fallback = this.fallbackEnabled(run);
-    const runOne = (task: { title: string; instructions: string }) => {
+    const projectContext = this.coderProjectContext(run);
+    const readonlyWorkspaceTools = WORKSPACE_TOOLS.filter(t => READONLY_TOOLS.has(t.function.name));
+    const runOne = (task: { title: string; instructions: string; verify: boolean }) => {
+      // verify tasks run the coder model READ-ONLY with a verdict-shaped prompt:
+      // cheap verification of earlier changes without the architect reading the
+      // files into its own expensive context.
       const tiers: SubAgentTier[] = [
         {
           providerId: run.coderProviderId!,
           providerDisplayName: coderDisplayName,
           model: run.coderModel!,
           reasoningEffort: run.coderReasoningEffort,
-          tools: [...WORKSPACE_TOOLS],
+          tools: task.verify ? [...readonlyWorkspaceTools] : [...WORKSPACE_TOOLS],
           agentRole: "coder",
-          systemPrompt: buildCoderSystemPrompt(run.projectName, run.projectPath, task.title),
+          systemPrompt: task.verify
+            ? buildVerifierSystemPrompt(run.projectName, run.projectPath, task.title)
+            : buildCoderSystemPrompt(run.projectName, run.projectPath, task.title, projectContext),
           // Tag every message with the sub-task title so the UI can render each
           // coder sub-agent in its own window instead of merging them.
           agentName: task.title
         }
       ];
       // Last resort (only when the preset enables fallback): the architect takes
-      // control and does it directly.
-      if (fallback) tiers.push(this.architectTier(run, task));
+      // control and does it directly. Never for verify tasks — a failed
+      // verification must not escalate into the architect doing expensive reads.
+      if (fallback && !task.verify) tiers.push(this.architectTier(run, task, projectContext));
       return this.runTaskWithFallback(runId, run, task, tiers);
     };
 
@@ -224,19 +261,27 @@ export class DelegationCoordinator implements Delegator {
       }
     }
 
-    // Scan each result's summary for additional file paths
+    // Collect each result's changed files. The structured FILES_CHANGED line is
+    // authoritative when present; the prose scan is only a fallback for models
+    // that ignore the output format. Runs on the FULL summary (before trimming).
     const fileExtPattern = /[\w\-./]+\.\w{1,5}/g;
     const sourceExts =
       /\.(ts|js|vue|go|json|tsx|jsx|css|scss|sass|less|md|py|rb|rs|java|kt|swift|yaml|yml|toml|xml|sh|bash|zsh|fish|env|gitignore|editorconfig|prettierrc|eslintrc|npmrc|nvmrc)$/i;
-    for (const r of results) {
-      if (r.summary) {
-        const matches = r.summary.match(fileExtPattern);
-        if (matches) {
-          for (const m of matches) {
-            const basename = (m.split("/").pop() ?? m).toLowerCase();
-            if (sourceExts.test(m) && !NON_FILE_TOKENS.has(basename)) {
-              filesToVerify.push(m);
-            }
+    for (let i = 0; i < results.length; i++) {
+      const r = results[i];
+      // Verify-task reports describe files that were checked, not changed.
+      if (!r.summary || tasks[i]?.verify) continue;
+      const structured = parseFilesChanged(r.summary);
+      if (structured) {
+        filesToVerify.push(...structured);
+        continue;
+      }
+      const matches = r.summary.match(fileExtPattern);
+      if (matches) {
+        for (const m of matches) {
+          const basename = (m.split("/").pop() ?? m).toLowerCase();
+          if (sourceExts.test(m) && !NON_FILE_TOKENS.has(basename)) {
+            filesToVerify.push(m);
           }
         }
       }
@@ -254,12 +299,28 @@ export class DelegationCoordinator implements Delegator {
       }
     }
 
-    // When a utility tier is available, verification is offloaded to it (cheap)
-    // instead of the architect reading each file into its expensive context.
+    // A call consisting purely of verify tasks IS the verification — don't ask
+    // the architect to verify the verification.
+    const allVerify = tasks.every((t: { verify: boolean }) => t.verify);
+    if (allVerify) {
+      return JSON.stringify({
+        success: true,
+        parallel,
+        results: results.map(r => ({ title: r.title, summary: trimSummary(r.summary) })),
+        _verification_required: false,
+        _is_verification: true,
+        _reminder: "Review the verdicts above. If issues were found, delegate a fix; otherwise the work is verified.",
+        _warnings: warnings.length > 0 ? warnings : undefined
+      });
+    }
+
+    // Verification is always offloaded to a cheaper model instead of the
+    // architect reading each file into its expensive context: the utility tier
+    // when configured, otherwise the coder running read-only (verify: true).
     const verifyViaUtility = !!(run.utilityModel && run.utilityProviderId);
     const reminder = verifyViaUtility
       ? "You MUST now verify these changes via delegate_to_utility: ask the utility model to read each file in _files_to_verify and confirm correctness, returning a SHORT verdict. Do NOT read the files yourself. If something is wrong, delegate a fix."
-      : "You MUST now read_file each file listed in _files_to_verify to confirm the changes are correct before marking any task complete. If changes are wrong, delegate a fix.";
+      : "You MUST now verify these changes by calling delegate_tasks with ONE task with verify: true, instructing it to read each file in _files_to_verify and return a SHORT verdict. Do NOT read the files yourself — that bloats your expensive context. If something is wrong, delegate a fix.";
 
     return JSON.stringify({
       success: true,
@@ -316,6 +377,7 @@ export class DelegationCoordinator implements Delegator {
     const parallel = !!args.parallel && tasks.length > 1;
 
     const fallback = this.fallbackEnabled(run);
+    const projectContext = this.coderProjectContext(run);
     const runOne = (task: { title: string; instructions: string }) => {
       const tiers: SubAgentTier[] = [
         {
@@ -341,11 +403,11 @@ export class DelegationCoordinator implements Delegator {
             reasoningEffort: run.coderReasoningEffort,
             tools: [...WORKSPACE_TOOLS],
             agentRole: "coder",
-            systemPrompt: buildCoderSystemPrompt(run.projectName, run.projectPath, task.title),
+            systemPrompt: buildCoderSystemPrompt(run.projectName, run.projectPath, task.title, projectContext),
             agentName: `${task.title} (coder fallback)`
           });
         }
-        tiers.push(this.architectTier(run, task));
+        tiers.push(this.architectTier(run, task, projectContext));
       }
       return this.runTaskWithFallback(runId, run, task, tiers);
     };

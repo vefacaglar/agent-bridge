@@ -8,6 +8,8 @@ export {
   buildSystemPrompt,
   buildCoderSystemPrompt,
   buildUtilitySystemPrompt,
+  buildVerifierSystemPrompt,
+  formatCoderMemoryContext,
   formatMemoryContext,
   formatActivePlan,
   getModeStrategy

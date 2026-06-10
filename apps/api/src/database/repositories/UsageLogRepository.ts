@@ -1,5 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
-import type { UsageLog, PaginatedUsageLogs } from "@agent-bridge/shared";
+import type { UsageLog, PaginatedUsageLogs, RunUsageSummary } from "@agent-bridge/shared";
 import { runDbWrite } from "../db.js";
 import type { IUsageLogRepository } from "./interfaces.js";
 
@@ -158,6 +158,56 @@ export class UsageLogRepository implements IUsageLogRepository {
         totalTokens,
         avgCacheHitRate
       }
+    };
+  }
+
+  getRunSummary(runId: string): RunUsageSummary {
+    const rows = this.db.prepare(`
+      SELECT
+        COALESCE(agent_role, 'main') as agentRole,
+        SUM(cost) as cost,
+        COUNT(*) as calls,
+        SUM(input_tokens) as inputTokens,
+        SUM(output_tokens) as outputTokens,
+        SUM(COALESCE(cache_read_tokens, 0)) as cacheReadTokens,
+        SUM(input_tokens + COALESCE(cache_read_tokens, 0)) as promptTokens
+      FROM usage_logs
+      WHERE run_id = ?
+      GROUP BY COALESCE(agent_role, 'main')
+    `).all(runId) as any[];
+
+    let totalCost = 0;
+    let totalCalls = 0;
+    let totalInputTokens = 0;
+    let totalOutputTokens = 0;
+    let totalCacheReadTokens = 0;
+    let totalPromptTokens = 0;
+
+    const byRole = rows.map((row) => {
+      totalCost += row.cost || 0;
+      totalCalls += row.calls || 0;
+      totalInputTokens += row.inputTokens || 0;
+      totalOutputTokens += row.outputTokens || 0;
+      totalCacheReadTokens += row.cacheReadTokens || 0;
+      totalPromptTokens += row.promptTokens || 0;
+      return {
+        agentRole: row.agentRole,
+        cost: row.cost || 0,
+        calls: row.calls || 0,
+        inputTokens: row.inputTokens || 0,
+        outputTokens: row.outputTokens || 0
+      };
+    });
+
+    return {
+      runId,
+      totalCost,
+      totalCalls,
+      totalInputTokens,
+      totalOutputTokens,
+      totalCacheReadTokens,
+      avgCacheHitRate: totalPromptTokens > 0 ? Math.round((totalCacheReadTokens / totalPromptTokens) * 100) : 0,
+      byRole
     };
   }
 }

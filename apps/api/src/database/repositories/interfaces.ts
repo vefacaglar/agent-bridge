@@ -9,7 +9,8 @@ import type {
   MemoryScope,
   MemoryCategory,
   UsageLog,
-  PaginatedUsageLogs
+  PaginatedUsageLogs,
+  RunUsageSummary
 } from "@agent-bridge/shared";
 
 export interface IRunRepository {
@@ -82,4 +83,5 @@ export interface IUsageLogRepository {
     providerId?: string;
     agentRole?: string;
   }): PaginatedUsageLogs;
+  getRunSummary(runId: string): RunUsageSummary;
 }

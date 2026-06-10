@@ -50,7 +50,8 @@ const {
   messages,
   sidePanelMessages,
   sidePanelGroupedMessages,
-  currentPlan
+  currentPlan,
+  runUsage
 } = chat;
 
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
@@ -135,6 +136,23 @@ function handleSidePanelResize(newWidth: number) {
 const currentProjectName = computed(() => {
   const current = projects.projectOptions.value.find(p => p.path === projects.activeProjectPath.value);
   return current ? current.name : 'Unknown Project';
+});
+
+// Compact cost summary for the active run, shown next to the breadcrumb once
+// usage exists. Costs are tiny, so sub-dollar amounts keep 4 decimals.
+const runUsageLabel = computed<string | null>(() => {
+  const u = runUsage.value;
+  if (!u || u.totalCalls === 0) return null;
+  const cost = u.totalCost >= 1 ? `$${u.totalCost.toFixed(2)}` : `$${u.totalCost.toFixed(4)}`;
+  return `${cost} · ${u.totalCalls} calls · ${u.avgCacheHitRate}% cache`;
+});
+
+const runUsageTooltip = computed<string>(() => {
+  const u = runUsage.value;
+  if (!u) return '';
+  return u.byRole
+    .map(r => `${r.agentRole}: $${r.cost.toFixed(4)} (${r.calls} calls, ${r.inputTokens.toLocaleString()} in / ${r.outputTokens.toLocaleString()} out)`)
+    .join('\n');
 });
 
 // The live task checklist pinned above the composer. It is driven entirely by
@@ -417,6 +435,7 @@ onUnmounted(() => {
               <span class="breadcrumb-project">{{ currentProjectName }}</span>
               <span class="breadcrumb-separator">/</span>
               <span class="breadcrumb-chat-title">{{ visibleTitle }}</span>
+              <span v-if="runUsageLabel" class="breadcrumb-usage" :title="runUsageTooltip">{{ runUsageLabel }}</span>
             </div>
             
           </div>
@@ -736,6 +755,15 @@ onUnmounted(() => {
   white-space: nowrap;
   flex: 1;
   min-width: 0;
+}
+
+.breadcrumb-usage {
+  margin-left: 12px;
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 0.82rem;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* Dialog Modal Custom Styling */

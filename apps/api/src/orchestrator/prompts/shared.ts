@@ -87,7 +87,7 @@ export function delegationBlock(delegation: DelegationContext): string {
   // of the architect reading every changed file into its expensive context.
   const verifyStep = delegation.utilityModel
     ? `1. Delegate verification to the UTILITY tier: call delegate_to_utility with a task asking it to read each changed file and confirm the changes are correct, returning a SHORT verdict. Do NOT read the files yourself — that bloats your expensive context.`
-    : `1. Read each file the coder says it changed (use read_file for each one).`;
+    : `1. Delegate verification: call delegate_tasks with ONE task with verify: true, instructing it to read each changed file and return a SHORT verdict. The verifier runs read-only on the coder model. Do NOT read the files yourself — that bloats your expensive context.`;
 
   let block = `\n\nDUAL-MODEL / ARCHITECT MODE:
 - You are the ARCHITECT. A separate coder model (${delegation.coderModel}) is available as your sub-agent(s).

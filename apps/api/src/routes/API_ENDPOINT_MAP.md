@@ -24,6 +24,7 @@ _Generated from `apps/api/src/routes/` — grouped by route file._
 | GET | `/api/runs` | Run history list | `ctx.runRepo.list()` |
 | GET | `/api/runs/:id` | Single run details | `ctx.runRepo.getById(id)` |
 | GET | `/api/runs/:id/messages` | Messages for a single run | `ctx.messageRepo.listByRunId(id)` |
+| GET | `/api/runs/:id/usage` | Aggregated token/cost totals for a run, broken down by agent role | `ctx.usageLogRepo.getRunSummary(id)` |
 | GET | `/api/runs/:id/plan` | Active plan for a single run (drives plan side panel) | `ctx.planRepo.getActive(id)` |
 | GET | `/api/runs/:id/pending` | Pending user-facing request (permission / question) | `ctx.orchestrator.getPendingPermission(id)`, `ctx.orchestrator.getPendingQuestion(id)` |
 | GET | `/api/runs/:id/events` | SSE event stream for a specific run | event bus: `eventBus.on(\`run:${id}\`, listener)` |

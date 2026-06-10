@@ -15,7 +15,7 @@ import { fullAccessStrategy } from "./fullAccess.js";
 
 export type { ModeStrategy, DelegationContext, PromptContext, ToolDef } from "./types.js";
 export { formatMemoryContext, formatActivePlan } from "./shared.js";
-export { buildCoderSystemPrompt, buildUtilitySystemPrompt } from "./subAgents.js";
+export { buildCoderSystemPrompt, buildUtilitySystemPrompt, buildVerifierSystemPrompt, formatCoderMemoryContext } from "./subAgents.js";
 
 const STRATEGIES: Record<string, ModeStrategy> = {
   [chatStrategy.mode]: chatStrategy,

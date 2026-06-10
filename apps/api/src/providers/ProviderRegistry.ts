@@ -380,6 +380,13 @@ export class ProviderRegistry {
     return this.safeModelSettings(block)[model]?.pricing;
   }
 
+  /** The user-entered context window (tokens) for a model; undefined = no compaction. */
+  resolveContextLimit(providerId: string, model: string): number | undefined {
+    const block = this.configs[providerId];
+    if (!block) return undefined;
+    return this.safeContextLimit(this.safeModelSettings(block)[model]?.contextLimit);
+  }
+
   private safeReasoningSettings(providerType: ProviderConfigBlock["type"], settings: ModelSettingsBlock): ModelReasoningSettings | undefined {
     const styleCandidate = settings.reasoning?.style;
     const style = REASONING_STYLES.has(styleCandidate as ReasoningStyle)

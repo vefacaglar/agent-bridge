@@ -370,3 +370,22 @@ export interface PaginatedUsageLogs {
   };
 }
 
+// Aggregated cost/token totals for one run, with a per-agent-role breakdown so
+// the real saving of an architect/coder/utility preset is measurable.
+export interface RunUsageSummary {
+  runId: string;
+  totalCost: number;
+  totalCalls: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalCacheReadTokens: number;
+  avgCacheHitRate: number;
+  byRole: Array<{
+    agentRole: string;
+    cost: number;
+    calls: number;
+    inputTokens: number;
+    outputTokens: number;
+  }>;
+}
+

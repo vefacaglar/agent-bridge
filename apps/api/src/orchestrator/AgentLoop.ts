@@ -11,6 +11,7 @@ import type { PermissionCoordinator } from "./PermissionCoordinator.js";
 import { randomId } from "./ids.js";
 import type { IUsageLogRepository } from "../database/repositories.js";
 import { calculateCost } from "./pricing.js";
+import { estimateTokens, compactHistory, COMPACT_TRIGGER_RATIO, COMPACT_TARGET_RATIO } from "./contextWindow.js";
 
 /** The model + toolset + prompt a single agent loop runs with. */
 export interface AgentRunOptions {
@@ -111,9 +112,31 @@ export class AgentLoop {
     let filesToVerify: string[] = [];
     let filesVerified: Set<string> = new Set();
 
+    // Context-window enforcement: compact the history in chunks when the prompt
+    // nears the model's configured limit. lastPromptTotal carries the REAL token
+    // count from the previous response's usage; the chars/4 estimate only covers
+    // the cold start (first call of a continuation).
+    const contextLimit = this.registry.resolveContextLimit(opts.providerId, opts.model);
+    let lastPromptTotal = 0;
+
     let completionDone = false;
     while (!completionDone) {
       checkCancelled();
+
+      if (contextLimit) {
+        const estimated = lastPromptTotal || estimateTokens(currentMessages, opts.systemPrompt);
+        if (estimated >= COMPACT_TRIGGER_RATIO * contextLimit) {
+          const compacted = compactHistory(currentMessages, Math.floor(COMPACT_TARGET_RATIO * contextLimit));
+          if (compacted) {
+            // In place: the array reference is shared with the caller and pushed
+            // to throughout this method.
+            currentMessages.length = 0;
+            currentMessages.push(...compacted.messages);
+            lastPromptTotal = 0; // stale after compaction; re-estimate until fresh usage arrives
+            console.log(`[context] compacted run=${runId} role=${opts.agentRole ?? "main"} evicted=${compacted.evictedCount} limit=${contextLimit}`);
+          }
+        }
+      }
 
       const msgId = randomId("msg-res");
       let accumulatedContent = "";
@@ -180,6 +203,7 @@ export class AgentLoop {
         const cacheRead = u.cacheReadInputTokens ?? 0;
         const cacheWrite = u.cacheWriteInputTokens ?? 0;
         const promptTotal = fresh + cacheRead + cacheWrite;
+        lastPromptTotal = promptTotal;
         const hitPct = promptTotal > 0 ? Math.round((cacheRead / promptTotal) * 100) : 0;
         const line =
           `[usage] ${new Date().toISOString()} run=${runId} role=${opts.agentRole ?? "main"} model=${opts.model} ` +
@@ -279,7 +303,14 @@ export class AgentLoop {
             // Extract files to verify from the delegation result
             try {
               const delegationResult = JSON.parse(result);
-              if (Array.isArray(delegationResult._files_to_verify)) {
+              if (delegationResult._is_verification === true) {
+                // The call WAS the verification (verify:true tasks on the coder,
+                // read-only). Like the utility path: count it as verified and
+                // disable the per-file completeness check.
+                verifiedAfterDelegation = true;
+                filesToVerify = [];
+                filesVerified = new Set();
+              } else if (Array.isArray(delegationResult._files_to_verify)) {
                 filesToVerify = delegationResult._files_to_verify;
                 filesVerified = new Set();
               }

@@ -1,4 +1,4 @@
-import type { ProviderMetadata, Run, RunMessage, Project, PermissionRule, Plan, AgentPreset, Memory, MemoryCategory, MemoryScope, AppSettings, PaginatedUsageLogs } from '@agent-bridge/shared';
+import type { ProviderMetadata, Run, RunMessage, Project, PermissionRule, Plan, AgentPreset, Memory, MemoryCategory, MemoryScope, AppSettings, PaginatedUsageLogs, RunUsageSummary } from '@agent-bridge/shared';
 
 /**
  * Resolves the backend base URL. The config file (settings.json) is the single
@@ -97,6 +97,7 @@ export const api = {
   getRuns: () => getJson<Run[]>('/api/runs'),
   getMessages: (runId: string) => getJson<RunMessage[]>(`/api/runs/${runId}/messages`),
   getRunPlan: (runId: string) => getJson<Plan | null>(`/api/runs/${runId}/plan`),
+  getRunUsage: (runId: string) => getJson<RunUsageSummary>(`/api/runs/${runId}/usage`),
   getRunPending: (runId: string) => getJson<{ permissionRequest: any | null; questionRequest: any | null }>(`/api/runs/${runId}/pending`),
   getProjects: () => getJson<Project[]>('/api/projects'),
   getPermissions: () => getJson<PermissionRule[]>('/api/permissions'),

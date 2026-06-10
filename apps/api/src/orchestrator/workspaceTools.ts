@@ -417,6 +417,10 @@ export const DELEGATE_TASKS_TOOL = {
                 type: "array",
                 description: "Expected touched files.",
                 items: { type: "string" }
+              },
+              verify: {
+                type: "boolean",
+                description: "Read-only verification task: the sub-agent may only read/list/search and must return a SHORT verdict on whether earlier changes are correct."
               }
             },
             required: ["title", "instructions"]
