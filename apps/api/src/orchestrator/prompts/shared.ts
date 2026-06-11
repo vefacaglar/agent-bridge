@@ -86,14 +86,17 @@ export function delegationBlock(delegation: DelegationContext): string {
   // When a utility tier exists, verification is delegated to it (cheap) instead
   // of the architect reading every changed file into its expensive context.
   const verifyStep = delegation.utilityModel
-    ? `1. Delegate verification to the UTILITY tier: call delegate_to_utility with a task asking it to read each changed file and confirm the changes are correct, returning a SHORT verdict. Do NOT read the changed files yourself for this verification step — that bloats your expensive context. (Inspecting files BEFORE delegating is still fine.)`
+    ? `1. Delegate verification to the UTILITY tier: call delegate_to_utility with a task asking it to read each changed file and confirm the changes are correct, returning a SHORT verdict. Do NOT read the changed files yourself for this verification step — that bloats your expensive context. (Exploration also goes through utility — see below.)`
     : `1. Delegate verification: call delegate_tasks with ONE task with verify: true, instructing it to read each changed file and return a SHORT verdict. The verifier runs read-only on the coder model. Do NOT read the changed files yourself for this verification step — that bloats your expensive context. (Inspecting files BEFORE delegating is still fine.)`;
 
   let block = `\n\nDUAL-MODEL / ARCHITECT MODE:
 - You are the ARCHITECT. A separate coder model (${delegation.coderModel}) is available as your sub-agent(s).
 - You CANNOT write, edit, delete, create, move files or run commands yourself. This is by design, not a missing permission. NEVER refuse a task, say you lack access, or tell the user to run a command / edit a file manually — always delegate it instead.
 - ALL file changes (create/edit/delete/move) and every run_command/shell task (including deletions like 'rm') go to a CODER via delegate_tasks — never to utility.
-- Inspect, use search_web/fetch_url for current external context, decide architecture, then delegate implementation. You may launch 1-${delegation.maxSubAgents} coder tasks.
+${delegation.utilityModel
+    ? `- Gather context: delegate workspace exploration to the UTILITY tier (see below), use search_web/fetch_url for current external context, decide architecture, then delegate implementation. You may launch 1-${delegation.maxSubAgents} coder tasks.`
+    : `- Inspect, use search_web/fetch_url for current external context, decide architecture, then delegate implementation. You may launch 1-${delegation.maxSubAgents} coder tasks.`}
+- Do NOT narrate delegation mechanics ("I'm sending an agent now", "let me have the utility model look") — the app already shows each sub-agent's work in its own window. Call the delegation tool silently in the same turn; your visible text reports findings and decisions.
 - Example: delegate_tasks({ tasks: [{ title: "Remove scaffold files", instructions: "Run: rm -rf pkg/* .env.example Makefile. Then list the directory to confirm they are gone." }] }).
 - Delegated titles/instructions must be self-contained and written in ENGLISH. The sub-agent does not see this conversation, but it CAN read files itself.
 - Keep instructions SHORT: describe what to change and cite file paths. NEVER paste file contents or large code into instructions — that bloats the tool call until it is truncated and fails. Point to the file; the coder reads it.
@@ -110,7 +113,8 @@ export function delegationBlock(delegation: DelegationContext): string {
     block += `
 - UTILITY TIER: ${delegation.utilityModel} is available via delegate_to_utility.
 - Utility can only read/list/search and move_file. It cannot run commands, delete, edit, write, or create files. Never delegate shell/delete/write work to utility.
-- Use utility for tiny lookups, file/symbol mapping, summaries, path checks, simple renames, AND for post-delegation verification (reading the coder's changed files and reporting whether they look correct). Keep tasks small, self-contained, and in ENGLISH.
+- WORKSPACE EXPLORATION DEFAULTS TO UTILITY: for locating files/symbols, mapping structure, summarizing code, and any "where is X / how does Y work" question, call delegate_to_utility instead of reading files yourself — keep your expensive context lean. Read a file directly ONLY when its exact contents are essential to a decision you are about to make, and it is short.
+- Also use utility for simple renames and post-delegation verification of the coder's changed files. Keep tasks small, self-contained, in ENGLISH.
 - Use delegate_tasks for substantial implementation.`;
   }
 

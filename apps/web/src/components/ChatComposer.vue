@@ -81,7 +81,7 @@ const draftTokens = computed(() => {
 });
 
 const contextTokens = computed(() => {
-  let total = 250; // system prompt estimate
+  let total = 0; // system prompt estimate
   if (props.messages) {
     for (const msg of props.messages) {
       if (msg.content) total += estimateTokens(msg.content);
@@ -756,7 +756,7 @@ onBeforeUnmount(() => {
       />
 
       <!-- Token info bar (placed outside the input box) -->
-      <div class="composer-token-info">
+      <div v-if="messages && messages.length > 0" class="composer-token-info">
         <span class="context-tokens" title="Total context (system prompt + history + draft) sent to model">
           Context: {{ formattedContext }}
         </span>
