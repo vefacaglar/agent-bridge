@@ -437,13 +437,21 @@ export class AgentLoop {
     }
 
     // delegate_tasks fans out to coder sub-agents; the orchestrator runs their
-    // loops itself (the sub-agents' own tool calls are gated normally).
-    if (toolCall.function?.name === "delegate_tasks") {
-      return this.delegator.executeDelegateTasks(runId, run, toolCall);
-    }
-
-    // delegate_to_utility fans out to cheap utility sub-agents (lookups/renames).
-    if (toolCall.function?.name === "delegate_to_utility") {
+    // loops itself (the sub-agents' own tool calls are gated normally). Gated by
+    // mode FIRST: runs can switch modes mid-thread, so a model continuing a
+    // build-mode thread in plan mode may imitate the delegate calls in its
+    // history — without this check those would actually launch sub-agents.
+    if (toolCall.function?.name === "delegate_tasks" || toolCall.function?.name === "delegate_to_utility") {
+      if (!strategy.allowsDelegation) {
+        return JSON.stringify({
+          success: false,
+          error: `Blocked: "${toolCall.function.name}" is not available in ${run.mode} mode. Delegation only runs in build-type modes. Ask the user to switch to Build mode to implement.`
+        });
+      }
+      if (toolCall.function.name === "delegate_tasks") {
+        return this.delegator.executeDelegateTasks(runId, run, toolCall);
+      }
+      // delegate_to_utility fans out to cheap utility sub-agents (lookups/renames).
       return this.delegator.executeUtilityTasks(runId, run, toolCall);
     }
 
@@ -451,7 +459,7 @@ export class AgentLoop {
     const isDelegated = !!(run.coderModel && run.coderProviderId);
 
     // Block the Architect (non-coder/non-utility role in a delegation setup) from calling write/delete/run_command directly.
-    if (isDelegated && agentRole !== "coder" && agentRole !== "utility" && !READONLY_TOOLS.has(toolName) && toolName !== "search_web" && toolName !== "delegate_tasks" && toolName !== "delegate_to_utility" && toolName !== "update_plan" && toolName !== "set_chat_title" && toolName !== "ask_user_question" && toolName !== "remember") {
+    if (isDelegated && agentRole !== "coder" && agentRole !== "utility" && !READONLY_TOOLS.has(toolName) && toolName !== "search_web" && toolName !== "fetch_url" && toolName !== "delegate_tasks" && toolName !== "delegate_to_utility" && toolName !== "update_plan" && toolName !== "set_chat_title" && toolName !== "ask_user_question" && toolName !== "remember") {
       return JSON.stringify({
         success: false,
         error: `You are the ARCHITECT and cannot run "${toolName}" directly — this is by design, not a missing permission. Delegate it to a coder with delegate_tasks. Example: delegate_tasks({ tasks: [{ title: "<short title>", instructions: "<self-contained English instructions; include any shell command to run>" }] }). For a tiny read-only lookup use delegate_to_utility instead.`

@@ -250,8 +250,8 @@ test("Orchestrator Integration Tests", async (t) => {
     assert.ok(systemPromptUsed.includes("Do NOT write production code"));
     assert.ok(systemPromptUsed.includes("do not treat repeated or pasted plan text as approval"));
     assert.ok(systemPromptUsed.includes("INITIAL PROJECT GUIDANCE"));
-    assert.ok(systemPromptUsed.includes("Agents.md"));
-    assert.ok(systemPromptUsed.includes("Claude.md"));
+    assert.ok(systemPromptUsed.includes("AGENTS.md"));
+    assert.ok(systemPromptUsed.includes("CLAUDE.md"));
   });
 
   await t.test("System prompt - does not inject project guidance in chat mode", () => {

@@ -65,7 +65,7 @@ GLOBAL RULES:
 - Ask only when blocked on a real user decision. Use ask_user_question for concrete multiple-choice decisions, or <confirm> only for a clear yes/no question. Do not infer approval from casual wording.
 - CRITICAL: If you intend to ask the user anything, you MUST express it by CALLING the ask_user_question tool (or <confirm>) in the SAME turn. NEVER write your questions as plain prose and end the turn — a reply that announces questions ("let me ask a few things", "I need to understand X first") without an actual ask_user_question tool call ends the run and leaves the user stuck. No tool call = no question. Do not split asking across turns: prepare and emit the tool call immediately.
 - Inspect with read_file/list_directory/search_files before risky edits. Use edit_file for targeted edits.
-- run_command, search_web, and fetch_url require user approval. Ordinary Build-mode file edits inside the approved task/plan should be done with tools, not approval text.
+- run_command, search_web, and fetch_url require user approval, unless the current mode section below states otherwise. Ordinary Build-mode file edits inside the approved task/plan should be done with tools, not approval text.
 - No machine-wide scans. Search workspace; check tools with version/path commands.
 - Maintain a live <task_list> checklist in your visible replies whenever the work touches more than one file, takes 2+ distinct steps, or requires running commands/tests. Skip it only for a single-file, single-step quick fix. Re-output the full updated list every reply, marking items '- [x]' as you complete them.
 - If there is an approved plan, implementation must stay strictly within it. If it is incomplete, unsafe, or wrong, stop and ask for a plan revision.`;
@@ -73,8 +73,8 @@ GLOBAL RULES:
 /** The "first request of this run" block: tells the model to read guidance files. */
 export function initialGuidance(): string {
   return `\n\nINITIAL PROJECT GUIDANCE:
-- This is the first model request for this run. Before doing substantive planning or implementation, inspect the active workspace guidance files by calling read_file for 'Agents.md' and 'Claude.md' when they exist.
-- If either file is missing or unreadable, continue with the available context and do not get stuck.`;
+- This is the first model request for this run. Before doing substantive planning or implementation, call list_directory('') and read any workspace guidance file present in the root (typically 'AGENTS.md' or 'CLAUDE.md'; casing varies). Use the exact file name from the listing — file names can be case-sensitive.
+- If no guidance file exists or one is unreadable, continue with the available context and do not get stuck.`;
 }
 
 /**
@@ -86,14 +86,14 @@ export function delegationBlock(delegation: DelegationContext): string {
   // When a utility tier exists, verification is delegated to it (cheap) instead
   // of the architect reading every changed file into its expensive context.
   const verifyStep = delegation.utilityModel
-    ? `1. Delegate verification to the UTILITY tier: call delegate_to_utility with a task asking it to read each changed file and confirm the changes are correct, returning a SHORT verdict. Do NOT read the files yourself — that bloats your expensive context.`
-    : `1. Delegate verification: call delegate_tasks with ONE task with verify: true, instructing it to read each changed file and return a SHORT verdict. The verifier runs read-only on the coder model. Do NOT read the files yourself — that bloats your expensive context.`;
+    ? `1. Delegate verification to the UTILITY tier: call delegate_to_utility with a task asking it to read each changed file and confirm the changes are correct, returning a SHORT verdict. Do NOT read the changed files yourself for this verification step — that bloats your expensive context. (Inspecting files BEFORE delegating is still fine.)`
+    : `1. Delegate verification: call delegate_tasks with ONE task with verify: true, instructing it to read each changed file and return a SHORT verdict. The verifier runs read-only on the coder model. Do NOT read the changed files yourself for this verification step — that bloats your expensive context. (Inspecting files BEFORE delegating is still fine.)`;
 
   let block = `\n\nDUAL-MODEL / ARCHITECT MODE:
 - You are the ARCHITECT. A separate coder model (${delegation.coderModel}) is available as your sub-agent(s).
 - You CANNOT write, edit, delete, create, move files or run commands yourself. This is by design, not a missing permission. NEVER refuse a task, say you lack access, or tell the user to run a command / edit a file manually — always delegate it instead.
 - ALL file changes (create/edit/delete/move) and every run_command/shell task (including deletions like 'rm') go to a CODER via delegate_tasks — never to utility.
-- Inspect, use search_web for current external context, decide architecture, then delegate implementation. You may launch 1-${delegation.maxSubAgents} coder tasks.
+- Inspect, use search_web/fetch_url for current external context, decide architecture, then delegate implementation. You may launch 1-${delegation.maxSubAgents} coder tasks.
 - Example: delegate_tasks({ tasks: [{ title: "Remove scaffold files", instructions: "Run: rm -rf pkg/* .env.example Makefile. Then list the directory to confirm they are gone." }] }).
 - Delegated titles/instructions must be self-contained and written in ENGLISH. The sub-agent does not see this conversation, but it CAN read files itself.
 - Keep instructions SHORT: describe what to change and cite file paths. NEVER paste file contents or large code into instructions — that bloats the tool call until it is truncated and fails. Point to the file; the coder reads it.
