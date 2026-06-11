@@ -69,6 +69,7 @@ export function useChatSession(options: ChatSessionOptions) {
   let isDisposed = false;
   let liveMessageFlushFrame: number | null = null;
   let sidePanelSnapshotTimer: ReturnType<typeof setTimeout> | null = null;
+  let usageDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   // Raw SSE updates stay in a plain Map so high-frequency token/sub-agent
   // events do not touch Vue reactivity until the scheduled flush runs.
   const pendingMessageUpdates = new Map<string, RunMessage>();
@@ -216,6 +217,23 @@ export function useChatSession(options: ChatSessionOptions) {
     }
   }
 
+  function clearUsageDebounceTimer() {
+    if (usageDebounceTimer) {
+      clearTimeout(usageDebounceTimer);
+      usageDebounceTimer = null;
+    }
+  }
+
+  function requestUsageRefresh(runId: string) {
+    if (usageDebounceTimer) return;
+    usageDebounceTimer = setTimeout(async () => {
+      usageDebounceTimer = null;
+      if (activeRun.value?.id === runId) {
+        await refreshRunUsage(runId);
+      }
+    }, 1500);
+  }
+
   async function hydratePendingRequest(runId: string) {
     const pending = await api.getRunPending(runId);
     if (!pending || activeRun.value?.id !== runId) return;
@@ -234,6 +252,7 @@ export function useChatSession(options: ChatSessionOptions) {
     // that run — it keeps going on the backend. We just stop watching its live
     // stream here; selecting it again later reconnects and reloads its history.
     clearPendingPermissionPoll();
+    clearUsageDebounceTimer();
     flushAllMessageSurfaces();
     eventSource?.close();
     eventSource = null;
@@ -428,6 +447,9 @@ export function useChatSession(options: ChatSessionOptions) {
         runs.value = runs.value.map(r => r.id === runId ? { ...r, errorMessage: data.errorMessage, status: 'failed' } : r);
         finishEventStream();
       }
+
+      // Request a throttled usage refresh on any activity to update the cost info bar in real-time
+      requestUsageRefresh(runId);
     };
 
     eventSource.onerror = () => finishEventStream();
@@ -442,6 +464,7 @@ export function useChatSession(options: ChatSessionOptions) {
 
   function finishEventStream(options: { sendQueuedMessage?: boolean } = {}) {
     clearPendingPermissionPoll();
+    clearUsageDebounceTimer();
     // Terminal SSE events may close the stream before a scheduled render tick,
     // so force the latest buffered message into reactive state before teardown.
     flushAllMessageSurfaces();
@@ -605,6 +628,7 @@ export function useChatSession(options: ChatSessionOptions) {
 
   function disconnect() {
     clearPendingPermissionPoll();
+    clearUsageDebounceTimer();
     flushAllMessageSurfaces();
     eventSource?.close();
     eventSource = null;
@@ -614,6 +638,7 @@ export function useChatSession(options: ChatSessionOptions) {
 
   tryOnScopeDispose(() => {
     clearPendingPermissionPoll();
+    clearUsageDebounceTimer();
     flushAllMessageSurfaces();
     isDisposed = true;
     clearPendingMessageUpdates();
