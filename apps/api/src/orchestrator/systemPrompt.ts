@@ -3,7 +3,7 @@
  * now live in ./prompts/ as ModeStrategy modules selected by getModeStrategy.
  * This file re-exports the public surface so existing imports keep working.
  */
-export type { DelegationContext, ModeStrategy, PromptContext, ToolDef } from "./prompts/index.js";
+export type { DelegationContext, ModeStrategy, PromptContext, ToolDef, SystemPromptOptions } from "./prompts/index.js";
 export {
   buildSystemPrompt,
   buildCoderSystemPrompt,

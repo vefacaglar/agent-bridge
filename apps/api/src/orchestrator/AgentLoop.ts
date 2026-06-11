@@ -1,8 +1,9 @@
-import type { Run, RunMessage, ChatMessage, ReasoningEffort } from "@locagens/shared";
+import type { Run, RunMessage, ChatMessage, ReasoningEffort, CompletionResponse } from "@locagens/shared";
+import type { ModelProvider } from "../providers/ModelProvider.js";
 import type { ProviderRegistry } from "../providers/ProviderRegistry.js";
 import { appendFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { getModeStrategy } from "./systemPrompt.js";
+import { getModeStrategy, type ModeStrategy } from "./systemPrompt.js";
 import { executeWorkspaceToolAsync, DANGEROUS_TOOLS, READONLY_TOOLS, MODIFYING_TOOLS, UTILITY_TOOL_NAMES } from "./workspaceTools.js";
 import { getOrchestratorTool } from "./tools/index.js";
 import type { OrchestratorToolContext } from "./tools/index.js";
@@ -73,6 +74,27 @@ const MAX_TASK_LIST_NUDGES = 1;
  */
 const ARCHITECT_DIRECT_INSPECT_BUDGET = 4;
 
+/**
+ * The tools an architect may call directly. Everything else it is advertised is
+ * a trap that redirects to delegation (see gateWorkspaceCall). Read-only tools
+ * are also allowed, but budgeted when a utility tier exists.
+ */
+const ARCHITECT_DIRECT_TOOLS = new Set([
+  "search_web",
+  "fetch_url",
+  "delegate_tasks",
+  "delegate_to_utility",
+  "update_plan",
+  "set_chat_title",
+  "ask_user_question",
+  "remember"
+]);
+
+/** Wraps a gating refusal in the standard tool-result error shape. */
+function deny(error: string): string {
+  return JSON.stringify({ success: false, error });
+}
+
 /** True when the reply carries a <task_list> with at least one unchecked item. */
 function hasOpenTaskListItems(text: string): boolean {
   const match = text.match(/<task_list>([\s\S]*?)(?:<\/task_list>|$)/);
@@ -87,6 +109,104 @@ function usageLogPath(): string | null {
     return join(dirname(resolve(process.env.LOCAGENS_DB_PATH)), "usage.log");
   }
   return null;
+}
+
+/**
+ * Tracks whether the architect verified its delegated work. Fed one executed
+ * tool call at a time; asked for the right verification nudge when the model
+ * tries to end its turn.
+ */
+class VerificationTracker {
+  private delegated = false;
+  private verified = false;
+  private filesToVerify: string[] = [];
+  private filesVerified = new Set<string>();
+
+  observe(toolCall: any, result: string): void {
+    const toolName = toolCall.function?.name;
+    if (toolName === "delegate_tasks") {
+      this.delegated = true;
+      this.verified = false;
+      this.observeDelegationResult(result);
+    } else if (toolName === "delegate_to_utility") {
+      // The architect offloaded verification to the cheap utility tier (one
+      // call covers all changed files). We can't match individual files through
+      // it, so count it as full verification.
+      this.markFullyVerified();
+    } else if (READONLY_TOOLS.has(toolName)) {
+      this.verified = true;
+      if (toolName === "read_file") this.observeFileRead(toolCall);
+    }
+  }
+
+  /**
+   * The nudge to inject when the architect tries to finish: the base nudge when
+   * it never verified, a completeness nudge when it verified only SOME files,
+   * or null when verification is satisfied (or never owed).
+   */
+  pendingNudge(baseNudge: string | undefined): string | null {
+    if (!baseNudge || !this.delegated) return null;
+    if (!this.verified) return baseNudge;
+    const remaining = this.filesToVerify.filter(f => !this.filesVerified.has(f));
+    if (this.filesToVerify.length === 0 || remaining.length === 0) return null;
+    return `You verified ${this.filesVerified.size}/${this.filesToVerify.length} files. Please also verify: ${remaining.join(", ")} before marking tasks complete.`;
+  }
+
+  private observeDelegationResult(result: string): void {
+    try {
+      const delegationResult = JSON.parse(result);
+      if (delegationResult._is_verification === true) {
+        // The call WAS the verification (verify:true tasks on the coder, read-only).
+        this.markFullyVerified();
+      } else if (Array.isArray(delegationResult._files_to_verify)) {
+        this.filesToVerify = delegationResult._files_to_verify;
+        this.filesVerified = new Set();
+      }
+    } catch {
+      // If parsing fails, skip tracking
+    }
+  }
+
+  /** Matches a read_file call against the files awaiting verification. */
+  private observeFileRead(toolCall: any): void {
+    if (this.filesToVerify.length === 0) return;
+    try {
+      const args = JSON.parse(toolCall.function?.arguments || "{}");
+      if (typeof args.path !== "string") return;
+      const baseOf = (p: string) => p.split("/").pop() ?? p;
+      const verifiedBase = baseOf(args.path);
+      for (const f of this.filesToVerify) {
+        if (baseOf(f) === verifiedBase) this.filesVerified.add(f);
+      }
+    } catch {
+      // If parsing fails, skip tracking
+    }
+  }
+
+  private markFullyVerified(): void {
+    this.verified = true;
+    this.filesToVerify = [];
+    this.filesVerified = new Set();
+  }
+}
+
+/** Mutable per-run loop state: action counts and nudge/inspection budgets. */
+interface LoopState {
+  toolCallsMade: number;
+  idleNudgesUsed: number;
+  postDelegationNudgesUsed: number;
+  taskListNudgesUsed: number;
+  directInspections: number;
+  verification: VerificationTracker;
+}
+
+/** The fixed per-run inputs every helper of the loop needs. */
+interface TurnContext {
+  runId: string;
+  opts: AgentRunOptions;
+  provider: ModelProvider;
+  contextLimit: number;
+  checkCancelled: () => void;
 }
 
 /**
@@ -118,316 +238,292 @@ export class AgentLoop {
    * messages with the supplied agentRole. Returns the model's final text.
    */
   async run(runId: string, run: Run, messages: ChatMessage[], opts: AgentRunOptions): Promise<string> {
-    const checkCancelled = () => {
-      if (!this.activeRuns.has(runId)) {
-        throw new Error("ORCHESTRATION_CANCELLED");
+    const turn: TurnContext = {
+      runId,
+      opts,
+      provider: this.registry.getProvider(opts.providerId),
+      // Models without a configured limit fall back to a conservative default —
+      // no model runs unprotected.
+      contextLimit: this.registry.resolveContextLimit(opts.providerId, opts.model) || DEFAULT_CONTEXT_LIMIT,
+      checkCancelled: () => {
+        if (!this.activeRuns.has(runId)) {
+          throw new Error("ORCHESTRATION_CANCELLED");
+        }
       }
     };
+    const state: LoopState = {
+      toolCallsMade: 0,
+      idleNudgesUsed: 0,
+      postDelegationNudgesUsed: 0,
+      taskListNudgesUsed: 0,
+      directInspections: 0,
+      verification: new VerificationTracker()
+    };
 
-    const provider = this.registry.getProvider(opts.providerId);
-    const currentMessages = messages;
     let lastText = "";
-    // Tracks whether the agent has taken ANY action this run, and how many idle
-    // nudges we've already spent (see AgentRunOptions.idleNudge).
-    let toolCallsMade = 0;
-    let nudgesUsed = 0;
-    let taskListNudgesUsed = 0;
-    // Tracks delegation state for post-delegation verification nudges.
-    let lastToolWasDelegation = false;
-    let postDelegationNudgesUsed = 0;
-    // Per-turn budget of direct read-only calls for an architect with a utility
-    // tier (see ARCHITECT_DIRECT_INSPECT_BUDGET).
-    const counters = { directInspections: 0 };
-    let verifiedAfterDelegation = false;
-    let filesToVerify: string[] = [];
-    let filesVerified: Set<string> = new Set();
-
-    // Context-window enforcement: compact the history in chunks when the prompt
-    // nears the model's configured limit. lastPromptTotal carries the REAL token
-    // count from the previous response's usage; the chars estimate only covers
-    // the cold start (first call of a continuation). Models without a configured
-    // limit fall back to a conservative default — no model runs unprotected.
-    const contextLimit = this.registry.resolveContextLimit(opts.providerId, opts.model) || DEFAULT_CONTEXT_LIMIT;
+    // The REAL token count of the previous prompt, from the provider's usage
+    // report. 0 = unknown (cold start / right after compaction) — the context
+    // check then falls back to a chars-based estimate.
     let lastPromptTotal = 0;
 
-    let completionDone = false;
-    while (!completionDone) {
-      checkCancelled();
+    while (true) {
+      turn.checkCancelled();
+      lastPromptTotal = this.enforceContextWindow(turn, messages, lastPromptTotal);
 
-      {
-        const estimated = lastPromptTotal || estimateTokens(currentMessages, opts.systemPrompt);
-        if (estimated >= COMPACT_TRIGGER_RATIO * contextLimit) {
-          const compacted = compactHistory(currentMessages, Math.floor(COMPACT_TARGET_RATIO * contextLimit));
-          if (compacted) {
-            // In place: the array reference is shared with the caller and pushed
-            // to throughout this method.
-            currentMessages.length = 0;
-            currentMessages.push(...compacted.messages);
-            lastPromptTotal = 0; // stale after compaction; re-estimate until fresh usage arrives
-            console.log(`[context] compacted run=${runId} role=${opts.agentRole ?? "main"} evicted=${compacted.evictedCount} clipped=${compacted.clippedCount} limit=${contextLimit}`);
-          }
-        }
-      }
-
-      const msgId = randomId("msg-res");
-      let accumulatedContent = "";
-      let accumulatedReasoning = "";
-      let hasCreatedMessage = false;
-
-      const startTime = Date.now();
-      const response = await provider.complete({
-        model: opts.model,
-        reasoningEffort: opts.reasoningEffort,
-        reasoning: this.registry.resolveReasoning(opts.providerId, opts.model, opts.reasoningEffort),
-        systemPrompt: opts.systemPrompt,
-        messages: currentMessages,
-        tools: opts.tools
-      }, (chunk) => {
-        checkCancelled();
-        if (chunk.content) accumulatedContent += chunk.content;
-        if (chunk.reasoningContent) accumulatedReasoning += chunk.reasoningContent;
-
-        const assistantMsg: RunMessage = {
-          id: msgId,
-          runId,
-          role: "assistant",
-          agentRole: opts.agentRole,
-          agentName: opts.agentName,
-          providerId: opts.providerId,
-          providerDisplayName: opts.providerDisplayName,
-          model: opts.model,
-          content: accumulatedContent,
-          reasoningContent: accumulatedReasoning || undefined,
-          createdAt: new Date().toISOString()
-        };
-
-        if (!hasCreatedMessage) {
-          this.messages.emitMessage(runId, assistantMsg);
-          hasCreatedMessage = true;
-        } else {
-          this.messages.updateMessage(runId, assistantMsg);
-        }
-      });
-
-      checkCancelled();
-      await this.messages.flushMessageDbUpdate(msgId);
-
-      // Prompt-cache measurement: one line per model call so cache hit-rate is
-      // observable live in the server console during a run. inputTokens is the
-      // fresh (full-rate) prompt; cacheRead is served cheaply from cache.
-      let usage = response.usage;
-      if (!usage) {
-        // Fallback estimation (e.g. for streaming OpenAI calls where usage chunk is omitted)
-        const promptText = (opts.systemPrompt || "") + messages.map(m => m.content || "").join("\n");
-        const estIn = Math.round(promptText.length / 3.5) || 1;
-        const estOut = Math.round((response.content || "").length / 3.5) || 1;
-        usage = {
-          inputTokens: estIn,
-          outputTokens: estOut,
-          totalTokens: estIn + estOut
-        };
-      }
-
-      if (usage) {
-        const u = usage;
-        const fresh = u.inputTokens ?? 0;
-        const cacheRead = u.cacheReadInputTokens ?? 0;
-        const cacheWrite = u.cacheWriteInputTokens ?? 0;
-        const promptTotal = fresh + cacheRead + cacheWrite;
-        lastPromptTotal = promptTotal;
-        const hitPct = promptTotal > 0 ? Math.round((cacheRead / promptTotal) * 100) : 0;
-        const line =
-          `[usage] ${new Date().toISOString()} run=${runId} role=${opts.agentRole ?? "main"} model=${opts.model} ` +
-          `in=${fresh} cacheRead=${cacheRead} cacheWrite=${cacheWrite} out=${u.outputTokens ?? 0} cacheHit=${hitPct}%`;
-        console.log(line);
-        // Also append to a local log file so token/cache usage can be inspected
-        // after the fact (the console stream is otherwise lost in the dev terminal).
-        try {
-          const logPath = usageLogPath();
-          if (logPath) appendFileSync(logPath, line + "\n");
-        } catch {
-          // Best-effort only; never let logging break a run.
-        }
-
-        // Cost comes solely from the model's user-entered pricing (no built-in
-        // table, no name-based guessing). Unpriced models cost 0.
-        const pricing = this.registry.resolvePricing(opts.providerId, opts.model);
-        const cost = calculateCost(pricing, fresh, u.outputTokens ?? 0, cacheRead, cacheWrite);
-
-        // Write to SQLite database usage_logs table asynchronously
-        this.usageLogRepo.create({
-          runId,
-          agentRole: opts.agentRole ?? "main",
-          providerId: opts.providerId,
-          model: opts.model,
-          inputTokens: fresh,
-          outputTokens: u.outputTokens ?? 0,
-          cacheReadTokens: cacheRead,
-          cacheWriteTokens: cacheWrite,
-          cacheHitRate: hitPct,
-          cost,
-          createdAt: new Date().toISOString(),
-          durationMs: Date.now() - startTime
-        }).catch(err => {
-          console.error(`[Database] Failed to write usage log to database: ${err.message}`);
-        });
-      }
-
-      const finalMsg: RunMessage = {
-        id: msgId,
-        runId,
-        role: "assistant",
-        agentRole: opts.agentRole,
-        agentName: opts.agentName,
-        providerId: opts.providerId,
-        providerDisplayName: opts.providerDisplayName,
-        model: opts.model,
-        content: response.content || (response.toolCalls ? "Calling workspace tools..." : ""),
-        reasoningContent: response.reasoningContent,
-        rawResponse: response.toolCalls ? JSON.stringify(response.toolCalls) : undefined,
-        createdAt: new Date().toISOString()
-      };
-
-      if (!hasCreatedMessage) {
-        this.messages.emitMessage(runId, finalMsg);
-      } else {
-        this.messages.updateMessage(runId, finalMsg);
-      }
-
+      const { response, promptTotal } = await this.streamCompletion(turn, messages);
+      lastPromptTotal = promptTotal;
       if (response.content) lastText = response.content;
 
       if (response.toolCalls && response.toolCalls.length > 0) {
-        toolCallsMade += response.toolCalls.length;
-        currentMessages.push({
-          role: "assistant",
-          content: response.content || "",
-          toolCalls: response.toolCalls
-        });
-
-        for (const tc of response.toolCalls) {
-          checkCancelled();
-          const result = await this.runToolCall(runId, run, tc, opts.agentRole, counters);
-
-          const toolMsg: RunMessage = {
-            id: randomId("msg-tool"),
-            runId,
-            role: "tool",
-            agentRole: opts.agentRole,
-            agentName: opts.agentName,
-            content: result,
-            createdAt: new Date().toISOString()
-          };
-          this.messages.emitMessage(runId, toolMsg);
-
-          currentMessages.push({
-            role: "tool",
-            content: result,
-            tool_call_id: tc.id,
-            name: tc.function.name
-          });
-
-          // Track delegation state for post-delegation verification nudge.
-          const toolName = tc.function?.name;
-          if (toolName === "delegate_tasks") {
-            lastToolWasDelegation = true;
-            verifiedAfterDelegation = false;
-            // Extract files to verify from the delegation result
-            try {
-              const delegationResult = JSON.parse(result);
-              if (delegationResult._is_verification === true) {
-                // The call WAS the verification (verify:true tasks on the coder,
-                // read-only). Like the utility path: count it as verified and
-                // disable the per-file completeness check.
-                verifiedAfterDelegation = true;
-                filesToVerify = [];
-                filesVerified = new Set();
-              } else if (Array.isArray(delegationResult._files_to_verify)) {
-                filesToVerify = delegationResult._files_to_verify;
-                filesVerified = new Set();
-              }
-            } catch {
-              // If parsing fails, skip tracking
-            }
-          } else if (toolName === "delegate_to_utility") {
-            // The architect offloaded verification to the cheap utility tier
-            // (one call covers all changed files). Treat that as full
-            // verification — we can't match individual files through it, so
-            // disable the per-file completeness check.
-            verifiedAfterDelegation = true;
-            filesToVerify = [];
-            filesVerified = new Set();
-          } else if (toolName === "read_file" || toolName === "list_directory" || toolName === "search_files") {
-            verifiedAfterDelegation = true;
-            // Track which specific file was verified
-            if (toolName === "read_file" && filesToVerify.length > 0) {
-              try {
-                const args = JSON.parse(tc.function?.arguments || "{}");
-                if (typeof args.path === "string") {
-                  const baseOf = (p: string) => p.split("/").pop() ?? p;
-                  const verifiedBase = baseOf(args.path);
-                  for (const f of filesToVerify) {
-                    if (baseOf(f) === verifiedBase) {
-                      filesVerified.add(f);
-                    }
-                  }
-                }
-              } catch {
-                // If parsing fails, skip tracking
-              }
-            }
-          }
-        }
-      } else if (
-        opts.idleNudge &&
-        toolCallsMade === 0 &&
-        nudgesUsed < (opts.maxIdleNudges ?? 0)
-      ) {
-        // The agent ended its turn without ever acting, despite work being
-        // expected. Re-add its text and inject one invisible reminder (not
-        // persisted, so it stays out of the UI) so it actually calls a tool.
-        nudgesUsed++;
-        currentMessages.push({ role: "assistant", content: response.content || "" });
-        currentMessages.push({ role: "user", content: opts.idleNudge });
-      } else if (
-        opts.postDelegationNudge &&
-        lastToolWasDelegation &&
-        !verifiedAfterDelegation &&
-        postDelegationNudgesUsed < (opts.maxPostDelegationNudges ?? 0)
-      ) {
-        // The architect delegated but did not verify the results at all.
-        postDelegationNudgesUsed++;
-        currentMessages.push({ role: "assistant", content: response.content || "" });
-        currentMessages.push({ role: "user", content: opts.postDelegationNudge });
-      } else if (
-        opts.postDelegationNudge &&
-        lastToolWasDelegation &&
-        verifiedAfterDelegation &&
-        filesToVerify.length > 0 &&
-        filesVerified.size < filesToVerify.length &&
-        postDelegationNudgesUsed < (opts.maxPostDelegationNudges ?? 0)
-      ) {
-        // The architect verified SOME but not ALL files.
-        postDelegationNudgesUsed++;
-        const remaining = filesToVerify.filter(f => !filesVerified.has(f));
-        const completenessNudge = `You verified ${filesVerified.size}/${filesToVerify.length} files. Please also verify: ${remaining.join(", ")} before marking tasks complete.`;
-        currentMessages.push({ role: "assistant", content: response.content || "" });
-        currentMessages.push({ role: "user", content: completenessNudge });
-      } else if (
-        toolCallsMade > 0 &&
-        taskListNudgesUsed < MAX_TASK_LIST_NUDGES &&
-        hasOpenTaskListItems(response.content || "")
-      ) {
-        // The agent worked, then stopped mid-task-list without acting or
-        // declaring a blocker. Remind it once (invisibly, like the other nudges).
-        taskListNudgesUsed++;
-        currentMessages.push({ role: "assistant", content: response.content || "" });
-        currentMessages.push({ role: "user", content: OPEN_TASK_LIST_NUDGE });
-      } else {
-        completionDone = true;
+        await this.executeToolCalls(turn, run, messages, response, state);
+        continue;
       }
+
+      // No tool call: the model thinks it is done. Give the relevant corrective
+      // nudge a shot (invisibly — nudges are not persisted, so they stay out of
+      // the UI); if none applies, the run is genuinely finished.
+      const nudge = this.chooseNudge(response.content || "", opts, state);
+      if (nudge === null) return lastText;
+      messages.push({ role: "assistant", content: response.content || "" });
+      messages.push({ role: "user", content: nudge });
+    }
+  }
+
+  /**
+   * Compacts the history in chunks when the prompt nears the model's context
+   * limit. Returns the (possibly reset) lastPromptTotal: 0 right after a
+   * compaction, since the previous usage report no longer describes the history.
+   */
+  private enforceContextWindow(turn: TurnContext, messages: ChatMessage[], lastPromptTotal: number): number {
+    const estimated = lastPromptTotal || estimateTokens(messages, turn.opts.systemPrompt);
+    if (estimated < COMPACT_TRIGGER_RATIO * turn.contextLimit) return lastPromptTotal;
+
+    const compacted = compactHistory(messages, Math.floor(COMPACT_TARGET_RATIO * turn.contextLimit));
+    if (!compacted) return lastPromptTotal;
+
+    // In place: the array reference is shared with the caller and pushed to
+    // throughout the loop.
+    messages.length = 0;
+    messages.push(...compacted.messages);
+    console.log(`[context] compacted run=${turn.runId} role=${turn.opts.agentRole ?? "main"} evicted=${compacted.evictedCount} clipped=${compacted.clippedCount} limit=${turn.contextLimit}`);
+    return 0;
+  }
+
+  /**
+   * One model call: streams the response into a live RunMessage, records usage,
+   * and emits the final message. Returns the response plus the prompt's real
+   * token total (estimated when the provider omitted usage).
+   */
+  private async streamCompletion(
+    turn: TurnContext,
+    messages: ChatMessage[]
+  ): Promise<{ response: CompletionResponse; promptTotal: number }> {
+    const { runId, opts } = turn;
+    const msgId = randomId("msg-res");
+    let accumulatedContent = "";
+    let accumulatedReasoning = "";
+    let hasCreatedMessage = false;
+
+    const emitStreamingMessage = () => {
+      const assistantMsg = this.buildAssistantMessage(turn, msgId, {
+        content: accumulatedContent,
+        reasoningContent: accumulatedReasoning || undefined
+      });
+      if (!hasCreatedMessage) {
+        this.messages.emitMessage(runId, assistantMsg);
+        hasCreatedMessage = true;
+      } else {
+        this.messages.updateMessage(runId, assistantMsg);
+      }
+    };
+
+    const startTime = Date.now();
+    const response = await turn.provider.complete({
+      model: opts.model,
+      reasoningEffort: opts.reasoningEffort,
+      reasoning: this.registry.resolveReasoning(opts.providerId, opts.model, opts.reasoningEffort),
+      systemPrompt: opts.systemPrompt,
+      messages,
+      tools: opts.tools
+    }, (chunk) => {
+      turn.checkCancelled();
+      if (chunk.content) accumulatedContent += chunk.content;
+      if (chunk.reasoningContent) accumulatedReasoning += chunk.reasoningContent;
+      emitStreamingMessage();
+    });
+
+    turn.checkCancelled();
+    await this.messages.flushMessageDbUpdate(msgId);
+
+    const promptTotal = this.recordUsage(turn, messages, response, startTime);
+
+    const finalMsg = this.buildAssistantMessage(turn, msgId, {
+      content: response.content || (response.toolCalls ? "Calling workspace tools..." : ""),
+      reasoningContent: response.reasoningContent,
+      rawResponse: response.toolCalls ? JSON.stringify(response.toolCalls) : undefined
+    });
+    if (!hasCreatedMessage) {
+      this.messages.emitMessage(runId, finalMsg);
+    } else {
+      this.messages.updateMessage(runId, finalMsg);
     }
 
-    return lastText;
+    return { response, promptTotal };
+  }
+
+  /** Assembles an assistant RunMessage carrying this loop's agent/model tags. */
+  private buildAssistantMessage(
+    turn: TurnContext,
+    msgId: string,
+    body: Pick<RunMessage, "content" | "reasoningContent" | "rawResponse">
+  ): RunMessage {
+    const { opts } = turn;
+    return {
+      id: msgId,
+      runId: turn.runId,
+      role: "assistant",
+      agentRole: opts.agentRole,
+      agentName: opts.agentName,
+      providerId: opts.providerId,
+      providerDisplayName: opts.providerDisplayName,
+      model: opts.model,
+      createdAt: new Date().toISOString(),
+      ...body
+    };
+  }
+
+  /**
+   * Logs token/cache usage (console + local file) and writes the usage_logs row
+   * with the locally computed cost. Returns the prompt's total token count, so
+   * the loop can use the REAL size for the next context-window check. Falls back
+   * to a chars-based estimate when the provider omitted usage.
+   */
+  private recordUsage(
+    turn: TurnContext,
+    messages: ChatMessage[],
+    response: CompletionResponse,
+    startTime: number
+  ): number {
+    const { runId, opts } = turn;
+    let usage = response.usage;
+    if (!usage) {
+      // Fallback estimation (e.g. for streaming OpenAI calls where usage chunk is omitted)
+      const promptText = (opts.systemPrompt || "") + messages.map(m => m.content || "").join("\n");
+      const estIn = Math.round(promptText.length / 3.5) || 1;
+      const estOut = Math.round((response.content || "").length / 3.5) || 1;
+      usage = { inputTokens: estIn, outputTokens: estOut, totalTokens: estIn + estOut };
+    }
+
+    const fresh = usage.inputTokens ?? 0;
+    const cacheRead = usage.cacheReadInputTokens ?? 0;
+    const cacheWrite = usage.cacheWriteInputTokens ?? 0;
+    const promptTotal = fresh + cacheRead + cacheWrite;
+    const hitPct = promptTotal > 0 ? Math.round((cacheRead / promptTotal) * 100) : 0;
+
+    // Prompt-cache measurement: one line per model call so cache hit-rate is
+    // observable live in the server console during a run. inputTokens is the
+    // fresh (full-rate) prompt; cacheRead is served cheaply from cache.
+    const line =
+      `[usage] ${new Date().toISOString()} run=${runId} role=${opts.agentRole ?? "main"} model=${opts.model} ` +
+      `in=${fresh} cacheRead=${cacheRead} cacheWrite=${cacheWrite} out=${usage.outputTokens ?? 0} cacheHit=${hitPct}%`;
+    console.log(line);
+    // Also append to a local log file so token/cache usage can be inspected
+    // after the fact (the console stream is otherwise lost in the dev terminal).
+    try {
+      const logPath = usageLogPath();
+      if (logPath) appendFileSync(logPath, line + "\n");
+    } catch {
+      // Best-effort only; never let logging break a run.
+    }
+
+    // Cost comes solely from the model's user-entered pricing (no built-in
+    // table, no name-based guessing). Unpriced models cost 0.
+    const pricing = this.registry.resolvePricing(opts.providerId, opts.model);
+    const cost = calculateCost(pricing, fresh, usage.outputTokens ?? 0, cacheRead, cacheWrite);
+
+    this.usageLogRepo.create({
+      runId,
+      agentRole: opts.agentRole ?? "main",
+      providerId: opts.providerId,
+      model: opts.model,
+      inputTokens: fresh,
+      outputTokens: usage.outputTokens ?? 0,
+      cacheReadTokens: cacheRead,
+      cacheWriteTokens: cacheWrite,
+      cacheHitRate: hitPct,
+      cost,
+      createdAt: new Date().toISOString(),
+      durationMs: Date.now() - startTime
+    }).catch(err => {
+      console.error(`[Database] Failed to write usage log to database: ${err.message}`);
+    });
+
+    return promptTotal;
+  }
+
+  /** Executes a response's tool calls in order, appending each result to the history. */
+  private async executeToolCalls(
+    turn: TurnContext,
+    run: Run,
+    messages: ChatMessage[],
+    response: CompletionResponse,
+    state: LoopState
+  ): Promise<void> {
+    const toolCalls = response.toolCalls ?? [];
+    state.toolCallsMade += toolCalls.length;
+    messages.push({
+      role: "assistant",
+      content: response.content || "",
+      toolCalls
+    });
+
+    for (const tc of toolCalls) {
+      turn.checkCancelled();
+      const result = await this.runToolCall(turn.runId, run, tc, turn.opts.agentRole, state);
+
+      this.messages.emitMessage(turn.runId, {
+        id: randomId("msg-tool"),
+        runId: turn.runId,
+        role: "tool",
+        agentRole: turn.opts.agentRole,
+        agentName: turn.opts.agentName,
+        content: result,
+        createdAt: new Date().toISOString()
+      });
+      messages.push({
+        role: "tool",
+        content: result,
+        tool_call_id: tc.id,
+        name: tc.function.name
+      });
+
+      state.verification.observe(tc, result);
+    }
+  }
+
+  /**
+   * Picks the corrective nudge for a turn that ended with no tool call, spending
+   * the matching budget. Priority: never acted at all > delegated but did not
+   * (fully) verify > stopped with open task-list items. Null = let the run finish.
+   */
+  private chooseNudge(responseText: string, opts: AgentRunOptions, state: LoopState): string | null {
+    if (opts.idleNudge && state.toolCallsMade === 0 && state.idleNudgesUsed < (opts.maxIdleNudges ?? 0)) {
+      state.idleNudgesUsed++;
+      return opts.idleNudge;
+    }
+
+    const verificationNudge = state.verification.pendingNudge(opts.postDelegationNudge);
+    if (verificationNudge && state.postDelegationNudgesUsed < (opts.maxPostDelegationNudges ?? 0)) {
+      state.postDelegationNudgesUsed++;
+      return verificationNudge;
+    }
+
+    if (state.toolCallsMade > 0 && state.taskListNudgesUsed < MAX_TASK_LIST_NUDGES && hasOpenTaskListItems(responseText)) {
+      state.taskListNudgesUsed++;
+      return OPEN_TASK_LIST_NUDGE;
+    }
+
+    return null;
   }
 
   /**
@@ -435,95 +531,40 @@ export class AgentLoop {
    * delegation, enforces the mode's gating policy, then runs workspace tools
    * (prompting for permission when required).
    */
-  private async runToolCall(runId: string, run: Run, toolCall: any, agentRole?: string, counters?: { directInspections: number }): Promise<string> {
+  private async runToolCall(runId: string, run: Run, toolCall: any, agentRole?: string, state?: LoopState): Promise<string> {
     // This run's mode strategy: it owns the gating policy (which tools are
     // allowed, what must be approved) so the checks below read its flags instead
     // of branching on run.mode directly.
     const strategy = getModeStrategy(run.mode);
+    const toolName = toolCall.function?.name;
 
     // Orchestrator-native tools (set_chat_title / update_plan / ask_user_question
     // / remember) run silently here — no filesystem/network I/O, no permission
     // gating. Each is a registered handler that owns its own per-mode rules (e.g.
     // update_plan rejects outside plan mode). See orchestrator/tools.
-    const nativeTool = getOrchestratorTool(toolCall.function?.name);
+    const nativeTool = getOrchestratorTool(toolName);
     if (nativeTool) {
       return nativeTool.execute(this.toolContext, runId, run, toolCall);
     }
 
-    // delegate_tasks fans out to coder sub-agents; the orchestrator runs their
-    // loops itself (the sub-agents' own tool calls are gated normally). Gated by
-    // mode FIRST: runs can switch modes mid-thread, so a model continuing a
-    // build-mode thread in plan mode may imitate the delegate calls in its
-    // history — without this check those would actually launch sub-agents.
-    if (toolCall.function?.name === "delegate_tasks" || toolCall.function?.name === "delegate_to_utility") {
+    // Delegation fans out to coder/utility sub-agents; the orchestrator runs
+    // their loops itself (the sub-agents' own tool calls are gated normally).
+    // Gated by mode FIRST: runs can switch modes mid-thread, so a model
+    // continuing a build-mode thread in plan mode may imitate the delegate calls
+    // in its history — without this check those would actually launch sub-agents.
+    if (toolName === "delegate_tasks" || toolName === "delegate_to_utility") {
       if (!strategy.allowsDelegation) {
-        return JSON.stringify({
-          success: false,
-          error: `Blocked: "${toolCall.function.name}" is not available in ${run.mode} mode. Delegation only runs in build-type modes. Ask the user to switch to Build mode to implement.`
-        });
+        return deny(`Blocked: "${toolName}" is not available in ${run.mode} mode. Delegation only runs in build-type modes. Ask the user to switch to Build mode to implement.`);
       }
-      if (toolCall.function.name === "delegate_tasks") {
-        return this.delegator.executeDelegateTasks(runId, run, toolCall);
-      }
-      // delegate_to_utility fans out to cheap utility sub-agents (lookups/renames).
-      return this.delegator.executeUtilityTasks(runId, run, toolCall);
+      return toolName === "delegate_tasks"
+        ? this.delegator.executeDelegateTasks(runId, run, toolCall)
+        : this.delegator.executeUtilityTasks(runId, run, toolCall);
     }
 
-    const toolName = toolCall.function?.name;
-    const isDelegated = !!(run.coderModel && run.coderProviderId);
-    const hasUtilityTier = !!(run.utilityModel && run.utilityProviderId);
-    const isArchitect = isDelegated && agentRole !== "coder" && agentRole !== "utility";
+    const denial = this.gateWorkspaceCall(run, toolName, strategy, agentRole, state);
+    if (denial) return denial;
 
-    // Architect exploration trap: with a utility tier available, the architect
-    // gets only a small per-turn budget of direct read-only calls; after that,
-    // exploration is redirected to delegate_to_utility (in-loop correction —
-    // the prompt rule alone does not hold weak models to this).
-    if (isArchitect && hasUtilityTier && strategy.allowsDelegation && READONLY_TOOLS.has(toolName) && counters) {
-      if (counters.directInspections >= ARCHITECT_DIRECT_INSPECT_BUDGET) {
-        return JSON.stringify({
-          success: false,
-          error: `You have used all ${ARCHITECT_DIRECT_INSPECT_BUDGET} direct inspection calls for this turn. Delegate exploration and summarization to the utility tier instead — it is cheaper and keeps your context lean. Example: delegate_to_utility({ tasks: [{ title: "Map project structure", instructions: "List the key directories and files under <path>, and summarize what each contains. Report back briefly." }] }).`
-        });
-      }
-      counters.directInspections++;
-    }
-
-    // Block the Architect (non-coder/non-utility role in a delegation setup) from calling write/delete/run_command directly.
-    if (isArchitect && !READONLY_TOOLS.has(toolName) && toolName !== "search_web" && toolName !== "fetch_url" && toolName !== "delegate_tasks" && toolName !== "delegate_to_utility" && toolName !== "update_plan" && toolName !== "set_chat_title" && toolName !== "ask_user_question" && toolName !== "remember") {
-      return JSON.stringify({
-        success: false,
-        error: `You are the ARCHITECT and cannot run "${toolName}" directly — this is by design, not a missing permission. Delegate it to a coder with delegate_tasks. Example: delegate_tasks({ tasks: [{ title: "<short title>", instructions: "<self-contained English instructions; include any shell command to run>" }] }). For a tiny read-only lookup use delegate_to_utility instead.`
-      });
-    }
-
-    // Block the Utility sub-agent from calling tools outside the utility set.
-    if (agentRole === "utility" && !UTILITY_TOOL_NAMES.has(toolName)) {
-      return JSON.stringify({
-        success: false,
-        error: `Blocked: Utility sub-agent cannot run "${toolName}". Utility is read-only (read_file/list_directory/search_files) plus move_file. Deletes, edits, writes, and shell commands must be delegated to a coder via delegate_tasks — not to utility.`
-      });
-    }
-
-    // HARD RULE: non-build modes are read-only. No file mutation, no run_command,
-    // no fetch_url/search_web — even if the user approves. The model must switch to Build
-    // mode before anything changes. We block here regardless of any grant.
-    if (!strategy.allowsMutation && MODIFYING_TOOLS.has(toolName)) {
-      return JSON.stringify({
-        success: false,
-        error: `Blocked: "${toolName}" is not allowed in ${run.mode} mode. ${run.mode === "chat" ? "Chat" : "Plan"} mode makes NO changes to the workspace and runs NO commands. Ask the user to switch to Build mode to implement.`
-      });
-    }
-
-    // Plan mode additionally allows ONLY read-only tools (it offers update_plan,
-    // handled above, plus inspection) — block anything else outright.
-    if (strategy.allowsPlanTool && !READONLY_TOOLS.has(toolName)) {
-      return JSON.stringify({
-        success: false,
-        error: `Blocked: "${toolName}" is not allowed in Plan mode. Plan mode makes NO changes and runs NO commands. Ask the user to switch to Build mode to implement.`
-      });
-    }
-
-    const isDangerous = DANGEROUS_TOOLS.has(toolCall.function?.name);
+    const isDangerous = DANGEROUS_TOOLS.has(toolName);
     // run_command / search_web / fetch_url require approval in most modes — but NOT in Full
     // Access mode, where the user has explicitly opted in to autonomous operation
     // with no interruptions. A matching standing grant also lets them run silently
@@ -534,10 +575,64 @@ export class AgentLoop {
     if (needsPermission) {
       const decision = await this.permissions.request(runId, run, toolCall);
       if (decision === "deny") {
-        return JSON.stringify({ success: false, error: "Permission denied by user." });
+        return deny("Permission denied by user.");
       }
       await this.messages.emitStatus(runId, "generating");
     }
     return executeWorkspaceToolAsync(run, toolCall);
+  }
+
+  /**
+   * The role/mode gating policy for a workspace tool call. Returns the refusal
+   * to send back to the model, or null when the call may proceed to the
+   * permission check + execution.
+   */
+  private gateWorkspaceCall(
+    run: Run,
+    toolName: string,
+    strategy: ModeStrategy,
+    agentRole?: string,
+    state?: LoopState
+  ): string | null {
+    const isDelegated = !!(run.coderModel && run.coderProviderId);
+    const hasUtilityTier = !!(run.utilityModel && run.utilityProviderId);
+    const isArchitect = isDelegated && agentRole !== "coder" && agentRole !== "utility";
+
+    // Architect exploration trap: with a utility tier available, the architect
+    // gets only a small per-turn budget of direct read-only calls; after that,
+    // exploration is redirected to delegate_to_utility (in-loop correction —
+    // the prompt rule alone does not hold weak models to this).
+    if (isArchitect && hasUtilityTier && strategy.allowsDelegation && READONLY_TOOLS.has(toolName) && state) {
+      if (state.directInspections >= ARCHITECT_DIRECT_INSPECT_BUDGET) {
+        return deny(`You have used all ${ARCHITECT_DIRECT_INSPECT_BUDGET} direct inspection calls for this turn. Delegate exploration and summarization to the utility tier instead — it is cheaper and keeps your context lean. Example: delegate_to_utility({ tasks: [{ title: "Map project structure", instructions: "List the key directories and files under <path>, and summarize what each contains. Report back briefly." }] }).`);
+      }
+      state.directInspections++;
+    }
+
+    // Architect mutation trap: every advertised mutating tool is rejected with a
+    // redirect to delegation — the only way the architect can change the project.
+    if (isArchitect && !READONLY_TOOLS.has(toolName) && !ARCHITECT_DIRECT_TOOLS.has(toolName)) {
+      return deny(`You are the ARCHITECT and cannot run "${toolName}" directly — this is by design, not a missing permission. Delegate it to a coder with delegate_tasks. Example: delegate_tasks({ tasks: [{ title: "<short title>", instructions: "<self-contained English instructions; include any shell command to run>" }] }). For a tiny read-only lookup use delegate_to_utility instead.`);
+    }
+
+    // The Utility sub-agent is held to its read-only(+move) tool set.
+    if (agentRole === "utility" && !UTILITY_TOOL_NAMES.has(toolName)) {
+      return deny(`Blocked: Utility sub-agent cannot run "${toolName}". Utility is read-only (read_file/list_directory/search_files) plus move_file. Deletes, edits, writes, and shell commands must be delegated to a coder via delegate_tasks — not to utility.`);
+    }
+
+    // HARD RULE: non-build modes are read-only. No file mutation, no run_command —
+    // even if the user approves. The model must switch to Build mode before
+    // anything changes. We block here regardless of any grant.
+    if (!strategy.allowsMutation && MODIFYING_TOOLS.has(toolName)) {
+      return deny(`Blocked: "${toolName}" is not allowed in ${run.mode} mode. ${run.mode === "chat" ? "Chat" : "Plan"} mode makes NO changes to the workspace and runs NO commands. Ask the user to switch to Build mode to implement.`);
+    }
+
+    // Plan mode additionally allows ONLY read-only tools (it offers update_plan,
+    // handled by the native-tool registry, plus inspection) — block anything else.
+    if (strategy.allowsPlanTool && !READONLY_TOOLS.has(toolName)) {
+      return deny(`Blocked: "${toolName}" is not allowed in Plan mode. Plan mode makes NO changes and runs NO commands. Ask the user to switch to Build mode to implement.`);
+    }
+
+    return null;
   }
 }

@@ -255,7 +255,7 @@ test("Orchestrator Integration Tests", async (t) => {
   });
 
   await t.test("System prompt - does not inject project guidance in chat mode", () => {
-    const prompt = buildSystemPrompt("Test Project", "/tmp/test-project", "chat", true);
+    const prompt = buildSystemPrompt({ projectName: "Test Project", projectPath: "/tmp/test-project", mode: "chat", shouldReadProjectGuidance: true });
 
     assert.ok(prompt.includes("CURRENT OPERATIONAL MODE: CHAT MODE"));
     assert.ok(prompt.includes("Do not claim you can run commands"));
@@ -271,10 +271,10 @@ test("Orchestrator Integration Tests", async (t) => {
     const projectPath = "/tmp/test-project";
     const delegation = { coderModel: "coder-model", maxSubAgents: 3, utilityModel: "utility-model" };
 
-    const chat = buildSystemPrompt(projectName, projectPath, "chat", true);
-    const plan = buildSystemPrompt(projectName, projectPath, "plan", true);
-    const build = buildSystemPrompt(projectName, projectPath, "accept_edits", true);
-    const architect = buildSystemPrompt(projectName, projectPath, "accept_edits", true, delegation);
+    const chat = buildSystemPrompt({ projectName, projectPath, mode: "chat", shouldReadProjectGuidance: true });
+    const plan = buildSystemPrompt({ projectName, projectPath, mode: "plan", shouldReadProjectGuidance: true });
+    const build = buildSystemPrompt({ projectName, projectPath, mode: "accept_edits", shouldReadProjectGuidance: true });
+    const architect = buildSystemPrompt({ projectName, projectPath, mode: "accept_edits", shouldReadProjectGuidance: true, delegation });
     const coder = buildCoderSystemPrompt(projectName, projectPath, "Implement the requested change");
     const utility = buildUtilitySystemPrompt(projectName, projectPath, "Find the relevant file");
 

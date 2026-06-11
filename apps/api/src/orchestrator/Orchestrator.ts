@@ -212,15 +212,15 @@ export class Orchestrator {
       const activePlan = strategy.allowsMutation ? this.planRepo.getActive(runId) : null;
       const planContext = formatActivePlan(activePlan);
 
-      const systemPrompt = buildSystemPrompt(
-        run.projectName,
-        run.projectPath,
-        run.mode,
-        run.mode !== "chat" && shouldReadProjectGuidance,
+      const systemPrompt = buildSystemPrompt({
+        projectName: run.projectName,
+        projectPath: run.projectPath,
+        mode: run.mode,
+        shouldReadProjectGuidance: run.mode !== "chat" && shouldReadProjectGuidance,
         delegation,
         memoryContext,
         planContext
-      );
+      });
 
       // When an approved plan exists, implementation is clearly expected. Weak
       // architects sometimes just say "I'll start now" and end the turn without

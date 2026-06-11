@@ -53,6 +53,101 @@ export function parseFilesChanged(summary: string): string[] | null {
   }
 }
 
+/** A delegated sub-task after validation/normalization. */
+interface DelegatedTask {
+  title: string;
+  instructions: string;
+  verify: boolean;
+}
+
+/** A sub-agent's report back to the architect. */
+interface TaskResult {
+  title: string;
+  summary: string;
+}
+
+/** Validates and normalizes a delegate_* call's task list, capped at `limit`. */
+function normalizeTasks(args: any, limit: number, fallbackTitle: string): DelegatedTask[] {
+  const rawTasks = Array.isArray(args.tasks) ? args.tasks : [];
+  return rawTasks
+    .filter((t: any) => t && typeof t.instructions === "string" && t.instructions.trim())
+    .slice(0, limit)
+    .map((t: any, i: number) => ({
+      title: typeof t.title === "string" && t.title.trim() ? t.title.trim() : `${fallbackTitle} ${i + 1}`,
+      instructions: String(t.instructions),
+      verify: t.verify === true
+    }));
+}
+
+/** File paths the architect explicitly attached to tasks (their `files` arrays). */
+function explicitTaskFiles(args: any): string[] {
+  const files: string[] = [];
+  if (!Array.isArray(args.tasks)) return files;
+  for (const t of args.tasks) {
+    if (!t || !Array.isArray(t.files)) continue;
+    for (const f of t.files) {
+      if (typeof f === "string" && f.trim()) files.push(f.trim());
+    }
+  }
+  return files;
+}
+
+const FILE_TOKEN_PATTERN = /[\w\-./]+\.\w{1,5}/g;
+const SOURCE_FILE_EXTENSIONS =
+  /\.(ts|js|vue|go|json|tsx|jsx|css|scss|sass|less|md|py|rb|rs|java|kt|swift|yaml|yml|toml|xml|sh|bash|zsh|fish|env|gitignore|editorconfig|prettierrc|eslintrc|npmrc|nvmrc)$/i;
+const ERROR_KEYWORDS = /\b(error|failed|could not|unable|exception|bug|broken|crash|regression)\b/i;
+
+/**
+ * Collects each result's changed files. The structured FILES_CHANGED line is
+ * authoritative when present; the prose scan is only a fallback for models that
+ * ignore the output format. Runs on the FULL summary (before trimming).
+ */
+function reportedChangedFiles(results: TaskResult[], tasks: DelegatedTask[]): string[] {
+  const files: string[] = [];
+  for (let i = 0; i < results.length; i++) {
+    const r = results[i];
+    // Verify-task reports describe files that were checked, not changed.
+    if (!r.summary || tasks[i]?.verify) continue;
+
+    const structured = parseFilesChanged(r.summary);
+    if (structured) {
+      files.push(...structured);
+      continue;
+    }
+
+    const matches = r.summary.match(FILE_TOKEN_PATTERN);
+    if (!matches) continue;
+    for (const m of matches) {
+      const basename = (m.split("/").pop() ?? m).toLowerCase();
+      if (SOURCE_FILE_EXTENSIONS.test(m) && !NON_FILE_TOKENS.has(basename)) {
+        files.push(m);
+      }
+    }
+  }
+  return files;
+}
+
+/** Flags summaries whose wording suggests the sub-agent hit problems. */
+function summaryWarnings(results: TaskResult[]): string[] {
+  return results
+    .filter(r => r.summary && ERROR_KEYWORDS.test(r.summary))
+    .map(r => `Task "${r.title}" may have issues — review the summary carefully.`);
+}
+
+/** Runs one sub-agent per task — concurrently only when the architect asked for it. */
+async function runTasks(
+  tasks: DelegatedTask[],
+  parallel: boolean,
+  runOne: (task: DelegatedTask) => Promise<TaskResult>
+): Promise<TaskResult[]> {
+  if (parallel) return Promise.all(tasks.map(runOne));
+  const results: TaskResult[] = [];
+  for (const task of tasks) {
+    results.push(await runOne(task));
+  }
+  return results;
+}
+
 /** One execution attempt for a delegated task: a model paired with its toolset. */
 interface SubAgentTier {
   providerId: string;
@@ -149,6 +244,82 @@ export class DelegationCoordinator implements Delegator {
     };
   }
 
+  /** Resolves a provider's display name from safe metadata, with fallbacks. */
+  private providerDisplayName(providerId: string | undefined, fallback: string): string {
+    const meta = this.registry.getSafeMetadata().find(p => p.id === providerId);
+    return meta?.displayName ?? providerId ?? fallback;
+  }
+
+  /**
+   * One coder sub-task: the coder tier, plus the architect as last resort when
+   * the preset enables fallback. verify tasks run the coder model READ-ONLY with
+   * a verdict-shaped prompt — cheap verification of earlier changes without the
+   * architect reading the files into its own expensive context — and never
+   * escalate to the architect (a failed verification must not turn into the
+   * architect doing expensive reads).
+   */
+  private runCoderTask(runId: string, run: Run, task: DelegatedTask): Promise<TaskResult> {
+    const projectContext = this.coderProjectContext(run);
+    const readonlyWorkspaceTools = WORKSPACE_TOOLS.filter(t => READONLY_TOOLS.has(t.function.name));
+    const tiers: SubAgentTier[] = [
+      {
+        providerId: run.coderProviderId!,
+        providerDisplayName: this.providerDisplayName(run.coderProviderId, "Coder"),
+        model: run.coderModel!,
+        reasoningEffort: run.coderReasoningEffort,
+        tools: task.verify ? [...readonlyWorkspaceTools] : [...WORKSPACE_TOOLS],
+        agentRole: "coder",
+        systemPrompt: task.verify
+          ? buildVerifierSystemPrompt(run.projectName, run.projectPath, task.title)
+          : buildCoderSystemPrompt(run.projectName, run.projectPath, task.title, projectContext),
+        // Tag every message with the sub-task title so the UI can render each
+        // coder sub-agent in its own window instead of merging them.
+        agentName: task.title
+      }
+    ];
+    if (this.fallbackEnabled(run) && !task.verify) {
+      tiers.push(this.architectTier(run, task, projectContext));
+    }
+    return this.runTaskWithFallback(runId, run, task, tiers);
+  }
+
+  /**
+   * One utility sub-task: the cheap utility tier, escalating (when the preset
+   * enables fallback) to the coder with the full toolset, then to the architect
+   * doing it directly.
+   */
+  private runUtilityTask(runId: string, run: Run, task: DelegatedTask): Promise<TaskResult> {
+    const projectContext = this.coderProjectContext(run);
+    const tiers: SubAgentTier[] = [
+      {
+        providerId: run.utilityProviderId!,
+        providerDisplayName: this.providerDisplayName(run.utilityProviderId, "Utility"),
+        model: run.utilityModel!,
+        reasoningEffort: run.utilityReasoningEffort,
+        tools: [...UTILITY_TOOLS],
+        agentRole: "utility",
+        systemPrompt: buildUtilitySystemPrompt(run.projectName, run.projectPath, task.title),
+        agentName: task.title
+      }
+    ];
+    if (this.fallbackEnabled(run)) {
+      if (run.coderModel && run.coderProviderId) {
+        tiers.push({
+          providerId: run.coderProviderId,
+          providerDisplayName: this.providerDisplayName(run.coderProviderId, "Coder"),
+          model: run.coderModel,
+          reasoningEffort: run.coderReasoningEffort,
+          tools: [...WORKSPACE_TOOLS],
+          agentRole: "coder",
+          systemPrompt: buildCoderSystemPrompt(run.projectName, run.projectPath, task.title, projectContext),
+          agentName: `${task.title} (coder fallback)`
+        });
+      }
+      tiers.push(this.architectTier(run, task, projectContext));
+    }
+    return this.runTaskWithFallback(runId, run, task, tiers);
+  }
+
   /** Builds the architect "last resort" tier: the run's own model + full toolset. */
   private architectTier(run: Run, task: { title: string }, projectContext?: string): SubAgentTier {
     return {
@@ -188,116 +359,19 @@ export class DelegationCoordinator implements Delegator {
       return JSON.stringify({ success: false, error: `Could not parse delegate_tasks arguments (${e.message}). This usually means the arguments were too large and got cut off. Do NOT paste file contents or large code into 'instructions' — the coder reads files itself with read_file. Keep each task's instructions short: describe what to change and cite file paths, then retry.` });
     }
 
-    const limit = this.maxSubAgentsFor(run);
-    const rawTasks = Array.isArray(args.tasks) ? args.tasks : [];
-    const tasks = rawTasks
-      .filter((t: any) => t && typeof t.instructions === "string" && t.instructions.trim())
-      .slice(0, limit)
-      .map((t: any, i: number) => ({
-        title: typeof t.title === "string" && t.title.trim() ? t.title.trim() : `Subtask ${i + 1}`,
-        instructions: String(t.instructions),
-        verify: t.verify === true
-      }));
-
+    const tasks = normalizeTasks(args, this.maxSubAgentsFor(run), "Subtask");
     if (tasks.length === 0) {
       return JSON.stringify({ success: false, error: "No valid tasks to delegate (each task needs non-empty instructions)." });
     }
 
-    // Collect file paths from task args (each task may have a `files` array)
-    const filesToVerify: string[] = [];
-    if (Array.isArray(args.tasks)) {
-      for (const t of args.tasks) {
-        if (t && Array.isArray(t.files)) {
-          for (const f of t.files) {
-            if (typeof f === "string" && f.trim()) {
-              filesToVerify.push(f.trim());
-            }
-          }
-        }
-      }
-    }
-
-    const coderMeta = this.registry.getSafeMetadata().find(p => p.id === run.coderProviderId);
-    const coderDisplayName = coderMeta ? coderMeta.displayName : run.coderProviderId;
     const parallel = !!args.parallel && tasks.length > 1;
+    const results = await runTasks(tasks, parallel, task => this.runCoderTask(runId, run, task));
 
-    const fallback = this.fallbackEnabled(run);
-    const projectContext = this.coderProjectContext(run);
-    const readonlyWorkspaceTools = WORKSPACE_TOOLS.filter(t => READONLY_TOOLS.has(t.function.name));
-    const runOne = (task: { title: string; instructions: string; verify: boolean }) => {
-      // verify tasks run the coder model READ-ONLY with a verdict-shaped prompt:
-      // cheap verification of earlier changes without the architect reading the
-      // files into its own expensive context.
-      const tiers: SubAgentTier[] = [
-        {
-          providerId: run.coderProviderId!,
-          providerDisplayName: coderDisplayName,
-          model: run.coderModel!,
-          reasoningEffort: run.coderReasoningEffort,
-          tools: task.verify ? [...readonlyWorkspaceTools] : [...WORKSPACE_TOOLS],
-          agentRole: "coder",
-          systemPrompt: task.verify
-            ? buildVerifierSystemPrompt(run.projectName, run.projectPath, task.title)
-            : buildCoderSystemPrompt(run.projectName, run.projectPath, task.title, projectContext),
-          // Tag every message with the sub-task title so the UI can render each
-          // coder sub-agent in its own window instead of merging them.
-          agentName: task.title
-        }
-      ];
-      // Last resort (only when the preset enables fallback): the architect takes
-      // control and does it directly. Never for verify tasks — a failed
-      // verification must not escalate into the architect doing expensive reads.
-      if (fallback && !task.verify) tiers.push(this.architectTier(run, task, projectContext));
-      return this.runTaskWithFallback(runId, run, task, tiers);
-    };
-
-    let results: { title: string; summary: string }[];
-    if (parallel) {
-      results = await Promise.all(tasks.map(runOne));
-    } else {
-      results = [];
-      for (const task of tasks) {
-        results.push(await runOne(task));
-      }
-    }
-
-    // Collect each result's changed files. The structured FILES_CHANGED line is
-    // authoritative when present; the prose scan is only a fallback for models
-    // that ignore the output format. Runs on the FULL summary (before trimming).
-    const fileExtPattern = /[\w\-./]+\.\w{1,5}/g;
-    const sourceExts =
-      /\.(ts|js|vue|go|json|tsx|jsx|css|scss|sass|less|md|py|rb|rs|java|kt|swift|yaml|yml|toml|xml|sh|bash|zsh|fish|env|gitignore|editorconfig|prettierrc|eslintrc|npmrc|nvmrc)$/i;
-    for (let i = 0; i < results.length; i++) {
-      const r = results[i];
-      // Verify-task reports describe files that were checked, not changed.
-      if (!r.summary || tasks[i]?.verify) continue;
-      const structured = parseFilesChanged(r.summary);
-      if (structured) {
-        filesToVerify.push(...structured);
-        continue;
-      }
-      const matches = r.summary.match(fileExtPattern);
-      if (matches) {
-        for (const m of matches) {
-          const basename = (m.split("/").pop() ?? m).toLowerCase();
-          if (sourceExts.test(m) && !NON_FILE_TOKENS.has(basename)) {
-            filesToVerify.push(m);
-          }
-        }
-      }
-    }
-
-    // Deduplicate
-    const uniqueFilesToVerify = [...new Set(filesToVerify)];
-
-    // Sub-agent success check — scan summaries for error keywords
-    const errorKeywords = /\b(error|failed|could not|unable|exception|bug|broken|crash|regression)\b/i;
-    const warnings: string[] = [];
-    for (const r of results) {
-      if (r.summary && errorKeywords.test(r.summary)) {
-        warnings.push(`Task "${r.title}" may have issues — review the summary carefully.`);
-      }
-    }
+    const uniqueFilesToVerify = [...new Set([
+      ...explicitTaskFiles(args),
+      ...reportedChangedFiles(results, tasks)
+    ])];
+    const warnings = summaryWarnings(results);
 
     // A call consisting purely of verify tasks IS the verification — don't ask
     // the architect to verify the verification.
@@ -357,70 +431,13 @@ export class DelegationCoordinator implements Delegator {
       return JSON.stringify({ success: false, error: `Could not parse delegate_to_utility arguments (${e.message}). This usually means they were too large and got cut off. Do NOT paste file contents into 'instructions' — utility reads files itself. Keep each task short: say what to look up and cite file paths, then retry.` });
     }
 
-    const rawTasks = Array.isArray(args.tasks) ? args.tasks : [];
-    const tasks = rawTasks
-      .filter((t: any) => t && typeof t.instructions === "string" && t.instructions.trim())
-      .slice(0, 3)
-      .map((t: any, i: number) => ({
-        title: typeof t.title === "string" && t.title.trim() ? t.title.trim() : `Lookup ${i + 1}`,
-        instructions: String(t.instructions)
-      }));
-
+    const tasks = normalizeTasks(args, 3, "Lookup");
     if (tasks.length === 0) {
       return JSON.stringify({ success: false, error: "No valid tasks to delegate (each task needs non-empty instructions)." });
     }
 
-    const utilityMeta = this.registry.getSafeMetadata().find(p => p.id === run.utilityProviderId);
-    const utilityDisplayName = utilityMeta ? utilityMeta.displayName : run.utilityProviderId;
-    const coderMeta = this.registry.getSafeMetadata().find(p => p.id === run.coderProviderId);
-    const coderDisplayName = coderMeta?.displayName ?? run.coderProviderId ?? "Coder";
     const parallel = !!args.parallel && tasks.length > 1;
-
-    const fallback = this.fallbackEnabled(run);
-    const projectContext = this.coderProjectContext(run);
-    const runOne = (task: { title: string; instructions: string }) => {
-      const tiers: SubAgentTier[] = [
-        {
-          providerId: run.utilityProviderId!,
-          providerDisplayName: utilityDisplayName,
-          model: run.utilityModel!,
-          reasoningEffort: run.utilityReasoningEffort,
-          tools: [...UTILITY_TOOLS],
-          agentRole: "utility",
-          systemPrompt: buildUtilitySystemPrompt(run.projectName, run.projectPath, task.title),
-          agentName: task.title
-        }
-      ];
-      // Resilience chain (only when the preset enables fallback): if the cheap
-      // utility errors out, escalate to the coder (full toolset, so it can
-      // actually write/delete), then to the architect doing it directly.
-      if (fallback) {
-        if (run.coderModel && run.coderProviderId) {
-          tiers.push({
-            providerId: run.coderProviderId,
-            providerDisplayName: coderDisplayName,
-            model: run.coderModel,
-            reasoningEffort: run.coderReasoningEffort,
-            tools: [...WORKSPACE_TOOLS],
-            agentRole: "coder",
-            systemPrompt: buildCoderSystemPrompt(run.projectName, run.projectPath, task.title, projectContext),
-            agentName: `${task.title} (coder fallback)`
-          });
-        }
-        tiers.push(this.architectTier(run, task, projectContext));
-      }
-      return this.runTaskWithFallback(runId, run, task, tiers);
-    };
-
-    let results: { title: string; summary: string }[];
-    if (parallel) {
-      results = await Promise.all(tasks.map(runOne));
-    } else {
-      results = [];
-      for (const task of tasks) {
-        results.push(await runOne(task));
-      }
-    }
+    const results = await runTasks(tasks, parallel, task => this.runUtilityTask(runId, run, task));
 
     return JSON.stringify({
       success: true,

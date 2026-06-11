@@ -35,6 +35,21 @@ export function getModeStrategy(mode?: string): ModeStrategy {
   return STRATEGIES[mode ?? ""] ?? buildStrategy;
 }
 
+/** Everything buildSystemPrompt composes a prompt from. All fields optional. */
+export interface SystemPromptOptions {
+  projectName?: string;
+  projectPath?: string;
+  mode?: string;
+  /** First model request of this run: tells the model to read guidance files. */
+  shouldReadProjectGuidance?: boolean;
+  /** Set when a coder model is configured — renders the architect instructions. */
+  delegation?: DelegationContext;
+  /** Pre-rendered REMEMBERED CONTEXT section (formatMemoryContext). */
+  memoryContext?: string;
+  /** Pre-rendered APPROVED PLAN section (formatActivePlan). */
+  planContext?: string;
+}
+
 /**
  * Builds the system prompt for a single-model workspace chat session. Picks the
  * mode strategy, then composes the shared sections around its prompt block:
@@ -42,15 +57,16 @@ export function getModeStrategy(mode?: string): ModeStrategy {
  * memory -> project context. A lightweight strategy (chat) returns its entire
  * prompt standalone, so no wrapping is applied.
  */
-export function buildSystemPrompt(
-  projectName?: string,
-  projectPath?: string,
-  mode?: string,
-  shouldReadProjectGuidance = false,
-  delegation?: DelegationContext,
-  memoryContext = "",
-  planContext = ""
-): string {
+export function buildSystemPrompt(options: SystemPromptOptions = {}): string {
+  const {
+    projectName,
+    projectPath,
+    mode,
+    shouldReadProjectGuidance = false,
+    delegation,
+    memoryContext = "",
+    planContext = ""
+  } = options;
   const strategy = getModeStrategy(mode);
   const ctx = { projectName, projectPath, shouldReadProjectGuidance, delegation, memoryContext };
 

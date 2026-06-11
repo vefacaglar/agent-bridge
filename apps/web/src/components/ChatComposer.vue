@@ -5,7 +5,10 @@ import { useCustomDialog } from '../composables/useCustomDialog';
 const { showAlert } = useCustomDialog();
 import type { PermissionDecision } from '../api/client';
 import type { MessageGroup } from '../lib/messageGroups';
-import { MODES_LIST, REASONING_EFFORTS, type ChatMode, type ModelOption } from '../composables/useComposerSettings';
+import { MODES_LIST, type ChatMode } from '../composables/useComposerSettings';
+import { useModelPicker } from '../composables/useModelPicker';
+import { formatModelName, formatContextLimit, getReasoningDesc } from '../lib/modelFormat';
+import type { ModelOption } from '../composables/useComposerSettings';
 import type { AgentPreset } from '@locagens/shared';
 import ConfirmationCard from './ConfirmationCard.vue';
 import PermissionCard from './PermissionCard.vue';
@@ -271,236 +274,26 @@ function selectModel(value: string) {
   showModelMenu.value = false;
 }
 
-// --- Redesigned Model Selector State & Logic ---
-const searchQuery = ref('');
-const searchInputRef = ref<HTMLInputElement | null>(null);
-const scrollContainerRef = ref<HTMLElement | null>(null);
-const collapsedProviders = ref<Record<string, boolean>>({});
-const favoriteModels = ref<string[]>([]);
-
-onMounted(() => {
-  const stored = localStorage.getItem('bm_favorite_models');
-  if (stored) {
-    try {
-      favoriteModels.value = JSON.parse(stored);
-    } catch (e) {
-      console.error(e);
-    }
-  }
+// --- Model picker dropdown: search / grouping / favorites / keyboard nav ---
+// (state and behavior live in useModelPicker; this component keeps only the
+// open/close state and the menu-switching keyboard shell)
+const picker = useModelPicker({
+  modelOptions: () => props.modelOptions,
+  selectedModel: () => props.selectedModel,
+  selectedReasoningEffort: () => props.selectedReasoningEffort,
+  commitModel: (value) => emit('update:selectedModel', value),
+  commitReasoningEffort: (value) => emit('update:selectedReasoningEffort', value)
 });
-
-function toggleFavorite(val: string) {
-  const idx = favoriteModels.value.indexOf(val);
-  if (idx > -1) {
-    favoriteModels.value.splice(idx, 1);
-  } else {
-    favoriteModels.value.push(val);
-  }
-  localStorage.setItem('bm_favorite_models', JSON.stringify(favoriteModels.value));
-}
-
-function isStarred(val: string): boolean {
-  return favoriteModels.value.includes(val);
-}
-
-function toggleProviderCollapse(providerId: string) {
-  collapsedProviders.value[providerId] = !collapsedProviders.value[providerId];
-}
-
-function isProviderCollapsed(providerId: string): boolean {
-  return !!collapsedProviders.value[providerId];
-}
-
-function formatContextLimit(limit?: number): string {
-  if (!limit) return '';
-  if (limit >= 1000000) {
-    return `${Math.round(limit / 1000000)}M`;
-  }
-  if (limit >= 1000) {
-    return `${Math.round(limit / 1000)}K`;
-  }
-  return String(limit);
-}
-
-function formatModelName(modelId: string): string {
-  let name = modelId.includes('/') ? modelId.split('/').pop()! : modelId;
-  const lowerName = name.toLowerCase();
-  
-  if (lowerName === 'claude-sonnet-4-6') return 'Claude Sonnet 4.6';
-  if (lowerName === 'claude-opus-4-8') return 'Claude Opus 4.8';
-  if (lowerName === 'claude-haiku-4-5-20251001') return 'Claude Haiku 4.5';
-  if (lowerName === 'deepseek-v4-pro') return 'DeepSeek V4 Pro';
-  if (lowerName === 'deepseek-v4-flash') return 'DeepSeek V4 Flash';
-  if (lowerName === 'deepseek-chat') return 'DeepSeek Chat';
-  if (lowerName === 'deepseek-reasoner') return 'DeepSeek Reasoner';
-
-  name = name.replace(/^claude-/i, 'Claude ');
-  name = name.replace(/^deepseek-/i, 'DeepSeek ');
-  name = name.replace(/^gpt-/i, 'GPT-');
-  name = name.replace(/^glm-/i, 'GLM ');
-  name = name.replace(/^kimi-/i, 'Kimi ');
-  name = name.replace(/^minimax-/i, 'MiniMax ');
-  name = name.replace(/^mimo-/i, 'Mimo ');
-  name = name.replace(/-/g, ' ');
-
-  return name.split(' ').map(word => {
-    if (!word) return '';
-    if (word === word.toUpperCase() && word.length > 1) return word;
-    return word.charAt(0).toUpperCase() + word.slice(1);
-  }).join(' ');
-}
-
-function getReasoningDesc(id: string): string {
-  const descriptions: Record<string, string> = {
-    default: 'Use provider default configuration',
-    none: 'Disable thinking/reasoning completely',
-    minimal: 'Minimal reasoning tokens and budget',
-    low: 'Low reasoning overhead',
-    medium: 'Balanced thinking depth',
-    high: 'High reasoning depth',
-    xhigh: 'Extra high reasoning depth',
-    max: 'Maximum reasoning depth'
-  };
-  return descriptions[id] || 'Reasoning parameter';
-}
-
-interface ProviderGroup {
-  providerId: string;
-  providerDisplayName: string;
-  models: ModelOption[];
-}
-
-const groupedModels = computed<ProviderGroup[]>(() => {
-  const groups: Record<string, ProviderGroup> = {};
-  const query = searchQuery.value.trim().toLowerCase();
-
-  const filtered = props.modelOptions.filter(opt => {
-    if (!query) return true;
-    return (
-      opt.model.toLowerCase().includes(query) ||
-      opt.label.toLowerCase().includes(query) ||
-      opt.providerId.toLowerCase().includes(query)
-    );
-  });
-
-  for (const option of filtered) {
-    const providerId = option.providerId;
-    const providerDisplayName = option.label.split(' / ')[0] || providerId;
-    if (!groups[providerId]) {
-      groups[providerId] = {
-        providerId,
-        providerDisplayName,
-        models: []
-      };
-    }
-    groups[providerId].models.push(option);
-  }
-
-  // Also auto-expand providers if there is search query
-  if (query) {
-    for (const pid of Object.keys(groups)) {
-      collapsedProviders.value[pid] = false;
-    }
-  }
-
-  return Object.values(groups).sort((a, b) => {
-    const nameA = a.providerDisplayName.toLowerCase();
-    const nameB = b.providerDisplayName.toLowerCase();
-    if (nameA.includes('deepseek') && !nameB.includes('deepseek')) return -1;
-    if (!nameA.includes('deepseek') && nameB.includes('deepseek')) return 1;
-    if (nameA.includes('opencode') && !nameB.includes('opencode')) return -1;
-    if (!nameA.includes('opencode') && nameB.includes('opencode')) return 1;
-    return a.providerDisplayName.localeCompare(b.providerDisplayName);
-  });
-});
-
-interface NavigableItem {
-  type: 'action' | 'model';
-  id: string;
-  label: string;
-  option?: ModelOption;
-}
-
-const navigableItems = computed<NavigableItem[]>(() => {
-  const items: NavigableItem[] = [];
-  items.push({
-    type: 'action',
-    id: 'add-provider',
-    label: '+ Add new provider'
-  });
-
-  for (const group of groupedModels.value) {
-    if (!isProviderCollapsed(group.providerId)) {
-      for (const model of group.models) {
-        items.push({
-          type: 'model',
-          id: model.value,
-          label: model.model,
-          option: model
-        });
-      }
-    }
-  }
-  return items;
-});
-
-const focusedIndex = ref(0);
-
-function isItemFocused(id: string): boolean {
-  const item = navigableItems.value[focusedIndex.value];
-  return item ? item.id === id : false;
-}
-
-function setFocusedItem(id: string) {
-  const idx = navigableItems.value.findIndex(item => item.id === id);
-  if (idx > -1) {
-    focusedIndex.value = idx;
-  }
-}
-
-watch(searchQuery, () => {
-  focusedIndex.value = navigableItems.value.length > 1 ? 1 : 0;
-});
-
-function scrollToFocusedItem() {
-  nextTick(() => {
-    const container = scrollContainerRef.value;
-    if (!container) return;
-    const focusedEl = container.querySelector('.focused');
-    if (!focusedEl) return;
-    
-    const containerTop = container.scrollTop;
-    const containerBottom = containerTop + container.clientHeight;
-    const elemTop = (focusedEl as HTMLElement).offsetTop;
-    const elemBottom = elemTop + (focusedEl as HTMLElement).offsetHeight;
-
-    if (elemTop < containerTop) {
-      container.scrollTop = elemTop;
-    } else if (elemBottom > containerBottom) {
-      container.scrollTop = elemBottom - container.clientHeight;
-    }
-  });
-}
-
-function cycleReasoningEffort(option: ModelOption, direction: number) {
-  if (!option.reasoningOptions || option.reasoningOptions.length === 0) return;
-  
-  const options = [
-    { id: 'default', label: 'Default' },
-    ...option.reasoningOptions.map(opt => ({
-      id: opt.id,
-      label: opt.label || REASONING_EFFORTS.find(x => x.id === opt.id)?.label || opt.id
-    }))
-  ];
-
-  if (props.selectedModel !== option.value) {
-    emit('update:selectedModel', option.value);
-  }
-
-  const currentIndex = options.findIndex(x => x.id === props.selectedReasoningEffort);
-  const nextIndex = (Math.max(0, currentIndex) + direction + options.length) % options.length;
-  emit('update:selectedReasoningEffort', options[nextIndex].id);
-}
+const {
+  searchQuery,
+  groupedModels,
+  isItemFocused,
+  setFocusedItem,
+  toggleFavorite,
+  isStarred,
+  toggleProviderCollapse,
+  isProviderCollapsed
+} = picker;
 
 function handleAddProvider() {
   emit('open-settings', 'providers');
@@ -512,20 +305,8 @@ function handleManagePresets() {
   showPresetMenu.value = false;
 }
 
-watch(showModelMenu, async (open) => {
-  if (open) {
-    searchQuery.value = '';
-    await nextTick();
-    searchInputRef.value?.focus();
-    
-    const activeIdx = navigableItems.value.findIndex(item => item.type === 'model' && item.id === props.selectedModel);
-    if (activeIdx > -1) {
-      focusedIndex.value = activeIdx;
-      scrollToFocusedItem();
-    } else {
-      focusedIndex.value = navigableItems.value.length > 1 ? 1 : 0;
-    }
-  }
+watch(showModelMenu, (open) => {
+  if (open) picker.onMenuOpened();
 });
 
 const activeReasoningLabel = computed(() =>
@@ -681,19 +462,13 @@ function handleKeyDown(e: KeyboardEvent) {
       }
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
-      if (navigableItems.value.length > 0) {
-        focusedIndex.value = (focusedIndex.value + 1) % navigableItems.value.length;
-        scrollToFocusedItem();
-      }
+      picker.moveFocus(1);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      if (navigableItems.value.length > 0) {
-        focusedIndex.value = (focusedIndex.value - 1 + navigableItems.value.length) % navigableItems.value.length;
-        scrollToFocusedItem();
-      }
+      picker.moveFocus(-1);
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      const item = navigableItems.value[focusedIndex.value];
+      const item = picker.focusedItem.value;
       if (item) {
         if (item.type === 'action' && item.id === 'add-provider') {
           handleAddProvider();
@@ -702,10 +477,10 @@ function handleKeyDown(e: KeyboardEvent) {
         }
       }
     } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-      const item = navigableItems.value[focusedIndex.value];
+      const item = picker.focusedItem.value;
       if (item && item.type === 'model' && item.option) {
         e.preventDefault();
-        cycleReasoningEffort(item.option, e.key === 'ArrowRight' ? 1 : -1);
+        picker.cycleReasoningOnFocused(e.key === 'ArrowRight' ? 1 : -1);
       }
     }
     return;
@@ -1014,7 +789,7 @@ onBeforeUnmount(() => {
                   <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                 </svg>
                 <input
-                  ref="searchInputRef"
+                  :ref="(el: unknown) => { picker.searchInputRef.value = el as HTMLInputElement | null; }"
                   v-model="searchQuery"
                   type="text"
                   placeholder="Search models"
@@ -1024,7 +799,7 @@ onBeforeUnmount(() => {
               </div>
 
               <!-- Models List scroll container -->
-              <div class="models-list-scroll" ref="scrollContainerRef">
+              <div class="models-list-scroll" :ref="(el: unknown) => { picker.scrollContainerRef.value = el as HTMLElement | null; }">
                 <div
                   v-for="group in groupedModels"
                   :key="group.providerId"
