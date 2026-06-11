@@ -21,17 +21,31 @@ function mapRowToMessage(row: any): RunMessage {
 }
 
 export class MessageRepository implements IMessageRepository {
+  // Messages are the hottest write path (one insert per message plus a throttled
+  // update per second while streaming), so statements are compiled once per SQL
+  // string and reused instead of re-prepared on every call.
+  private statementCache = new Map<string, ReturnType<DatabaseSync["prepare"]>>();
+
   constructor(private db: DatabaseSync) {}
 
+  private prepareCached(sql: string): ReturnType<DatabaseSync["prepare"]> {
+    let stmt = this.statementCache.get(sql);
+    if (!stmt) {
+      stmt = this.db.prepare(sql);
+      this.statementCache.set(sql, stmt);
+    }
+    return stmt;
+  }
+
   async create(message: RunMessage): Promise<void> {
-    const stmt = this.db.prepare(`
+    const stmt = this.prepareCached(`
       INSERT INTO messages (
         id, run_id, role, agent_role, agent_name,
         provider_id, provider_display_name, model,
         content, reasoning_content, raw_response, created_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    const updateRunStmt = this.db.prepare("UPDATE runs SET updated_at = ?, last_active_at = ? WHERE id = ?");
+    const updateRunStmt = this.prepareCached("UPDATE runs SET updated_at = ?, last_active_at = ? WHERE id = ?");
 
     await runDbWrite({ op: "message.create", args: { message } }, () => {
       stmt.run(
@@ -53,7 +67,7 @@ export class MessageRepository implements IMessageRepository {
   }
 
   listByRunId(runId: string): RunMessage[] {
-    const stmt = this.db.prepare("SELECT * FROM messages WHERE run_id = ? ORDER BY created_at ASC");
+    const stmt = this.prepareCached("SELECT * FROM messages WHERE run_id = ? ORDER BY created_at ASC");
     const rows = stmt.all(runId) as any[];
     return rows.map(mapRowToMessage);
   }
@@ -81,7 +95,7 @@ export class MessageRepository implements IMessageRepository {
     const sql = `UPDATE messages SET ${fields.join(", ")} WHERE id = ?`;
     values.push(id);
 
-    const stmt = this.db.prepare(sql);
+    const stmt = this.prepareCached(sql);
     await runDbWrite({ op: "message.update", args: { id, updates } }, () => stmt.run(...values));
   }
 }

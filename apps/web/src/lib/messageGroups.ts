@@ -25,15 +25,31 @@ export interface AgentSummary {
   children?: MessageGroup[];
 }
 
-/** Whether an assistant message carries serialized tool calls in rawResponse. */
-export function hasToolCalls(message: RunMessage): boolean {
-  if (!message.rawResponse) return false;
+// groupMessages re-runs over the FULL message list on every streaming flush, so
+// without memoization every assistant message's rawResponse would be JSON.parsed
+// once per frame. Message objects are replaced immutably on update, so a WeakMap
+// keyed by the message object is both correct and self-cleaning.
+const parsedToolCallsCache = new WeakMap<RunMessage, any[]>();
+
+function parseToolCalls(message: RunMessage): any[] {
+  if (!message.rawResponse) return [];
+  const cached = parsedToolCallsCache.get(message);
+  if (cached) return cached;
+
+  let toolCalls: any[] = [];
   try {
     const parsed = JSON.parse(message.rawResponse);
-    return Array.isArray(parsed) && parsed.length > 0;
+    if (Array.isArray(parsed)) toolCalls = parsed;
   } catch (e) {
-    return false;
+    // Malformed rawResponse: treat as no tool calls
   }
+  parsedToolCallsCache.set(message, toolCalls);
+  return toolCalls;
+}
+
+/** Whether an assistant message carries serialized tool calls in rawResponse. */
+export function hasToolCalls(message: RunMessage): boolean {
+  return parseToolCalls(message).length > 0;
 }
 
 /** Treats a tool response as successful unless it explicitly reports failure. */
@@ -185,14 +201,8 @@ function buildFlatGroups(messages: RunMessage[]): MessageGroup[] {
       result.push({ type: 'system', id: msg.id, message: msg, toolCalls: [], toolResponses: [] });
       i++;
     } else if (msg.role === 'assistant') {
-      if (hasToolCalls(msg)) {
-        let toolCalls: any[] = [];
-        try {
-          toolCalls = JSON.parse(msg.rawResponse || '[]');
-        } catch (e) {
-          toolCalls = [];
-        }
-
+      const toolCalls = parseToolCalls(msg);
+      if (toolCalls.length > 0) {
         const toolResponses: RunMessage[] = [];
         let j = i + 1;
         while (j < messages.length && messages[j].role === 'tool') {

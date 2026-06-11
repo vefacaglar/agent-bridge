@@ -173,6 +173,10 @@ try {
   // Ignored if column already exists
 }
 
+// Covers MessageRepository.listByRunId (WHERE run_id ... ORDER BY created_at):
+// messages is the fastest-growing table and is scanned on every run open.
+db.exec("CREATE INDEX IF NOT EXISTS idx_messages_run ON messages(run_id, created_at)");
+
 // Create Projects Table
 db.exec(`
   CREATE TABLE IF NOT EXISTS projects (

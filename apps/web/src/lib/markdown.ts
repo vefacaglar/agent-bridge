@@ -4,6 +4,17 @@ import 'highlight.js/styles/github-dark.css';
 
 const marked = new Marked({ gfm: true, breaks: true });
 
+// highlightAuto tries every registered language, so it is by far the most
+// expensive path in rendering — and during streaming an unlabeled code block is
+// re-detected on every frame (the cache only hits once content stops changing).
+// Bound the cost: only auto-detect short blocks, and only against the languages
+// that realistically appear in this tool's output.
+const AUTO_HIGHLIGHT_MAX_CHARS = 3000;
+const AUTO_HIGHLIGHT_LANGUAGES = [
+  'javascript', 'typescript', 'python', 'json', 'bash', 'shell',
+  'xml', 'css', 'sql', 'java', 'c', 'cpp', 'go', 'rust', 'yaml', 'markdown'
+].filter((lang) => hljs.getLanguage(lang));
+
 let codeBlockCounter = 0;
 let currentPrefix = '';
 
@@ -23,9 +34,9 @@ marked.use({
         } catch (e) {
           console.error('highlight.js error:', e);
         }
-      } else if (!lang) {
+      } else if (!lang && code.length <= AUTO_HIGHLIGHT_MAX_CHARS) {
         try {
-          const result = hljs.highlightAuto(code);
+          const result = hljs.highlightAuto(code, AUTO_HIGHLIGHT_LANGUAGES);
           highlightedCode = result.value;
           hasHighlighting = true;
         } catch (e) {

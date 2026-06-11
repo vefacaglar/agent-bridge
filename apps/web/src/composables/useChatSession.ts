@@ -193,10 +193,15 @@ export function useChatSession(options: ChatSessionOptions) {
     pendingPermissionRequest.value = null;
     pendingQuestionRequest.value = null;
 
-    await loadMessages(latestRun.id);
-    currentPlan.value = await api.getRunPlan(latestRun.id);
-    await refreshRunUsage(latestRun.id);
-    await hydratePendingRequest(latestRun.id);
+    // These four loads are independent of each other — fetch them in parallel
+    // so opening a run costs one round-trip instead of four sequential ones.
+    const [, plan] = await Promise.all([
+      loadMessages(latestRun.id),
+      api.getRunPlan(latestRun.id),
+      refreshRunUsage(latestRun.id),
+      hydratePendingRequest(latestRun.id)
+    ]);
+    currentPlan.value = plan;
 
     if (ACTIVE_STATUSES.includes(latestRun.status)) {
       isRunning.value = true;

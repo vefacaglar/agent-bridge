@@ -75,6 +75,16 @@ const MAX_TASK_LIST_NUDGES = 1;
 const ARCHITECT_DIRECT_INSPECT_BUDGET = 4;
 
 /**
+ * Minimum gap between message_updated SSE emissions during token streaming.
+ * Every emission carries the message's FULL accumulated content, so emitting on
+ * every chunk makes total stream traffic grow quadratically with response
+ * length. The DB write is already throttled (RunMessageStream); this throttles
+ * the wire. The final message emitted after completion always carries the full
+ * text, so trailing chunks are never lost.
+ */
+const STREAM_EMIT_INTERVAL_MS = 80;
+
+/**
  * The tools an architect may call directly. Everything else it is advertised is
  * a trap that redirects to delegation (see gateWorkspaceCall). Read-only tools
  * are also allowed, but budgeted when a utility tier exists.
@@ -338,6 +348,7 @@ export class AgentLoop {
     };
 
     const startTime = Date.now();
+    let lastEmitTime = 0;
     const response = await turn.provider.complete({
       model: opts.model,
       reasoningEffort: opts.reasoningEffort,
@@ -349,7 +360,11 @@ export class AgentLoop {
       turn.checkCancelled();
       if (chunk.content) accumulatedContent += chunk.content;
       if (chunk.reasoningContent) accumulatedReasoning += chunk.reasoningContent;
-      emitStreamingMessage();
+      const now = Date.now();
+      if (!hasCreatedMessage || now - lastEmitTime >= STREAM_EMIT_INTERVAL_MS) {
+        lastEmitTime = now;
+        emitStreamingMessage();
+      }
     });
 
     turn.checkCancelled();
@@ -408,8 +423,9 @@ export class AgentLoop {
     let usage = response.usage;
     if (!usage) {
       // Fallback estimation (e.g. for streaming OpenAI calls where usage chunk is omitted)
-      const promptText = (opts.systemPrompt || "") + messages.map(m => m.content || "").join("\n");
-      const estIn = Math.round(promptText.length / 3.5) || 1;
+      const promptChars = (opts.systemPrompt || "").length +
+        messages.reduce((sum, m) => sum + (typeof m.content === "string" ? m.content.length : 0), 0);
+      const estIn = Math.round(promptChars / 3.5) || 1;
       const estOut = Math.round((response.content || "").length / 3.5) || 1;
       usage = { inputTokens: estIn, outputTokens: estOut, totalTokens: estIn + estOut };
     }
