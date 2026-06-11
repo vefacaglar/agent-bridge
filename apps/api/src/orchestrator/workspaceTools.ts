@@ -79,13 +79,21 @@ export const WORKSPACE_TOOLS = [
     type: "function" as const,
     function: {
       name: "read_file",
-      description: "Read a workspace file.",
+      description: "Read a workspace file. Large files are returned in windows of up to 2000 lines; the result then includes total_lines and a notice telling you which offset to request next.",
       parameters: {
         type: "object",
         properties: {
           path: {
             type: "string",
             description: "Workspace-relative file path."
+          },
+          offset: {
+            type: "number",
+            description: "1-based line number to start reading from. Use together with limit to page through large files."
+          },
+          limit: {
+            type: "number",
+            description: "Maximum number of lines to return (default and cap: 2000)."
           }
         },
         required: ["path"]
@@ -815,7 +823,7 @@ export function executeWorkspaceTool(run: Run, toolCall: ToolCall): string {
         if (fs.statSync(absolutePath).isDirectory()) {
           throw new Error(`Path '${args.path}' is a directory, not a file. Use list_directory instead.`);
         }
-        return JSON.stringify({ success: true, content: fs.readFileSync(absolutePath, "utf-8") });
+        return JSON.stringify(readFileWindow(fs.readFileSync(absolutePath, "utf-8"), args));
       }
       case "list_directory": {
         const absolutePath = resolveInside(baseDir, requirePath(args.path));
@@ -871,8 +879,15 @@ export function executeWorkspaceTool(run: Run, toolCall: ToolCall): string {
         // Network access, so it is gated like run_command. Returns a promise
         // that the caller awaits via executeWorkspaceToolAsync.
         return JSON.stringify({ success: false, error: "fetch_url must be executed via executeWorkspaceToolAsync." });
-      default:
-        throw new Error(`Unknown function: ${toolCall.function.name}`);
+      default: {
+        // A self-correcting error: weak models hallucinate tool names, and a bare
+        // "unknown function" dead-ends them. Listing the real names lets the model
+        // fix its call on the next turn.
+        const knownTools = WORKSPACE_TOOLS.map(t => t.function.name).join(", ");
+        throw new Error(
+          `Unknown tool "${toolCall.function.name}" — it does not exist. Use one of these exact tool names instead: ${knownTools}.`
+        );
+      }
     }
   } catch (err: any) {
     return JSON.stringify({ success: false, error: err.message });
@@ -1090,4 +1105,51 @@ function truncateOutput(output: string): string {
   const MAX = 20_000;
   if (output.length <= MAX) return output;
   return output.slice(0, MAX) + `\n... [output truncated, ${output.length - MAX} more characters]`;
+}
+
+// read_file paging caps. Without them a single read of a lockfile or a minified
+// bundle blows up the model's context window in one call.
+const READ_FILE_MAX_LINES = 2_000;
+const READ_FILE_MAX_CHARS = 60_000;
+
+/**
+ * Slices a file's content to the requested offset/limit window, capped at
+ * READ_FILE_MAX_LINES / READ_FILE_MAX_CHARS. When the window does not cover the
+ * whole file, the result carries total_lines, the returned range, and a notice
+ * telling the model how to page for the rest.
+ */
+function readFileWindow(full: string, args: any): Record<string, unknown> {
+  const lines = full.split("\n");
+  const offset = Math.max(1, Math.floor(Number(args.offset) || 1));
+  const requested = Math.floor(Number(args.limit) || READ_FILE_MAX_LINES);
+  const limit = Math.min(READ_FILE_MAX_LINES, Math.max(1, requested));
+
+  const window = lines.slice(offset - 1, offset - 1 + limit);
+  let content = window.join("\n");
+  let charClipped = false;
+  if (content.length > READ_FILE_MAX_CHARS) {
+    content = content.slice(0, READ_FILE_MAX_CHARS);
+    charClipped = true;
+  }
+
+  const endLine = charClipped
+    ? offset - 1 + content.split("\n").length
+    : offset - 1 + window.length;
+  const coversWholeFile = offset === 1 && !charClipped && endLine >= lines.length;
+  if (coversWholeFile) {
+    return { success: true, content };
+  }
+
+  return {
+    success: true,
+    content,
+    total_lines: lines.length,
+    returned_lines: `${offset}-${endLine}`,
+    notice:
+      `File has ${lines.length} lines; this result covers lines ${offset}-${endLine}` +
+      (charClipped ? ` (clipped at ${READ_FILE_MAX_CHARS} characters)` : "") +
+      (endLine < lines.length
+        ? `. Call read_file again with offset=${endLine + 1} to continue reading. Prefer search_files to locate the relevant section instead of paging through the whole file.`
+        : ".")
+  };
 }

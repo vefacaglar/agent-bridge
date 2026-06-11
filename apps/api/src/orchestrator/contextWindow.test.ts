@@ -92,6 +92,33 @@ test("compactHistory inserts exactly one marker with tool names and paths", () =
   assert.equal(result.messages[1], markers[0]);
 });
 
+test("compactHistory marker restates the original task", () => {
+  const messages = buildHistory(20);
+  const result = compactHistory(messages, 500);
+  assert.ok(result);
+  const marker = result.messages[1];
+  assert.match(marker.content, /Your task is still: "Original task: build the thing"/);
+});
+
+test("compactHistory clips oversized tool results when eviction alone falls short", () => {
+  // 4 huge pairs + trailing = 6 units; everything is inside the pinned tail, so
+  // eviction can remove nothing — clipping must kick in instead.
+  const messages = buildHistory(4, 40_000);
+  const before = estimateTokens(messages, "");
+  const result = compactHistory(messages, Math.floor(before * 0.3));
+  assert.ok(result);
+  assert.equal(result.evictedCount, 0);
+  assert.ok(result.clippedCount > 0);
+  // Clipped results are stubs; pairing is preserved.
+  const stubs = result.messages.filter(m => m.role === "tool" && m.content.startsWith("[STALE TOOL RESULT REMOVED"));
+  assert.equal(stubs.length, result.clippedCount);
+  for (const stub of stubs) assert.ok(stub.tool_call_id);
+  // The most recent tool result keeps its full payload.
+  const lastToolMsg = [...result.messages].reverse().find(m => m.role === "tool");
+  assert.ok(lastToolMsg && lastToolMsg.content.length >= 40_000);
+  assert.ok(estimateTokens(result.messages, "") < before);
+});
+
 test("compactHistory shrinks the estimate below the original", () => {
   const messages = buildHistory(30, 1000);
   const before = estimateTokens(messages, "");

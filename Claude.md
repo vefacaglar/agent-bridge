@@ -346,7 +346,7 @@ Tools are defined and executed in `workspaceTools.ts`:
 write_file(path, content)
 edit_file(path, old_string, new_string, replace_all?)
 delete_file(path)
-read_file(path)
+read_file(path, offset?, limit?)   large files paged in windows of ≤2000 lines
 list_directory(path)
 create_directory(path)
 move_file(source_path, destination_path)

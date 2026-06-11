@@ -11,7 +11,7 @@ import type { PermissionCoordinator } from "./PermissionCoordinator.js";
 import { randomId } from "./ids.js";
 import type { IUsageLogRepository } from "../database/repositories.js";
 import { calculateCost } from "./pricing.js";
-import { estimateTokens, compactHistory, COMPACT_TRIGGER_RATIO, COMPACT_TARGET_RATIO } from "./contextWindow.js";
+import { estimateTokens, compactHistory, COMPACT_TRIGGER_RATIO, COMPACT_TARGET_RATIO, DEFAULT_CONTEXT_LIMIT } from "./contextWindow.js";
 
 /** The model + toolset + prompt a single agent loop runs with. */
 export interface AgentRunOptions {
@@ -51,6 +51,21 @@ export interface AgentRunOptions {
 export interface Delegator {
   executeDelegateTasks(runId: string, run: Run, toolCall: any): Promise<string>;
   executeUtilityTasks(runId: string, run: Run, toolCall: any): Promise<string>;
+}
+
+// One-shot reminder injected when the agent ends its turn mid-run with unchecked
+// <task_list> items and no tool call — the classic weak-model "I'll do X next"
+// stall, after it has already started working (the idle nudge only covers the
+// zero-tool-call case). Capped at one per run to avoid loops.
+const OPEN_TASK_LIST_NUDGE =
+  "Your <task_list> still has unchecked '- [ ]' items, but you ended your turn without calling any tool. " +
+  "Either continue the work with your tools NOW, or — if you are blocked or the remaining items are intentionally out of scope — say so explicitly and update the list.";
+const MAX_TASK_LIST_NUDGES = 1;
+
+/** True when the reply carries a <task_list> with at least one unchecked item. */
+function hasOpenTaskListItems(text: string): boolean {
+  const match = text.match(/<task_list>([\s\S]*?)(?:<\/task_list>|$)/);
+  return !!match && /-\s*\[\s\]/.test(match[1]);
 }
 
 function usageLogPath(): string | null {
@@ -105,6 +120,7 @@ export class AgentLoop {
     // nudges we've already spent (see AgentRunOptions.idleNudge).
     let toolCallsMade = 0;
     let nudgesUsed = 0;
+    let taskListNudgesUsed = 0;
     // Tracks delegation state for post-delegation verification nudges.
     let lastToolWasDelegation = false;
     let postDelegationNudgesUsed = 0;
@@ -114,16 +130,17 @@ export class AgentLoop {
 
     // Context-window enforcement: compact the history in chunks when the prompt
     // nears the model's configured limit. lastPromptTotal carries the REAL token
-    // count from the previous response's usage; the chars/4 estimate only covers
-    // the cold start (first call of a continuation).
-    const contextLimit = this.registry.resolveContextLimit(opts.providerId, opts.model);
+    // count from the previous response's usage; the chars estimate only covers
+    // the cold start (first call of a continuation). Models without a configured
+    // limit fall back to a conservative default — no model runs unprotected.
+    const contextLimit = this.registry.resolveContextLimit(opts.providerId, opts.model) || DEFAULT_CONTEXT_LIMIT;
     let lastPromptTotal = 0;
 
     let completionDone = false;
     while (!completionDone) {
       checkCancelled();
 
-      if (contextLimit) {
+      {
         const estimated = lastPromptTotal || estimateTokens(currentMessages, opts.systemPrompt);
         if (estimated >= COMPACT_TRIGGER_RATIO * contextLimit) {
           const compacted = compactHistory(currentMessages, Math.floor(COMPACT_TARGET_RATIO * contextLimit));
@@ -133,7 +150,7 @@ export class AgentLoop {
             currentMessages.length = 0;
             currentMessages.push(...compacted.messages);
             lastPromptTotal = 0; // stale after compaction; re-estimate until fresh usage arrives
-            console.log(`[context] compacted run=${runId} role=${opts.agentRole ?? "main"} evicted=${compacted.evictedCount} limit=${contextLimit}`);
+            console.log(`[context] compacted run=${runId} role=${opts.agentRole ?? "main"} evicted=${compacted.evictedCount} clipped=${compacted.clippedCount} limit=${contextLimit}`);
           }
         }
       }
@@ -188,8 +205,8 @@ export class AgentLoop {
       if (!usage) {
         // Fallback estimation (e.g. for streaming OpenAI calls where usage chunk is omitted)
         const promptText = (opts.systemPrompt || "") + messages.map(m => m.content || "").join("\n");
-        const estIn = Math.round(promptText.length / 3.8) || 1;
-        const estOut = Math.round((response.content || "").length / 3.8) || 1;
+        const estIn = Math.round(promptText.length / 3.5) || 1;
+        const estOut = Math.round((response.content || "").length / 3.5) || 1;
         usage = {
           inputTokens: estIn,
           outputTokens: estOut,
@@ -381,6 +398,16 @@ export class AgentLoop {
         const completenessNudge = `You verified ${filesVerified.size}/${filesToVerify.length} files. Please also verify: ${remaining.join(", ")} before marking tasks complete.`;
         currentMessages.push({ role: "assistant", content: response.content || "" });
         currentMessages.push({ role: "user", content: completenessNudge });
+      } else if (
+        toolCallsMade > 0 &&
+        taskListNudgesUsed < MAX_TASK_LIST_NUDGES &&
+        hasOpenTaskListItems(response.content || "")
+      ) {
+        // The agent worked, then stopped mid-task-list without acting or
+        // declaring a blocker. Remind it once (invisibly, like the other nudges).
+        taskListNudgesUsed++;
+        currentMessages.push({ role: "assistant", content: response.content || "" });
+        currentMessages.push({ role: "user", content: OPEN_TASK_LIST_NUDGE });
       } else {
         completionDone = true;
       }
