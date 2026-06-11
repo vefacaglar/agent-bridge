@@ -1,5 +1,5 @@
 {
-  "name": "@agent-bridge/web",
+  "name": "@locagens/web",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@agent-bridge/shared": "workspace:*",
+    "@locagens/shared": "workspace:*",
     "@vueuse/core": "^14.3.0",
     "highlight.js": "^11.11.1",
     "marked": "^18.0.5",

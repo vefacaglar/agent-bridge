@@ -1,5 +1,5 @@
 import { computed, ref, watch, type Ref } from 'vue';
-import type { Run, Project } from '@agent-bridge/shared';
+import type { Run, Project } from '@locagens/shared';
 import { api } from '../api/client';
 import { DEFAULT_PROJECT_PATH } from '../lib/format';
 import { useCustomDialog } from './useCustomDialog';

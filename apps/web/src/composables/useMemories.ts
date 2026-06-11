@@ -1,5 +1,5 @@
 import { ref } from 'vue';
-import type { Memory, MemoryCategory, MemoryScope } from '@agent-bridge/shared';
+import type { Memory, MemoryCategory, MemoryScope } from '@locagens/shared';
 import { api } from '../api/client';
 import { useCustomDialog } from './useCustomDialog';
 

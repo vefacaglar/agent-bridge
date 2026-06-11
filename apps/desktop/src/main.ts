@@ -8,7 +8,7 @@ const DEV_URL = "http://localhost:5173";
 
 // Force the app name so app.getPath("userData") resolves to
 // ~/Library/Application Support/Locagens (matching the backend's own default
-// config dir) rather than the scoped package name "@agent-bridge/desktop".
+// config dir) rather than the scoped package name "@locagens/desktop".
 app.setName("Locagens");
 
 let win: BrowserWindow | null = null;

@@ -1,6 +1,6 @@
 import { computed, ref, type ComputedRef, type Ref } from 'vue';
 import { tryOnScopeDispose } from '@vueuse/core';
-import type { ProviderMetadata, Run, RunMessage, RunStatus, Plan, RunUsageSummary } from '@agent-bridge/shared';
+import type { ProviderMetadata, Run, RunMessage, RunStatus, Plan, RunUsageSummary } from '@locagens/shared';
 import { api, type PermissionDecision } from '../api/client';
 import { ACTIVE_STATUSES } from '../lib/format';
 import { groupMessages, type MessageGroup } from '../lib/messageGroups';

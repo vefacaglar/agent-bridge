@@ -1,5 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
-import type { Plan, PlanTask } from "@agent-bridge/shared";
+import type { Plan, PlanTask } from "@locagens/shared";
 import { runDbWrite } from "../db.js";
 import type { IPlanRepository, PlanInput } from "./interfaces.js";
 

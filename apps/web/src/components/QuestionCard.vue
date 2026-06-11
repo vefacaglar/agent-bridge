@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import type { UserQuestion } from '@agent-bridge/shared';
+import type { UserQuestion } from '@locagens/shared';
 import ThemedButton from './ThemedButton.vue';
 
 const props = defineProps<{

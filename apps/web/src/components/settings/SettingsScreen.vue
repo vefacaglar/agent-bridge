@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import type { Memory, MemoryCategory, MemoryScope, PermissionRule, ProviderMetadata, AgentPreset } from '@agent-bridge/shared';
+import type { Memory, MemoryCategory, MemoryScope, PermissionRule, ProviderMetadata, AgentPreset } from '@locagens/shared';
 import PermissionsTab from './PermissionsTab.vue';
 import ProvidersTab from './ProvidersTab.vue';
 import AgentPresetsTab from './AgentPresetsTab.vue';

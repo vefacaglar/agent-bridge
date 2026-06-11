@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import type { Memory, MemoryCategory, MemoryScope } from '@agent-bridge/shared';
+import type { Memory, MemoryCategory, MemoryScope } from '@locagens/shared';
 import ThemedSelect from './ThemedSelect.vue';
 import ThemedButton from '../ThemedButton.vue';
 

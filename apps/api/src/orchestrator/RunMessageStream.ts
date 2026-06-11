@@ -1,4 +1,4 @@
-import type { Run, RunStatus, RunMessage } from "@agent-bridge/shared";
+import type { Run, RunStatus, RunMessage } from "@locagens/shared";
 import type { IRunRepository, IMessageRepository } from "../database/repositories.js";
 import { eventBus } from "./eventBus.js";
 

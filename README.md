@@ -58,7 +58,7 @@ Repository style: monorepo
 ## Project Structure
 
 ```txt
-agent-bridge/
+locagens/
   apps/
     api/
       src/
@@ -195,7 +195,7 @@ pnpm dev
 Useful checks:
 
 ```bash
-pnpm --filter @agent-bridge/api test
-pnpm --filter @agent-bridge/api build
-pnpm --filter @agent-bridge/web build
+pnpm --filter @locagens/api test
+pnpm --filter @locagens/api build
+pnpm --filter @locagens/web build
 ```

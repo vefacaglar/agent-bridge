@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
-import type { UsageLog } from '@agent-bridge/shared';
+import type { UsageLog } from '@locagens/shared';
 import { api } from '../api/client';
 
 const emit = defineEmits<{

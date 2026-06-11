@@ -1,4 +1,4 @@
-import type { PermissionPreview } from '@agent-bridge/shared';
+import type { PermissionPreview } from '@locagens/shared';
 import type { PermissionDecision } from '../api/client';
 import { lineDiff, type DiffRow } from './diff';
 

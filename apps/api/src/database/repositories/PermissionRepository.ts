@@ -1,5 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
-import type { PermissionRule } from "@agent-bridge/shared";
+import type { PermissionRule } from "@locagens/shared";
 import { runDbWrite } from "../db.js";
 import type { IPermissionRepository } from "./interfaces.js";
 

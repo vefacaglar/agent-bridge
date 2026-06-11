@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import type { PermissionRule } from '@agent-bridge/shared';
+import type { PermissionRule } from '@locagens/shared';
 import ThemedButton from '../ThemedButton.vue';
 
 const props = defineProps<{

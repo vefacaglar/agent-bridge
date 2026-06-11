@@ -1,5 +1,5 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import type { ProviderMetadata, Run, AgentPreset } from '@agent-bridge/shared';
+import type { ProviderMetadata, Run, AgentPreset } from '@locagens/shared';
 import { api } from '../api/client';
 import { useChatAutoScroll } from './useChatAutoScroll';
 import { useChatSession } from './useChatSession';

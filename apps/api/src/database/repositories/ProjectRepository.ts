@@ -1,5 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
-import type { Project } from "@agent-bridge/shared";
+import type { Project } from "@locagens/shared";
 import { runDbWrite } from "../db.js";
 import type { IProjectRepository } from "./interfaces.js";
 

@@ -1,4 +1,4 @@
-import type { PlanTask } from "@agent-bridge/shared";
+import type { PlanTask } from "@locagens/shared";
 import { UPDATE_PLAN_TOOL } from "../workspaceTools.js";
 import { getModeStrategy } from "../prompts/index.js";
 import type { OrchestratorTool } from "./types.js";

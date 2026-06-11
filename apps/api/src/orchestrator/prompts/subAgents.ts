@@ -1,4 +1,4 @@
-import type { Memory } from "@agent-bridge/shared";
+import type { Memory } from "@locagens/shared";
 import { projectContextSuffix } from "./shared.js";
 
 // Keep the coder prompt lean: only the first few project memories, hard-capped.

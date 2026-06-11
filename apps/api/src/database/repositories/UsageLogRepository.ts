@@ -1,5 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
-import type { UsageLog, PaginatedUsageLogs, RunUsageSummary } from "@agent-bridge/shared";
+import type { UsageLog, PaginatedUsageLogs, RunUsageSummary } from "@locagens/shared";
 import { runDbWrite } from "../db.js";
 import type { IUsageLogRepository } from "./interfaces.js";
 

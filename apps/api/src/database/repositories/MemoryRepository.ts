@@ -1,5 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
-import type { Memory, MemoryScope, MemoryCategory } from "@agent-bridge/shared";
+import type { Memory, MemoryScope, MemoryCategory } from "@locagens/shared";
 import { runDbWrite } from "../db.js";
 import type { IMemoryRepository, MemoryInput } from "./interfaces.js";
 

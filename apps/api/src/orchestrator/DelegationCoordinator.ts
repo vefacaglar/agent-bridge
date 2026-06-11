@@ -1,4 +1,4 @@
-import type { Run, RunMessage, ReasoningEffort } from "@agent-bridge/shared";
+import type { Run, RunMessage, ReasoningEffort } from "@locagens/shared";
 import type { ProviderRegistry } from "../providers/ProviderRegistry.js";
 import type { IMemoryRepository } from "../database/repositories.js";
 import { buildCoderSystemPrompt, buildUtilitySystemPrompt, buildVerifierSystemPrompt, formatCoderMemoryContext, getModeStrategy } from "./systemPrompt.js";

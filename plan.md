@@ -110,7 +110,7 @@ SSE is enough for the first version because the backend mainly streams run event
 ## 6. Suggested Project Structure
 
 ```txt
-agent-bridge/
+locagens/
   apps/
     web/
       src/

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import type { ChatMessage } from "@agent-bridge/shared";
+import type { ChatMessage } from "@locagens/shared";
 import { estimateTokens, compactHistory } from "./contextWindow.js";
 
 function toolCallMsg(id: string, name: string, args: Record<string, any>, content = ""): ChatMessage {

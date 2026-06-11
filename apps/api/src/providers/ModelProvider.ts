@@ -1,4 +1,4 @@
-import type { CompletionRequest, CompletionResponse } from "@agent-bridge/shared";
+import type { CompletionRequest, CompletionResponse } from "@locagens/shared";
 
 /**
  * Output-token ceiling sent on every completion when the caller doesn't specify

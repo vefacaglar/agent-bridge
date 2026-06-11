@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, onUnmounted } from 'vue';
-import type { Run, Plan } from '@agent-bridge/shared';
+import type { Run, Plan } from '@locagens/shared';
 import type { AgentSummary, MessageGroup } from '../lib/messageGroups';
 import { renderMarkdown, cleanMessageContent, formatSystemErrorMessage, capturePreScrollStates, restorePreScrollStates } from '../lib/markdown';
 import { formatTime } from '../lib/format';

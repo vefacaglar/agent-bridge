@@ -1,4 +1,4 @@
-import type { UserQuestion } from "@agent-bridge/shared";
+import type { UserQuestion } from "@locagens/shared";
 import { ASK_QUESTION_TOOL } from "../workspaceTools.js";
 import type { OrchestratorTool } from "./types.js";
 

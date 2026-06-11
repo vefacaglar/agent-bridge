@@ -1,4 +1,4 @@
-import type { Memory, Plan } from "@agent-bridge/shared";
+import type { Memory, Plan } from "@locagens/shared";
 import { WORKSPACE_TOOLS, READONLY_TOOLS, MODIFYING_TOOLS } from "../workspaceTools.js";
 import type { DelegationContext, ToolDef } from "./types.js";
 

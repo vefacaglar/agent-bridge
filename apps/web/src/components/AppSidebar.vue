@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
-import type { Run } from '@agent-bridge/shared';
+import type { Run } from '@locagens/shared';
 import { DEFAULT_PROJECT_PATH } from '../lib/format';
 
 interface ProjectOption {

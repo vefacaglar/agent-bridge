@@ -14,12 +14,12 @@ importers:
 
   apps/api:
     dependencies:
-      '@agent-bridge/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
       '@fastify/cors':
         specifier: ^9.0.1
         version: 9.0.1
+      '@locagens/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       fastify:
         specifier: ^4.26.2
         version: 4.29.1
@@ -54,7 +54,7 @@ importers:
 
   apps/web:
     dependencies:
-      '@agent-bridge/shared':
+      '@locagens/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@vueuse/core':

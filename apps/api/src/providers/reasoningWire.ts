@@ -1,4 +1,4 @@
-import type { ResolvedReasoningConfig } from "@agent-bridge/shared";
+import type { ResolvedReasoningConfig } from "@locagens/shared";
 
 /** Model name without any "vendor/" prefix, lowercased. */
 function basename(model: string): string {

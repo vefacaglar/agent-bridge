@@ -6,7 +6,7 @@ const { showAlert } = useCustomDialog();
 import type { PermissionDecision } from '../api/client';
 import type { MessageGroup } from '../lib/messageGroups';
 import { MODES_LIST, REASONING_EFFORTS, type ChatMode, type ModelOption } from '../composables/useComposerSettings';
-import type { AgentPreset } from '@agent-bridge/shared';
+import type { AgentPreset } from '@locagens/shared';
 import ConfirmationCard from './ConfirmationCard.vue';
 import PermissionCard from './PermissionCard.vue';
 import QuestionCard from './QuestionCard.vue';

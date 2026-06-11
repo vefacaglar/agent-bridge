@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch, nextTick } from 'vue';
-import type { Plan } from '@agent-bridge/shared';
+import type { Plan } from '@locagens/shared';
 import type { AgentSummary } from '../lib/messageGroups';
 import { renderMarkdown, cleanMessageContent } from '../lib/markdown';
 import { changeDiffRows, type WorkspaceChange } from '../lib/workspaceChanges';

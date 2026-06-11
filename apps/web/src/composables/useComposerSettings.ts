@@ -1,5 +1,5 @@
 import { computed, ref, watch, nextTick, type Ref } from 'vue';
-import type { ProviderMetadata, AgentPreset, ReasoningOption, ProviderModelSettings, Run } from '@agent-bridge/shared';
+import type { ProviderMetadata, AgentPreset, ReasoningOption, ProviderModelSettings, Run } from '@locagens/shared';
 import { splitCombined } from '../lib/format';
 
 // Three modes are exposed: Build (applies edits directly; the backend's

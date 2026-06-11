@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import type { MemoryCategory, MemoryScope } from "@agent-bridge/shared";
+import type { MemoryCategory, MemoryScope } from "@locagens/shared";
 import type { AppContext } from "../context.js";
 
 const CATEGORIES: MemoryCategory[] = ["user", "feedback", "project", "reference"];

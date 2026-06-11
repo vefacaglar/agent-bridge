@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import type { AppSettings } from "@agent-bridge/shared";
+import type { AppSettings } from "@locagens/shared";
 
 export const DEFAULT_PORT = 4321;
 const MIN_PORT = 1;

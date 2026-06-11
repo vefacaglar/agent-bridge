@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useAppShell } from './composables/useAppShell';
-import type { Run } from '@agent-bridge/shared';
+import type { Run } from '@locagens/shared';
 import AppSidebar from './components/AppSidebar.vue';
 import MessageThread from './components/MessageThread.vue';
 import ChatComposer from './components/ChatComposer.vue';

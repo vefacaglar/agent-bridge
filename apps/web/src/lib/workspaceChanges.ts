@@ -1,4 +1,4 @@
-import type { RunMessage } from '@agent-bridge/shared';
+import type { RunMessage } from '@locagens/shared';
 import { lineDiff, type DiffRow } from './diff';
 
 export type WorkspaceChangeKind = 'created' | 'edited' | 'deleted' | 'moved';

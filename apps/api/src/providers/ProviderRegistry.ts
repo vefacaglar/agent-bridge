@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import type { ProviderMetadata, AgentPreset, ModelReasoningSettings, ReasoningEffort, ReasoningOption, ReasoningStyle, ResolvedReasoningConfig, ModelPricing, PriceTier } from "@agent-bridge/shared";
+import type { ProviderMetadata, AgentPreset, ModelReasoningSettings, ReasoningEffort, ReasoningOption, ReasoningStyle, ResolvedReasoningConfig, ModelPricing, PriceTier } from "@locagens/shared";
 import type { ModelProvider } from "./ModelProvider.js";
 import { ProviderFactory } from "./ProviderFactory.js";
 import { MacOSKeychainProviderSecretStore, type ProviderSecretStore } from "./ProviderSecretStore.js";

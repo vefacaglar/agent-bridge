@@ -1,5 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
-import type { RunMessage } from "@agent-bridge/shared";
+import type { RunMessage } from "@locagens/shared";
 import { runDbWrite } from "../db.js";
 import type { IMessageRepository } from "./interfaces.js";
 

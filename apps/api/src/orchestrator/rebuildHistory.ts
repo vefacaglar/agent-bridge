@@ -1,4 +1,4 @@
-import type { ChatMessage, RunMessage } from "@agent-bridge/shared";
+import type { ChatMessage, RunMessage } from "@locagens/shared";
 
 /**
  * Reconstructs the provider-facing message list from persisted messages,

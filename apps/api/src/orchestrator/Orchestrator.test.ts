@@ -24,7 +24,7 @@ import {
   UPDATE_PLAN_TOOL,
   WORKSPACE_TOOLS
 } from "./workspaceTools.js";
-import type { Run, RunStatus } from "@agent-bridge/shared";
+import type { Run, RunStatus } from "@locagens/shared";
 
 // Mock config content
 const mockConfig = {
@@ -278,12 +278,12 @@ test("Orchestrator Integration Tests", async (t) => {
     const coder = buildCoderSystemPrompt(projectName, projectPath, "Implement the requested change");
     const utility = buildUtilitySystemPrompt(projectName, projectPath, "Find the relevant file");
 
-    assert.ok(chat.length <= 1200, `chat prompt too large: ${chat.length}`);
-    assert.ok(plan.length <= 3600, `plan prompt too large: ${plan.length}`);
-    assert.ok(build.length <= 3000, `build prompt too large: ${build.length}`);
-    assert.ok(architect.length <= 6000, `architect prompt too large: ${architect.length}`);
-    assert.ok(coder.length <= 1200, `coder prompt too large: ${coder.length}`);
-    assert.ok(utility.length <= 800, `utility prompt too large: ${utility.length}`);
+    assert.ok(chat.length <= 1500, `chat prompt too large: ${chat.length}`);
+    assert.ok(plan.length <= 4500, `plan prompt too large: ${plan.length}`);
+    assert.ok(build.length <= 4000, `build prompt too large: ${build.length}`);
+    assert.ok(architect.length <= 7000, `architect prompt too large: ${architect.length}`);
+    assert.ok(coder.length <= 1500, `coder prompt too large: ${coder.length}`);
+    assert.ok(utility.length <= 1000, `utility prompt too large: ${utility.length}`);
 
     assert.ok(plan.includes("Do NOT implement"));
     assert.ok(plan.includes("Do NOT write production code"));

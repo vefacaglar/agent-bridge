@@ -6,14 +6,14 @@
     "pnpm": ">=8.0.0"
   },
   "scripts": {
-    "dev:shared": "pnpm --filter @agent-bridge/shared dev",
-    "dev:api": "pnpm --filter @agent-bridge/api dev",
-    "dev:web": "pnpm --filter @agent-bridge/web dev",
+    "dev:shared": "pnpm --filter @locagens/shared dev",
+    "dev:api": "pnpm --filter @locagens/api dev",
+    "dev:web": "pnpm --filter @locagens/web dev",
     "dev": "pnpm --recursive --parallel dev",
-    "dev:desktop": "pnpm --filter @agent-bridge/desktop start",
+    "dev:desktop": "pnpm --filter @locagens/desktop start",
     "build:db-writer": "mkdir -p .locagens-dev/go-cache && GOCACHE=\"$PWD/.locagens-dev/go-cache\" go -C apps/db-writer build -o dist/db-writer .",
     "build": "pnpm --recursive build",
-    "dist": "pnpm run build:db-writer && pnpm --filter @agent-bridge/shared build && pnpm --filter @agent-bridge/web build && pnpm --filter @agent-bridge/api run build:bundle && pnpm --filter @agent-bridge/desktop run dist",
+    "dist": "pnpm run build:db-writer && pnpm --filter @locagens/shared build && pnpm --filter @locagens/web build && pnpm --filter @locagens/api run build:bundle && pnpm --filter @locagens/desktop run dist",
     "clean": "pnpm --recursive exec rm -rf dist node_modules"
   },
   "devDependencies": {

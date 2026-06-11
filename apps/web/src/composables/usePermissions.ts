@@ -1,5 +1,5 @@
 import { ref } from 'vue';
-import type { PermissionRule } from '@agent-bridge/shared';
+import type { PermissionRule } from '@locagens/shared';
 import { api } from '../api/client';
 import { useCustomDialog } from './useCustomDialog';
 

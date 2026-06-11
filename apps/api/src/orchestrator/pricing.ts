@@ -1,4 +1,4 @@
-import type { ModelPricing, PriceTier } from "@agent-bridge/shared";
+import type { ModelPricing, PriceTier } from "@locagens/shared";
 
 /**
  * Picks the pricing tier for a request by its total prompt (input) token count.

@@ -1,5 +1,5 @@
 import { nextTick, onBeforeUnmount, watch, type Ref } from 'vue';
-import type { RunMessage } from '@agent-bridge/shared';
+import type { RunMessage } from '@locagens/shared';
 
 export function useChatAutoScroll(
   container: Ref<HTMLElement | null>,

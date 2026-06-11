@@ -1,4 +1,4 @@
-import type { Run, RunMessage, ChatMessage, ReasoningEffort } from "@agent-bridge/shared";
+import type { Run, RunMessage, ChatMessage, ReasoningEffort } from "@locagens/shared";
 import type { ProviderRegistry } from "../providers/ProviderRegistry.js";
 import { appendFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";

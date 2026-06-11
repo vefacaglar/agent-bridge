@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import type { ReasoningEffort, Run, RunStatus } from "@agent-bridge/shared";
+import type { ReasoningEffort, Run, RunStatus } from "@locagens/shared";
 import { type AppContext, normalizeProject } from "../context.js";
 import { eventBus } from "../orchestrator/eventBus.js";
 import { permissionKey, commandEscapesWorkspace, buildPermissionPreview } from "../orchestrator/workspaceTools.js";

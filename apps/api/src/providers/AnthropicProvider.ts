@@ -1,4 +1,4 @@
-import type { CompletionRequest, CompletionResponse, ChatMessage } from "@agent-bridge/shared";
+import type { CompletionRequest, CompletionResponse, ChatMessage } from "@locagens/shared";
 import type { ModelProvider } from "./ModelProvider.js";
 import { DEFAULT_MAX_TOKENS } from "./ModelProvider.js";
 

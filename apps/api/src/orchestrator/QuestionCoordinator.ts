@@ -1,4 +1,4 @@
-import type { UserQuestion } from "@agent-bridge/shared";
+import type { UserQuestion } from "@locagens/shared";
 import { eventBus } from "./eventBus.js";
 import type { RunMessageStream } from "./RunMessageStream.js";
 import type { QuestionAnswerInput } from "./tools/index.js";

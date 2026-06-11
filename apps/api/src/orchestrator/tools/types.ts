@@ -1,4 +1,4 @@
-import type { Run, UserQuestion } from "@agent-bridge/shared";
+import type { Run, UserQuestion } from "@locagens/shared";
 import type { ModeStrategy, ToolDef } from "../prompts/index.js";
 import type { IRunRepository, IPlanRepository, IMemoryRepository } from "../../database/repositories.js";
 import type { eventBus } from "../eventBus.js";

@@ -1,5 +1,5 @@
 {
-  "name": "@agent-bridge/desktop",
+  "name": "@locagens/desktop",
   "version": "0.1.0",
   "private": true,
   "main": "./dist/main.js",

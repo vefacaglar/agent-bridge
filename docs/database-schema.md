@@ -1,4 +1,4 @@
-# Database Schema — agent-bridge
+# Database Schema — Locagens
 
 **Database engine:** SQLite (node:sqlite `DatabaseSync`)  
 **File:** `apps/api/src/database/db.ts`  

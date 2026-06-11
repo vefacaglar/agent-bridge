@@ -11,7 +11,7 @@ import type {
   UsageLog,
   PaginatedUsageLogs,
   RunUsageSummary
-} from "@agent-bridge/shared";
+} from "@locagens/shared";
 
 export interface IRunRepository {
   create(run: Run): Promise<void>;

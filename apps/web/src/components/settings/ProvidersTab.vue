@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
-import type { ProviderModelSettings, ReasoningEffort, ReasoningOption, ReasoningStyle, PriceTier } from '@agent-bridge/shared';
+import type { ProviderModelSettings, ReasoningEffort, ReasoningOption, ReasoningStyle, PriceTier } from '@locagens/shared';
 import { api } from '../../api/client';
 import { useCustomDialog } from '../../composables/useCustomDialog';
 import ThemedSelect from './ThemedSelect.vue';

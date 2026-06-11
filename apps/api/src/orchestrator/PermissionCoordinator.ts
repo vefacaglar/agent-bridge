@@ -1,4 +1,4 @@
-import type { Run } from "@agent-bridge/shared";
+import type { Run } from "@locagens/shared";
 import { db } from "../database/db.js";
 import { eventBus } from "./eventBus.js";
 import { buildPermissionPreview, permissionKey, commandEscapesWorkspace } from "./workspaceTools.js";

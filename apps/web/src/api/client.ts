@@ -1,4 +1,4 @@
-import type { ProviderMetadata, Run, RunMessage, Project, PermissionRule, Plan, AgentPreset, Memory, MemoryCategory, MemoryScope, AppSettings, PaginatedUsageLogs, RunUsageSummary } from '@agent-bridge/shared';
+import type { ProviderMetadata, Run, RunMessage, Project, PermissionRule, Plan, AgentPreset, Memory, MemoryCategory, MemoryScope, AppSettings, PaginatedUsageLogs, RunUsageSummary } from '@locagens/shared';
 
 /**
  * Resolves the backend base URL. The config file (settings.json) is the single

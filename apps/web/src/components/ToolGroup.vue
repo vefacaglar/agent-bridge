@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import type { RunMessage } from '@agent-bridge/shared';
+import type { RunMessage } from '@locagens/shared';
 import { isToolSuccess } from '../lib/messageGroups';
 import { cleanMessageContent, renderMarkdown } from '../lib/markdown';
 

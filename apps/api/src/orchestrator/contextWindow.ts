@@ -1,4 +1,4 @@
-import type { ChatMessage } from "@agent-bridge/shared";
+import type { ChatMessage } from "@locagens/shared";
 
 /**
  * Context-window enforcement for the shared generation loop.

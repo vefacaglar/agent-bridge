@@ -1,4 +1,4 @@
-import type { RunStatus } from '@agent-bridge/shared';
+import type { RunStatus } from '@locagens/shared';
 
 /** Run statuses that mean a run is still actively processing. */
 export const ACTIVE_STATUSES: RunStatus[] = ['created', 'generating', 'awaiting_permission', 'awaiting_input'];
