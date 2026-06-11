@@ -9,15 +9,6 @@
       ],
       "modelSettings": {
         "gpt-5.5": {
-          "pricing": {
-            "tiers": [
-              {
-                "inputRate": 5,
-                "outputRate": 40,
-                "cacheReadRate": 0.5
-              }
-            ]
-          },
           "reasoning": {
             "style": "openai-chat",
             "options": [
@@ -32,6 +23,20 @@
               {
                 "id": "high",
                 "value": "high"
+              }
+            ]
+          },
+          "reasoningEfforts": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "pricing": {
+            "tiers": [
+              {
+                "inputRate": 5,
+                "outputRate": 40,
+                "cacheReadRate": 0.5
               }
             ]
           },
@@ -111,6 +116,18 @@
       ],
       "modelSettings": {
         "minimax-m3": {
+          "reasoning": {
+            "style": "openai-chat",
+            "options": [
+              {
+                "id": "high",
+                "value": "high"
+              }
+            ]
+          },
+          "reasoningEfforts": [
+            "high"
+          ],
           "pricing": {
             "tiers": [
               {
@@ -123,15 +140,6 @@
                 "inputRate": 0.6,
                 "outputRate": 2.4,
                 "cacheReadRate": 0.12
-              }
-            ]
-          },
-          "reasoning": {
-            "style": "openai-chat",
-            "options": [
-              {
-                "id": "high",
-                "value": "high"
               }
             ]
           },
@@ -164,21 +172,24 @@
           "contextLimit": 204800
         },
         "kimi-k2.6": {
-          "pricing": {
-            "tiers": [
-              {
-                "inputRate": 0.95,
-                "outputRate": 4,
-                "cacheReadRate": 0.16
-              }
-            ]
-          },
           "reasoning": {
             "style": "openai-chat",
             "options": [
               {
                 "id": "high",
                 "value": "high"
+              }
+            ]
+          },
+          "reasoningEfforts": [
+            "high"
+          ],
+          "pricing": {
+            "tiers": [
+              {
+                "inputRate": 0.95,
+                "outputRate": 4,
+                "cacheReadRate": 0.16
               }
             ]
           },
@@ -197,15 +208,6 @@
           "contextLimit": 256000
         },
         "glm-5.1": {
-          "pricing": {
-            "tiers": [
-              {
-                "inputRate": 1.4,
-                "outputRate": 4.4,
-                "cacheReadRate": 0.26
-              }
-            ]
-          },
           "reasoning": {
             "style": "openai-chat",
             "options": [
@@ -216,6 +218,19 @@
               {
                 "id": "high",
                 "value": "high"
+              }
+            ]
+          },
+          "reasoningEfforts": [
+            "low",
+            "high"
+          ],
+          "pricing": {
+            "tiers": [
+              {
+                "inputRate": 1.4,
+                "outputRate": 4.4,
+                "cacheReadRate": 0.26
               }
             ]
           },
@@ -234,6 +249,18 @@
           "contextLimit": 200000
         },
         "deepseek-v4-pro": {
+          "reasoning": {
+            "style": "openai-chat",
+            "options": [
+              {
+                "id": "high",
+                "value": "high"
+              }
+            ]
+          },
+          "reasoningEfforts": [
+            "high"
+          ],
           "pricing": {
             "tiers": [
               {
@@ -243,6 +270,9 @@
               }
             ]
           },
+          "contextLimit": 1000000
+        },
+        "deepseek-v4-flash": {
           "reasoning": {
             "style": "openai-chat",
             "options": [
@@ -252,9 +282,9 @@
               }
             ]
           },
-          "contextLimit": 1000000
-        },
-        "deepseek-v4-flash": {
+          "reasoningEfforts": [
+            "high"
+          ],
           "pricing": {
             "tiers": [
               {
@@ -264,18 +294,26 @@
               }
             ]
           },
+          "contextLimit": 1000000
+        },
+        "mimo-v2.5-pro": {
           "reasoning": {
             "style": "openai-chat",
             "options": [
+              {
+                "id": "low",
+                "value": "low"
+              },
               {
                 "id": "high",
                 "value": "high"
               }
             ]
           },
-          "contextLimit": 1000000
-        },
-        "mimo-v2.5-pro": {
+          "reasoningEfforts": [
+            "low",
+            "high"
+          ],
           "pricing": {
             "tiers": [
               {
@@ -290,19 +328,6 @@
                 "outputRate": 6,
                 "cacheReadRate": 0.4,
                 "cacheWriteRate": 0
-              }
-            ]
-          },
-          "reasoning": {
-            "style": "openai-chat",
-            "options": [
-              {
-                "id": "low",
-                "value": "low"
-              },
-              {
-                "id": "high",
-                "value": "high"
               }
             ]
           },
@@ -376,8 +401,6 @@
             ]
           },
           "reasoningEfforts": [
-            "low",
-            "medium",
             "high"
           ],
           "pricing": {
@@ -402,8 +425,6 @@
             ]
           },
           "reasoningEfforts": [
-            "low",
-            "medium",
             "high"
           ],
           "pricing": {
@@ -418,15 +439,6 @@
           "contextLimit": 1000000
         },
         "moonshotai/Kimi-K2.6": {
-          "pricing": {
-            "tiers": [
-              {
-                "inputRate": 0.95,
-                "outputRate": 4,
-                "cacheReadRate": 0.16
-              }
-            ]
-          },
           "reasoning": {
             "style": "openai-chat",
             "options": [
@@ -436,18 +448,21 @@
               }
             ]
           },
-          "contextLimit": 256000
-        },
-        "zai-org/GLM-5.1": {
+          "reasoningEfforts": [
+            "high"
+          ],
           "pricing": {
             "tiers": [
               {
-                "inputRate": 1.4,
-                "outputRate": 4.4,
-                "cacheReadRate": 0.26
+                "inputRate": 0.95,
+                "outputRate": 4,
+                "cacheReadRate": 0.16
               }
             ]
           },
+          "contextLimit": 256000
+        },
+        "zai-org/GLM-5.1": {
           "reasoning": {
             "style": "openai-chat",
             "options": [
@@ -461,9 +476,34 @@
               }
             ]
           },
+          "reasoningEfforts": [
+            "low",
+            "high"
+          ],
+          "pricing": {
+            "tiers": [
+              {
+                "inputRate": 1.4,
+                "outputRate": 4.4,
+                "cacheReadRate": 0.26
+              }
+            ]
+          },
           "contextLimit": 200000
         },
         "MiniMaxAI/MiniMax-M3": {
+          "reasoning": {
+            "style": "openai-chat",
+            "options": [
+              {
+                "id": "high",
+                "value": "high"
+              }
+            ]
+          },
+          "reasoningEfforts": [
+            "high"
+          ],
           "pricing": {
             "tiers": [
               {
@@ -479,6 +519,9 @@
               }
             ]
           },
+          "contextLimit": 1000000
+        },
+        "Qwen/Qwen3.6-Max-Preview": {
           "reasoning": {
             "style": "openai-chat",
             "options": [
@@ -488,23 +531,14 @@
               }
             ]
           },
-          "contextLimit": 1000000
-        },
-        "Qwen/Qwen3.6-Max-Preview": {
+          "reasoningEfforts": [
+            "high"
+          ],
           "pricing": {
             "tiers": [
               {
                 "inputRate": 1.2,
                 "outputRate": 3.6
-              }
-            ]
-          },
-          "reasoning": {
-            "style": "openai-chat",
-            "options": [
-              {
-                "id": "high",
-                "value": "high"
               }
             ]
           },
@@ -522,20 +556,23 @@
           "contextLimit": 1000000
         },
         "Qwen/Qwen3.7-Max": {
-          "pricing": {
-            "tiers": [
-              {
-                "inputRate": 1.2,
-                "outputRate": 3.6
-              }
-            ]
-          },
           "reasoning": {
             "style": "openai-chat",
             "options": [
               {
                 "id": "high",
                 "value": "high"
+              }
+            ]
+          },
+          "reasoningEfforts": [
+            "high"
+          ],
+          "pricing": {
+            "tiers": [
+              {
+                "inputRate": 1.2,
+                "outputRate": 3.6
               }
             ]
           },
@@ -564,6 +601,23 @@
           "contextLimit": 256000
         },
         "xiaomi/mimo-v2.5-pro": {
+          "reasoning": {
+            "style": "openai-chat",
+            "options": [
+              {
+                "id": "low",
+                "value": "low"
+              },
+              {
+                "id": "high",
+                "value": "high"
+              }
+            ]
+          },
+          "reasoningEfforts": [
+            "low",
+            "high"
+          ],
           "pricing": {
             "tiers": [
               {
@@ -578,19 +632,6 @@
                 "outputRate": 6,
                 "cacheReadRate": 0.4,
                 "cacheWriteRate": 0
-              }
-            ]
-          },
-          "reasoning": {
-            "style": "openai-chat",
-            "options": [
-              {
-                "id": "low",
-                "value": "low"
-              },
-              {
-                "id": "high",
-                "value": "high"
               }
             ]
           },
@@ -639,7 +680,6 @@
           },
           "reasoningEfforts": [
             "low",
-            "medium",
             "high"
           ],
           "pricing": {
@@ -675,6 +715,10 @@
               }
             ]
           },
+          "reasoningEfforts": [
+            "low",
+            "high"
+          ],
           "pricing": {
             "tiers": [
               {
@@ -747,6 +791,40 @@
     }
   },
   "agentPresets": {
+    "deepseek-v4-pro-to-flash": {
+      "displayName": "Deepseek pro plan",
+      "architect": {
+        "providerId": "commandcode",
+        "model": "deepseek/deepseek-v4-pro",
+        "reasoningEffort": "high"
+      },
+      "coder": {
+        "providerId": "commandcode",
+        "model": "deepseek/deepseek-v4-flash"
+      },
+      "maxSubAgents": 3,
+      "utility": {
+        "providerId": "commandcode",
+        "model": "xiaomi/mimo-v2.5"
+      },
+      "fallback": true
+    },
+    "qwenplan": {
+      "displayName": "qwenplan",
+      "architect": {
+        "providerId": "opencode-go-anthropic",
+        "model": "qwen3.7-max"
+      },
+      "coder": {
+        "providerId": "opencode",
+        "model": "kimi-k2.6"
+      },
+      "maxSubAgents": 3,
+      "utility": {
+        "providerId": "xiaomitokenplan",
+        "model": "mimo-v2.5"
+      }
+    },
     "minimax-m3-mimo-v25": {
       "displayName": "minimax m3 to mimo v2.5",
       "architect": {
@@ -760,36 +838,9 @@
       "maxSubAgents": 3,
       "utility": {
         "providerId": "commandcode",
-        "model": "nvidia/nemotron-3-ultra-550b-a55b"
+        "model": "xiaomi/mimo-v2.5"
       },
       "fallback": true
-    },
-    "deepseek-v4-pro-to-flash": {
-      "displayName": "Deepseek pro plan",
-      "architect": {
-        "providerId": "commandcode",
-        "model": "deepseek/deepseek-v4-pro",
-        "reasoningEffort": "high"
-      },
-      "coder": {
-        "providerId": "commandcode",
-        "model": "deepseek/deepseek-v4-flash",
-        "reasoningEffort": "low"
-      },
-      "maxSubAgents": 3,
-      "fallback": true
-    },
-    "qwenplan": {
-      "displayName": "qwenplan",
-      "architect": {
-        "providerId": "opencode-go-anthropic",
-        "model": "qwen3.7-max"
-      },
-      "coder": {
-        "providerId": "opencode",
-        "model": "deepseek-v4-flash"
-      },
-      "maxSubAgents": 3
     }
   }
 }
