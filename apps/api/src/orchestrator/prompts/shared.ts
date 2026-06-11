@@ -114,6 +114,7 @@ ${delegation.utilityModel
 - UTILITY TIER: ${delegation.utilityModel} is available via delegate_to_utility.
 - Utility can only read/list/search and move_file. It cannot run commands, delete, edit, write, or create files. Never delegate shell/delete/write work to utility.
 - WORKSPACE EXPLORATION DEFAULTS TO UTILITY: for locating files/symbols, mapping structure, summarizing code, and any "where is X / how does Y work" question, call delegate_to_utility instead of reading files yourself — keep your expensive context lean. Read a file directly ONLY when its exact contents are essential to a decision you are about to make, and it is short.
+- HARD LIMIT: you get at most 4 direct read_file/list_directory/search_files calls per turn (spend them on guidance files and short, decisive reads). Beyond that, read-only calls are rejected and you MUST go through delegate_to_utility.
 - Also use utility for simple renames and post-delegation verification of the coder's changed files. Keep tasks small, self-contained, in ENGLISH.
 - Use delegate_tasks for substantial implementation.`;
   }

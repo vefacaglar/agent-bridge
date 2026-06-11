@@ -281,7 +281,7 @@ test("Orchestrator Integration Tests", async (t) => {
     assert.ok(chat.length <= 1500, `chat prompt too large: ${chat.length}`);
     assert.ok(plan.length <= 4500, `plan prompt too large: ${plan.length}`);
     assert.ok(build.length <= 4000, `build prompt too large: ${build.length}`);
-    assert.ok(architect.length <= 7200, `architect prompt too large: ${architect.length}`);
+    assert.ok(architect.length <= 7500, `architect prompt too large: ${architect.length}`);
     assert.ok(coder.length <= 1500, `coder prompt too large: ${coder.length}`);
     assert.ok(utility.length <= 1000, `utility prompt too large: ${utility.length}`);
 
@@ -826,6 +826,69 @@ test("Orchestrator Integration Tests", async (t) => {
       "the second model call should include the injected idle nudge"
     );
     assert.strictEqual(runRepo.getById(runId)?.status, "done");
+  });
+
+  await t.test("Orchestrator - architect with utility tier exhausts its direct-inspection budget", async () => {
+    const registry = new ProviderRegistry(testConfigPath);
+    const runRepo = new RunRepository(db);
+    const messageRepo = new MessageRepository(db);
+    const orchestrator = new Orchestrator(runRepo, messageRepo, registry, new PlanRepository(db), new MemoryRepository(db), new UsageLogRepository(db));
+
+    const runId = "run-test-inspect-budget";
+    await runRepo.create({
+      id: runId,
+      title: "Test inspect budget",
+      task: "Explore the project",
+      status: "created",
+      providerId: "test-provider",
+      providerDisplayName: "Test Provider",
+      model: "model-1",
+      coderProviderId: "test-provider",
+      coderModel: "model-1",
+      utilityProviderId: "test-provider",
+      utilityModel: "model-1",
+      projectPath: process.cwd(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    } as Run);
+
+    let callCount = 0;
+    globalThis.fetch = async (_url: any, _options: any) => {
+      callCount++;
+      if (callCount === 1) {
+        // Architect fires 5 read-only calls in one turn — one over the budget of 4.
+        return {
+          ok: true,
+          json: async () => ({
+            choices: [{
+              message: {
+                role: "assistant",
+                content: "Exploring.",
+                tool_calls: [1, 2, 3, 4, 5].map(i => ({
+                  id: `call_read_${i}`,
+                  type: "function",
+                  function: { name: "list_directory", arguments: JSON.stringify({ path: "" }) }
+                }))
+              }
+            }]
+          })
+        } as any;
+      }
+      return {
+        ok: true,
+        json: async () => ({ choices: [{ message: { role: "assistant", content: "Done." } }] })
+      } as any;
+    };
+
+    await orchestrator.run(runId);
+    assert.strictEqual(runRepo.getById(runId)?.status, "done");
+
+    const toolResults = messageRepo.listByRunId(runId).filter(m => m.role === "tool").map(m => JSON.parse(m.content));
+    assert.strictEqual(toolResults.length, 5);
+    // First 4 inspections succeed, the 5th is redirected to the utility tier.
+    for (const r of toolResults.slice(0, 4)) assert.strictEqual(r.success, true);
+    assert.strictEqual(toolResults[4].success, false);
+    assert.ok(toolResults[4].error.includes("delegate_to_utility"));
   });
 
   await t.test("Orchestrator - delegate_to_utility runs a utility sub-agent", async () => {

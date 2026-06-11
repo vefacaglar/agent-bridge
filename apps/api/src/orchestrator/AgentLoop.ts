@@ -62,6 +62,17 @@ const OPEN_TASK_LIST_NUDGE =
   "Either continue the work with your tools NOW, or — if you are blocked or the remaining items are intentionally out of scope — say so explicitly and update the list.";
 const MAX_TASK_LIST_NUDGES = 1;
 
+/**
+ * When a utility tier is configured, the architect should explore the workspace
+ * through delegate_to_utility, not by reading it into its own expensive context.
+ * The prompt alone does not hold weak models to this, so — like the mutating-tool
+ * trap — it is enforced in-loop: the architect gets a small per-turn budget of
+ * direct read_file/list_directory/search_files calls (enough for guidance files
+ * and a short, decisive read), and further read-only calls are rejected with a
+ * redirect to delegate_to_utility.
+ */
+const ARCHITECT_DIRECT_INSPECT_BUDGET = 4;
+
 /** True when the reply carries a <task_list> with at least one unchecked item. */
 function hasOpenTaskListItems(text: string): boolean {
   const match = text.match(/<task_list>([\s\S]*?)(?:<\/task_list>|$)/);
@@ -124,6 +135,9 @@ export class AgentLoop {
     // Tracks delegation state for post-delegation verification nudges.
     let lastToolWasDelegation = false;
     let postDelegationNudgesUsed = 0;
+    // Per-turn budget of direct read-only calls for an architect with a utility
+    // tier (see ARCHITECT_DIRECT_INSPECT_BUDGET).
+    const counters = { directInspections: 0 };
     let verifiedAfterDelegation = false;
     let filesToVerify: string[] = [];
     let filesVerified: Set<string> = new Set();
@@ -292,7 +306,7 @@ export class AgentLoop {
 
         for (const tc of response.toolCalls) {
           checkCancelled();
-          const result = await this.runToolCall(runId, run, tc, opts.agentRole);
+          const result = await this.runToolCall(runId, run, tc, opts.agentRole, counters);
 
           const toolMsg: RunMessage = {
             id: randomId("msg-tool"),
@@ -421,7 +435,7 @@ export class AgentLoop {
    * delegation, enforces the mode's gating policy, then runs workspace tools
    * (prompting for permission when required).
    */
-  private async runToolCall(runId: string, run: Run, toolCall: any, agentRole?: string): Promise<string> {
+  private async runToolCall(runId: string, run: Run, toolCall: any, agentRole?: string, counters?: { directInspections: number }): Promise<string> {
     // This run's mode strategy: it owns the gating policy (which tools are
     // allowed, what must be approved) so the checks below read its flags instead
     // of branching on run.mode directly.
@@ -457,9 +471,25 @@ export class AgentLoop {
 
     const toolName = toolCall.function?.name;
     const isDelegated = !!(run.coderModel && run.coderProviderId);
+    const hasUtilityTier = !!(run.utilityModel && run.utilityProviderId);
+    const isArchitect = isDelegated && agentRole !== "coder" && agentRole !== "utility";
+
+    // Architect exploration trap: with a utility tier available, the architect
+    // gets only a small per-turn budget of direct read-only calls; after that,
+    // exploration is redirected to delegate_to_utility (in-loop correction —
+    // the prompt rule alone does not hold weak models to this).
+    if (isArchitect && hasUtilityTier && strategy.allowsDelegation && READONLY_TOOLS.has(toolName) && counters) {
+      if (counters.directInspections >= ARCHITECT_DIRECT_INSPECT_BUDGET) {
+        return JSON.stringify({
+          success: false,
+          error: `You have used all ${ARCHITECT_DIRECT_INSPECT_BUDGET} direct inspection calls for this turn. Delegate exploration and summarization to the utility tier instead — it is cheaper and keeps your context lean. Example: delegate_to_utility({ tasks: [{ title: "Map project structure", instructions: "List the key directories and files under <path>, and summarize what each contains. Report back briefly." }] }).`
+        });
+      }
+      counters.directInspections++;
+    }
 
     // Block the Architect (non-coder/non-utility role in a delegation setup) from calling write/delete/run_command directly.
-    if (isDelegated && agentRole !== "coder" && agentRole !== "utility" && !READONLY_TOOLS.has(toolName) && toolName !== "search_web" && toolName !== "fetch_url" && toolName !== "delegate_tasks" && toolName !== "delegate_to_utility" && toolName !== "update_plan" && toolName !== "set_chat_title" && toolName !== "ask_user_question" && toolName !== "remember") {
+    if (isArchitect && !READONLY_TOOLS.has(toolName) && toolName !== "search_web" && toolName !== "fetch_url" && toolName !== "delegate_tasks" && toolName !== "delegate_to_utility" && toolName !== "update_plan" && toolName !== "set_chat_title" && toolName !== "ask_user_question" && toolName !== "remember") {
       return JSON.stringify({
         success: false,
         error: `You are the ARCHITECT and cannot run "${toolName}" directly — this is by design, not a missing permission. Delegate it to a coder with delegate_tasks. Example: delegate_tasks({ tasks: [{ title: "<short title>", instructions: "<self-contained English instructions; include any shell command to run>" }] }). For a tiny read-only lookup use delegate_to_utility instead.`
