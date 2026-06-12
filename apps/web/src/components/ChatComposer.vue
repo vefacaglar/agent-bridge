@@ -135,6 +135,12 @@ const formattedContext = computed(() => {
   return formatTokensCompact(current);
 });
 
+const usageParts = computed(() => {
+  return props.runUsageLabel
+    ? props.runUsageLabel.split(' · ').filter(Boolean)
+    : [];
+});
+
 const canSend = computed(() => {
   return !props.isRunning && props.selectedModel && (props.taskInput.trim() || attachedFiles.value.length > 0);
 });
@@ -532,15 +538,31 @@ onBeforeUnmount(() => {
 
       <!-- Token info bar (placed outside the input box) -->
       <div v-if="messages && messages.length > 0" class="composer-token-info">
-        <span class="context-tokens" title="Total context (system prompt + history + draft) sent to model">
-          Context: {{ formattedContext }}
-        </span>
-        <template v-if="runUsageLabel">
-          <span class="info-separator">·</span>
-          <span class="composer-usage" :title="runUsageTooltip">
-            {{ runUsageLabel }}
+        <div class="composer-info-strip">
+          <span class="composer-info-metric context-tokens" title="Total context (system prompt + history + draft) sent to model">
+            <svg class="composer-info-icon" xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 7h16"/>
+              <path d="M4 12h16"/>
+              <path d="M4 17h10"/>
+            </svg>
+            <span class="composer-info-label">Context</span>
+            <span class="composer-info-value">{{ formattedContext }}</span>
           </span>
-        </template>
+          <template v-if="usageParts.length">
+            <span class="composer-info-divider"></span>
+            <span
+              v-for="(part, idx) in usageParts"
+              :key="`${part}-${idx}`"
+              class="composer-info-metric composer-usage"
+              :title="runUsageTooltip"
+            >
+              <span v-if="idx === 0" class="composer-info-label">Cost</span>
+              <span v-else-if="part.includes('calls')" class="composer-info-label">Calls</span>
+              <span v-else-if="part.includes('cache')" class="composer-info-label">Cache</span>
+              <span class="composer-info-value">{{ part.replace(' calls', '').replace(' cache', '') }}</span>
+            </span>
+          </template>
+        </div>
       </div>
 
       <div v-if="hasQueuedMessage" class="queued-message-preview">
@@ -997,8 +1019,8 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  margin-bottom: 6px;
-  font-size: 0.72rem;
+  margin-bottom: 8px;
+  font-size: 0.75rem;
   color: var(--faint);
   user-select: none;
   padding: 0 4px;
@@ -1035,18 +1057,61 @@ onBeforeUnmount(() => {
 }
 
 .context-tokens {
-  color: var(--composer-token-accent);
+  color: var(--text);
+}
+
+.composer-info-strip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  min-height: 28px;
+  max-width: 100%;
+  padding: 4px 7px;
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.025));
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.composer-info-metric {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 0 7px;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.composer-info-icon {
+  color: rgba(255, 255, 255, 0.44);
+  flex-shrink: 0;
+}
+
+.composer-info-divider {
+  width: 1px;
+  height: 14px;
+  margin: 0 4px;
+  background: rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
+}
+
+.composer-info-label {
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 0.66rem;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.composer-info-value {
+  color: rgba(255, 255, 255, 0.84);
+  font-variant-numeric: tabular-nums;
   font-weight: 500;
 }
 
-.info-separator {
-  margin: 0 6px;
-  color: var(--faint);
-  user-select: none;
-}
-
 .composer-usage {
-  color: var(--muted);
+  color: var(--text);
 }
 
 .queued-message-preview {

@@ -426,7 +426,15 @@ function formatRunAge(run: Run): string {
 .sidebar {
   gap: 0;
   padding: 12px 14px 14px !important;
-  background: linear-gradient(90deg, #242526 0%, #202122 100%);
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0 !important;
+  border-top-left-radius: 0 !important;
+  border-top-right-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+  background: #202122;
+  outline: none;
+  box-shadow: none;
 }
 
 .nav-action {

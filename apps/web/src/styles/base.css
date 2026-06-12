@@ -47,6 +47,16 @@ body,
   height: 100%;
   width: 100%;
   overflow: hidden;
+  border-radius: 0 !important;
+}
+
+.app-shell,
+.app-shell::before,
+.app-shell::after,
+.sidebar,
+.sidebar::before,
+.sidebar::after {
+  border-radius: 0 !important;
 }
 
 body {
