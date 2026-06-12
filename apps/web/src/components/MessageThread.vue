@@ -280,7 +280,10 @@ const formattedElapsedTime = computed(() => {
         @click="handleUserMessageClick($event, activeRun?.id || '')"
         :ref="(el) => checkBubbleHeight(el as HTMLElement, activeRun?.id || '')"
       >
-        <div class="user-raw-message">{{ activeRun?.task || '' }}</div>
+        <div
+          class="user-raw-message user-markdown-body"
+          v-html="renderMarkdown(activeRun?.task || '', activeRun?.id || 'active-run')"
+        ></div>
       </article>
       <div class="user-response-footer">
         <button 
@@ -346,7 +349,10 @@ const formattedElapsedTime = computed(() => {
           @click="handleUserMessageClick($event, group.message.id)"
           :ref="(el) => checkBubbleHeight(el as HTMLElement, group.message.id)"
         >
-          <div class="user-raw-message">{{ group.message.content || '' }}</div>
+          <div
+            class="user-raw-message user-markdown-body"
+            v-html="renderMarkdown(group.message.content || '', group.message.id)"
+          ></div>
         </article>
         <div class="user-response-footer">
           <button 

@@ -95,17 +95,33 @@ function onDeleteProject(path: string, event: Event) {
   event.stopPropagation();
   emit('delete-project', path);
 }
+
+function formatRunAge(run: Run): string {
+  const stamp = run.lastActiveAt || run.updatedAt || run.createdAt;
+  const time = Date.parse(stamp);
+  if (!Number.isFinite(time)) return '';
+
+  const diffMs = Math.max(0, Date.now() - time);
+  const minute = 60 * 1000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+  const week = 7 * day;
+  const month = 30 * day;
+  const year = 365 * day;
+
+  if (diffMs < minute) return 'now';
+  if (diffMs < hour) return `${Math.floor(diffMs / minute)}m`;
+  if (diffMs < day) return `${Math.floor(diffMs / hour)}h`;
+  if (diffMs < week) return `${Math.floor(diffMs / day)}d`;
+  if (diffMs < month) return `${Math.floor(diffMs / week)}w`;
+  if (diffMs < year) return `${Math.floor(diffMs / month)}mo`;
+  return `${Math.floor(diffMs / year)}y`;
+}
 </script>
 
 <template>
   <aside class="sidebar" :class="{ collapsed: isSidebarCollapsed }">
     <div class="sidebar-header">
-      <button class="search-btn" title="Search">
-        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="11" cy="11" r="8"/>
-          <path d="m21 21-4.3-4.3"/>
-        </svg>
-      </button>
       <button class="collapse-btn" @click="emit('toggle-sidebar')" title="Collapse Sidebar">
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <rect width="18" height="18" x="3" y="3" rx="2" />
@@ -114,22 +130,32 @@ function onDeleteProject(path: string, event: Event) {
       </button>
     </div>
 
-    <button class="nav-action new-chat-action" @click="emit('new-chat')">
-      <svg class="new-chat-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 20h9"/>
-        <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
-      </svg>
-      <span>New session</span>
-    </button>
+    <nav class="sidebar-nav" aria-label="Primary">
+      <button class="nav-action sidebar-nav-item new-chat-action" @click="emit('new-chat')">
+        <svg class="new-chat-icon" xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 20h9"/>
+          <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+        </svg>
+        <span>New chat</span>
+      </button>
 
-    <button class="nav-action usage-logs-action" :class="{ active: showUsageLogsPage }" @click="emit('open-usage-logs')" style="margin-top: 4px;">
-      <svg class="usage-logs-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;">
-        <line x1="18" y1="20" x2="18" y2="10"/>
-        <line x1="12" y1="20" x2="12" y2="4"/>
-        <line x1="6" y1="20" x2="6" y2="14"/>
-      </svg>
-      <span>Usage Logs</span>
-    </button>
+      <button class="nav-action sidebar-nav-item search-action" type="button">
+        <svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/>
+          <path d="m21 21-4.3-4.3"/>
+        </svg>
+        <span>Search</span>
+      </button>
+
+      <button class="nav-action sidebar-nav-item usage-logs-action" :class="{ active: showUsageLogsPage }" @click="emit('open-usage-logs')">
+        <svg class="usage-logs-icon" xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="20" x2="18" y2="10"/>
+          <line x1="12" y1="20" x2="12" y2="4"/>
+          <line x1="6" y1="20" x2="6" y2="14"/>
+        </svg>
+        <span>Usage logs</span>
+      </button>
+    </nav>
 
     <div class="sidebar-block projects-accordion">
       <div class="sidebar-label flex-between">
@@ -192,7 +218,8 @@ function onDeleteProject(path: string, event: Event) {
                 :class="{ active: run.id === activeRunId }"
                 @click="emit('select-run', run)"
               >
-                <span>{{ run.title }}</span>
+                <span class="chat-title">{{ run.title }}</span>
+                <span class="chat-age">{{ formatRunAge(run) }}</span>
               </button>
               <button
                 v-if="hasMoreRunsForProject(project.path)"
@@ -200,7 +227,7 @@ function onDeleteProject(path: string, event: Event) {
                 class="load-more-btn"
                 @click="loadMoreForProject(project.path)"
               >
-                load more...
+                Show more
               </button>
             </div>
           </Transition>
@@ -221,36 +248,34 @@ function onDeleteProject(path: string, event: Event) {
 
 <style scoped>
 .sidebar {
-  gap: 6px;
-  padding: var(--shell-inset) 12px 12px !important;
+  gap: 0;
+  padding: 12px 14px 14px !important;
+  background: linear-gradient(90deg, #242526 0%, #202122 100%);
 }
 
 .nav-action {
-  padding: 4px 8px;
-  font-size: 0.88rem;
+  padding: 0;
+  font-size: 0.9rem;
 }
 
 .nav-action.active {
-  background: var(--sidebar-active);
-  border: 1px solid var(--border-soft);
   color: var(--text);
-  font-weight: 500;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.07);
 }
 
 .sidebar-header {
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  height: var(--top-bar-h);
+  height: 32px;
   flex: 0 0 auto;
   padding: 0;
   background: transparent;
   border: none;
-  gap: 6px;
-  margin-top: 0;
+  margin: 0 0 12px;
 }
 
-.search-btn,
 .collapse-btn {
   display: flex;
   align-items: center;
@@ -258,16 +283,42 @@ function onDeleteProject(path: string, event: Event) {
   width: 28px;
   height: 28px;
   border-radius: 6px;
-  background: var(--panel-close-bg);
-  color: var(--muted);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.5);
   cursor: pointer;
   transition: all 0.2s ease;
   border: none;
 }
 
-.search-btn:hover,
 .collapse-btn:hover {
-  background: var(--panel-close-hover-bg);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 18px;
+}
+
+.sidebar-nav-item {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 30px;
+  padding: 3px 8px;
+  border-radius: 7px;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.sidebar-nav-item svg {
+  justify-self: center;
+}
+
+.sidebar-nav-item:hover {
+  background: rgba(255, 255, 255, 0.07);
   color: var(--text);
 }
 
@@ -275,15 +326,17 @@ function onDeleteProject(path: string, event: Event) {
   flex: 1;
   overflow-y: auto;
   min-height: 0;
-  margin-top: 4px;
+  margin-top: 0;
+  scrollbar-gutter: stable;
 }
 
 .new-chat-action,
 .usage-logs-action,
-.settings-action {
-  display: flex;
+.search-action {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .new-chat-icon {
@@ -291,19 +344,35 @@ function onDeleteProject(path: string, event: Event) {
 }
 
 .settings-action {
-  margin-top: 4px;
+  margin-top: 12px;
   flex-shrink: 0;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  min-height: 32px;
+  padding: 3px 8px;
+  border-radius: 7px;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.settings-action svg {
+  flex-shrink: 0;
+  justify-self: center;
+}
+
+.settings-action:hover {
+  background: rgba(255, 255, 255, 0.07);
 }
 
 .project-list {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  margin-top: 4px;
+  gap: 6px;
+  margin-top: 12px;
 }
 
 .project-accordion-item {
-  border-radius: 6px;
+  border-radius: 7px;
   overflow: hidden;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -312,38 +381,40 @@ function onDeleteProject(path: string, event: Event) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 6px;
-  border-radius: 6px;
-  color: var(--muted);
+  min-height: 30px;
+  padding: 3px 8px;
+  border-radius: 7px;
+  color: rgba(255, 255, 255, 0.88);
   cursor: pointer;
   user-select: none;
   transition: all 0.2s ease;
+  line-height: 1.35;
 }
 
 .project-header-left {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
   min-width: 0;
   flex: 1;
 }
 
 .folder-icon {
   flex-shrink: 0;
-  color: var(--faint);
+  color: rgba(255, 255, 255, 0.82);
   transition: color 0.2s ease;
 }
 
 .project-header:hover .folder-icon {
-  color: var(--muted);
+  color: var(--text);
 }
 
 .project-header.active .folder-icon {
-  color: var(--muted);
+  color: var(--text);
 }
 
 .project-header:hover {
-  background: var(--nav-action-hover-bg);
+  background: rgba(255, 255, 255, 0.07);
   color: var(--text);
 }
 
@@ -357,22 +428,61 @@ function onDeleteProject(path: string, event: Event) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.84rem;
+  font-size: 0.9rem;
+  line-height: 1.35;
 }
 
 .project-chats-list {
-  padding: 1px 2px 2px 10px;
+  padding: 3px 0 1px 32px;
   margin-top: 0;
   border-left: none;
   margin-left: 0;
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 0;
 }
 
 .chat-history-item {
-  padding: 4px 6px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 10px;
+  min-height: 0;
+  padding: 2px 8px 3px 0;
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.84);
   font-size: 0.82rem;
+  line-height: 1.45;
+  overflow: visible;
+}
+
+.chat-history-item:hover {
+  background: transparent;
+  color: var(--text);
+}
+
+.chat-history-item.active {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.chat-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.45;
+  padding-bottom: 0;
+}
+
+.chat-age {
+  color: rgba(255, 255, 255, 0.48);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  line-height: 1.45;
+  padding-bottom: 0;
 }
 
 .project-header-actions {
@@ -384,7 +494,7 @@ function onDeleteProject(path: string, event: Event) {
 .new-chat-project-btn,
 .delete-project-btn {
   background: transparent;
-  color: var(--faint);
+  color: rgba(255, 255, 255, 0.45);
   cursor: pointer;
   padding: 3px;
   border-radius: 4px;
@@ -402,7 +512,7 @@ function onDeleteProject(path: string, event: Event) {
 
 .new-chat-project-btn:hover {
   color: var(--text);
-  background: var(--surface-strong);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .delete-project-btn:hover {
@@ -426,20 +536,35 @@ function onDeleteProject(path: string, event: Event) {
 
 .load-more-btn {
   background: transparent;
-  color: var(--faint);
-  font-size: 0.74rem;
-  padding: 3px 6px;
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 0.82rem;
+  padding: 2px 8px 2px 0;
   text-align: left;
   cursor: pointer;
   width: 100%;
   transition: color 0.2s ease;
-  font-style: italic;
   border: none;
   border-radius: 4px;
 }
 
 .load-more-btn:hover {
-  color: var(--muted);
-  background: var(--sidebar-load-more-hover);
+  color: rgba(255, 255, 255, 0.72);
+  background: transparent;
+}
+
+.sidebar-label {
+  padding: 0 8px;
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 0.9rem;
+  line-height: 1.2;
+}
+
+.add-project-btn {
+  opacity: 0;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.projects-accordion:hover .add-project-btn {
+  opacity: 1;
 }
 </style>
