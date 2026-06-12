@@ -122,7 +122,7 @@ export function renderMarkdown(content: string, idPrefix?: string): string {
       }
       markdownCache.set(cacheKey, { content, rendered });
     }
-    return rendered;
+    return rendered.trimEnd();
   } catch (err) {
     console.error('Markdown parsing error:', err);
     return content;

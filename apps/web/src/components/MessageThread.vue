@@ -884,7 +884,7 @@ const formattedElapsedTime = computed(() => {
   font-family: inherit;
   font-size: 0.94rem;
   line-height: 1.55;
-  white-space: pre-wrap;
+  white-space: normal;
   word-break: break-word;
 }
 .user-markdown-body :deep(p) {
