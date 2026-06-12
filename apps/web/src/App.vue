@@ -563,6 +563,7 @@ onUnmounted(() => {
       :run-id="activeRunId"
       :project-path="activeRun?.projectPath || projects.activeProjectPath.value"
       :isOpen="sidePanelOpen && !showUsageLogsPage"
+      :is-running="isRunning"
       :plan="currentPlan"
       :changes="workspaceChanges"
       :agents="agentSummaries"

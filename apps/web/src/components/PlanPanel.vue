@@ -18,6 +18,7 @@ const props = defineProps<{
   agents?: AgentSummary[];
   showActions?: boolean;
   isOpen?: boolean;
+  isRunning?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -237,25 +238,48 @@ function resetGitForm() {
 }
 
 watch(
-  () => [activeTab.value, props.projectPath] as const,
-  ([tab, path]) => {
-    if (tab === 'review' && path) {
+  () => [activeTab.value, props.projectPath, props.isOpen] as const,
+  ([tab, path, isOpen]) => {
+    if (tab === 'review' && path && isOpen) {
       checkGitStatus();
     }
   },
   { immediate: true }
 );
+watch(
+  () => props.plan,
+  (newPlan) => {
+    plan.value = newPlan;
+  },
+  { immediate: true, deep: true }
+);
 
 watch(
-  () => [props.plan, props.changes, props.agents, props.isOpen] as const,
-  ([newPlan, newChanges, newAgents, isOpen]) => {
-    if (isOpen || !plan.value) {
-      plan.value = newPlan;
-      changes.value = newChanges ?? [];
-      agents.value = newAgents ?? [];
+  () => props.changes,
+  (newChanges) => {
+    changes.value = newChanges ?? [];
+    if (activeTab.value === 'review' && props.isOpen && props.projectPath) {
+      checkGitStatus();
     }
   },
-  { immediate: true }
+  { immediate: true, deep: true }
+);
+
+watch(
+  () => props.agents,
+  (newAgents) => {
+    agents.value = newAgents ?? [];
+  },
+  { immediate: true, deep: true }
+);
+
+watch(
+  () => props.isRunning,
+  (running) => {
+    if (!running && activeTab.value === 'review' && props.isOpen && props.projectPath) {
+      checkGitStatus();
+    }
+  }
 );
 
 const doneCount = computed(() => plan.value?.tasks.filter(t => t.status === 'completed').length ?? 0);
