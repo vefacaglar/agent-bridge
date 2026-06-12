@@ -18,14 +18,6 @@ const emit = defineEmits<{
       <svg class="step-row-toggle" :class="{ rotated: expanded }" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="m6 9 6 6 6-6"></path>
       </svg>
-      <svg class="step-row-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="3"></circle>
-        <circle cx="12" cy="5" r="1"></circle>
-        <circle cx="12" cy="19" r="1"></circle>
-        <circle cx="5" cy="12" r="1"></circle>
-        <circle cx="19" cy="12" r="1"></circle>
-        <path d="M12 8v3M12 13v3M8 12h3M13 12h3"></path>
-      </svg>
       <span class="step-row-label">Reasoning</span>
     </header>
     <div v-if="expanded" class="reasoning-details">

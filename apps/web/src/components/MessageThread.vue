@@ -309,10 +309,6 @@ const formattedElapsedTime = computed(() => {
         <svg class="step-row-toggle" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="m9 18 6-6-6-6"></path>
         </svg>
-        <svg class="step-row-icon" style="color: var(--planner);" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
-          <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
-        </svg>
         <span class="step-row-label">Plan: {{ plan.title }}</span>
         <span v-if="plan.tasks.length" style="font-size: 0.72rem; color: var(--faint); font-family: monospace; margin-left: 6px; user-select: none;">
           {{ planDoneCount }} / {{ plan.tasks.length }} tasks completed
@@ -325,12 +321,6 @@ const formattedElapsedTime = computed(() => {
       <header class="step-row" @click="emit('open-agents')">
         <svg class="step-row-toggle" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="m9 18 6-6-6-6"></path>
-        </svg>
-        <svg class="step-row-icon" style="color: var(--executor);" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
-          <circle cx="9" cy="7" r="4"></circle>
-          <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
-          <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
         </svg>
         <span class="step-row-label">Background Agents</span>
         <span style="font-size: 0.72rem; color: var(--faint); font-family: monospace; margin-left: 6px; user-select: none;">
@@ -401,12 +391,6 @@ const formattedElapsedTime = computed(() => {
         >
           <svg class="arrow-right-icon step-row-toggle" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <path d="m9 18 6-6-6-6"></path>
-          </svg>
-          <svg class="step-row-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
-            <circle cx="9" cy="7" r="4"></circle>
-            <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
-            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
           </svg>
           <span class="step-row-label">
             {{ group.children?.[0]?.message.agentRole === 'utility' ? 'Utility' : 'Coder' }}: {{ group.title }}
@@ -502,11 +486,6 @@ const formattedElapsedTime = computed(() => {
           <svg class="step-row-toggle" :class="{ rotated: expandedErrors[group.id] }" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="m6 9 6 6 6-6"></path>
           </svg>
-          <svg class="step-row-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"></circle>
-            <line x1="12" y1="8" x2="12" y2="12"></line>
-            <line x1="12" y1="16" x2="12.01" y2="16"></line>
-          </svg>
           <span class="step-row-label">System Error</span>
           <span style="font-size: 0.72rem; color: var(--faint); font-family: monospace; margin-left: 6px; user-select: none;">
             {{ formatTime(group.message.createdAt) }}
@@ -534,11 +513,6 @@ const formattedElapsedTime = computed(() => {
       <header class="step-row" @click="toggleError('trailing-error')">
         <svg class="step-row-toggle" :class="{ rotated: expandedErrors['trailing-error'] }" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="m6 9 6 6 6-6"></path>
-        </svg>
-        <svg class="step-row-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10"></circle>
-          <line x1="12" y1="8" x2="12" y2="12"></line>
-          <line x1="12" y1="16" x2="12.01" y2="16"></line>
         </svg>
         <span class="step-row-label">System Error</span>
         <span style="font-size: 0.72rem; color: var(--faint); font-family: monospace; margin-left: 6px; user-select: none;">
