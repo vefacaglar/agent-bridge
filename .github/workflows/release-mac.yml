@@ -50,6 +50,23 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Update package.json version
+        run: |
+          node -e "
+            const fs = require('fs');
+            const tagName = '${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref_name }}';
+            const version = tagName.replace(/^v/, '');
+            if (/^\d+\.\d+\.\d+/.test(version)) {
+              console.log('Setting version to:', version);
+              const pkgPath = 'apps/desktop/package.json';
+              const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+              pkg.version = version;
+              fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
+            } else {
+              console.log('Skipping version update, using default version. Tag/Ref:', tagName);
+            }
+          "
+
       - name: Build all packages (Go + web + api + Electron)
         run: pnpm dist
 
