@@ -3,7 +3,8 @@ name: Release macOS DMG
 on:
   push:
     tags:
-      - v*
+      - 'v*'
+      - '[0-9]*'
   workflow_dispatch:
     inputs:
       tag_name:
@@ -51,17 +52,33 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Update package.json version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TAG_NAME: ${{ inputs.tag_name }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
           node -e "
             const fs = require('fs');
-            const tagName = '${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref_name }}';
+            const eventName = process.env.EVENT_NAME;
+            const inputTagName = process.env.INPUT_TAG_NAME;
+            const refName = process.env.REF_NAME;
+            const tagName = eventName === 'workflow_dispatch' && inputTagName ? inputTagName : refName;
             const version = tagName.replace(/^v/, '');
             if (/^\d+\.\d+\.\d+/.test(version)) {
               console.log('Setting version to:', version);
-              const pkgPath = 'apps/desktop/package.json';
-              const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-              pkg.version = version;
-              fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
+              const paths = [
+                'apps/desktop/package.json',
+                'apps/api/package.json',
+                'packages/shared/package.json'
+              ];
+              for (const pkgPath of paths) {
+                if (fs.existsSync(pkgPath)) {
+                  const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+                  pkg.version = version;
+                  fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
+                  console.log('Updated', pkgPath);
+                }
+              }
             } else {
               console.log('Skipping version update, using default version. Tag/Ref:', tagName);
             }
