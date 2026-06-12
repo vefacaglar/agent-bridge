@@ -230,10 +230,18 @@ function isRowVisible(idx: number): boolean {
 function clusterLabel(c: ToolCluster): string {
   const names = c.indices.map(i => props.toolCalls[i].function?.name);
   const n = c.indices.length;
-  if (names.every(name => name === 'read_file')) return `Read ${n} files`;
-  if (names.every(name => name === 'list_directory')) return `Listed ${n} directories`;
-  if (names.every(name => name === 'search_files')) return `Ran ${n} searches`;
-  return `Inspected ${n} items`;
+  const isPending = clusterStatus(c) === 'pending';
+  if (isPending) {
+    if (names.every(name => name === 'read_file')) return `Reading ${n} files...`;
+    if (names.every(name => name === 'list_directory')) return `Listing ${n} directories...`;
+    if (names.every(name => name === 'search_files')) return `Running ${n} searches...`;
+    return `Inspecting ${n} items...`;
+  } else {
+    if (names.every(name => name === 'read_file')) return `Read ${n} files`;
+    if (names.every(name => name === 'list_directory')) return `Listed ${n} directories`;
+    if (names.every(name => name === 'search_files')) return `Ran ${n} searches`;
+    return `Inspected ${n} items`;
+  }
 }
 
 function clusterStatus(c: ToolCluster): 'success' | 'failed' | 'pending' {
@@ -386,45 +394,52 @@ function getStepLabel(name: string, args: string, idx: number): string {
     }
     return 'Workspace tool output';
   }
-  return getToolLabel(name, args);
+  const isFinished = !!props.toolResponses[idx];
+  return getToolLabel(name, args, isFinished);
 }
 
-function getToolLabel(name: string, args: string): string {
+function getToolLabel(name: string, args: string, isFinished: boolean): string {
   const path = getToolPathCached(args);
   const parsed = parseArgsCached(args);
   switch (name) {
     case 'read_file':
-      return `File read: ${path}`;
+      return isFinished ? `Read: ${path}` : `Reading: ${path}`;
     case 'write_file':
-      return `File written/updated: ${path}`;
+      return isFinished ? `Written: ${path}` : `Writing: ${path}`;
     case 'edit_file':
-      return `File edited: ${path}`;
+      return isFinished ? `Edited: ${path}` : `Editing: ${path}`;
     case 'delete_file':
-      return `File deleted: ${path}`;
+      return isFinished ? `Deleted: ${path}` : `Deleting: ${path}`;
     case 'list_directory':
-      return `Directory listed: ${path || 'root'}`;
+      return isFinished ? `Directory listed: ${path || 'root'}` : `Listing directory: ${path || 'root'}`;
     case 'create_directory':
-      return `Folder created: ${path}`;
+      return isFinished ? `Folder created: ${path}` : `Creating folder: ${path}`;
     case 'move_file':
-      return `Moved: ${parsed.source_path ?? ''} → ${parsed.destination_path ?? ''}`;
+      return isFinished 
+        ? `Moved: ${parsed.source_path ?? ''} → ${parsed.destination_path ?? ''}`
+        : `Moving: ${parsed.source_path ?? ''} → ${parsed.destination_path ?? ''}`;
     case 'search_files':
-      return `Searched: ${parsed.query ?? ''}`;
+      return isFinished ? `Searched: ${parsed.query ?? ''}` : `Searching: ${parsed.query ?? ''}`;
     case 'search_web':
-      return `Web search: ${parsed.query ?? ''}`;
+      return isFinished ? `Searched web: ${parsed.query ?? ''}` : `Searching web: ${parsed.query ?? ''}`;
     case 'run_command':
-      return `Command: ${parsed.command ?? ''}`;
+      return isFinished ? `Ran command: ${parsed.command ?? ''}` : `Running command: ${parsed.command ?? ''}`;
     case 'fetch_url':
-      return `Fetched: ${parsed.url ?? ''}`;
+      return isFinished ? `Fetched: ${parsed.url ?? ''}` : `Fetching: ${parsed.url ?? ''}`;
     case 'delegate_tasks': {
       const count = Array.isArray(parsed.tasks) ? parsed.tasks.length : 0;
-      return `Delegated ${count} task${count === 1 ? '' : 's'} to coder${parsed.parallel ? ' (parallel)' : ''}`;
+      return isFinished
+        ? `Delegated ${count} task${count === 1 ? '' : 's'} to coder${parsed.parallel ? ' (parallel)' : ''}`
+        : `Delegating ${count} task${count === 1 ? '' : 's'} to coder...`;
     }
     case 'delegate_to_utility': {
       const count = Array.isArray(parsed.tasks) ? parsed.tasks.length : 0;
-      return `Delegated ${count} task${count === 1 ? '' : 's'} to utility${parsed.parallel ? ' (parallel)' : ''}`;
+      return isFinished
+        ? `Delegated ${count} task${count === 1 ? '' : 's'} to utility${parsed.parallel ? ' (parallel)' : ''}`
+        : `Delegating ${count} task${count === 1 ? '' : 's'} to utility...`;
     }
     default:
-      return `Tool ${name} executed`;
+      return isFinished ? `Tool ${name} executed` : `Executing tool ${name}...`;
   }
 }
 
@@ -681,7 +696,7 @@ function formatToolResult(name: string, contentJson: string): string {
         @click="toggleCluster(idx)"
       >
         <svg class="step-row-toggle" :class="{ rotated: isClusterExpanded(idx) }" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="m6 9 6 6 6-6"></path>
+          <path d="m9 18 6-6-6-6"></path>
         </svg>
         <span
           class="step-row-label"
@@ -719,7 +734,7 @@ function formatToolResult(name: string, contentJson: string): string {
       >
         <header class="step-row" @click="handleRowClick(tc.function?.name, tc.function?.arguments, idx)">
           <svg v-if="!isFileLinkTool(tc.function?.name)" class="step-row-toggle" :class="{ rotated: detailsExpanded[idx] }" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="m6 9 6 6 6-6"></path>
+            <path d="m9 18 6-6-6-6"></path>
           </svg>
           
           <span

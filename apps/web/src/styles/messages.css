@@ -63,11 +63,26 @@
   order: 1;
   flex-shrink: 0;
   color: inherit;
-  transition: transform 0.2s ease;
+  transition: transform 0.2s ease, opacity 0.2s ease;
 }
 
 .step-row-toggle.rotated {
-  transform: rotate(180deg);
+  transform: rotate(90deg);
+}
+
+/* Unopened accordions' toggles are hidden by default and only visible on hover */
+.tool-call-accordion .step-row-toggle:not(.rotated),
+.tool-cluster-header .step-row-toggle:not(.rotated),
+.reasoning-accordion .step-row-toggle:not(.rotated),
+.system-error-accordion .step-row-toggle:not(.rotated) {
+  opacity: 0;
+}
+
+.tool-call-accordion:hover .step-row-toggle:not(.rotated),
+.tool-cluster-header:hover .step-row-toggle:not(.rotated),
+.reasoning-accordion:hover .step-row-toggle:not(.rotated),
+.system-error-accordion:hover .step-row-toggle:not(.rotated) {
+  opacity: 1;
 }
 
 .empty-chat {

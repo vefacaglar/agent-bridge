@@ -368,6 +368,7 @@ const formattedElapsedTime = computed(() => {
           v-if="group.message.reasoningContent"
           :content="group.message.reasoningContent"
           :expanded="isReasoningExpanded(group.id)"
+          :is-thinking="isRunning && idx === groupedMessages.length - 1 && !group.toolCalls?.length && !group.message.content?.trim()"
           :data-reasoning-group-id="group.id"
           @toggle="toggleReasoning(group.id)"
         />
@@ -479,7 +480,7 @@ const formattedElapsedTime = computed(() => {
       <div v-else-if="group.type === 'system'" class="system-error-accordion" :class="{ 'is-expanded': expandedErrors[group.id] }">
         <header class="step-row" @click="toggleError(group.id)">
           <svg class="step-row-toggle" :class="{ rotated: expandedErrors[group.id] }" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="m6 9 6 6 6-6"></path>
+            <path d="m9 18 6-6-6-6"></path>
           </svg>
           <span class="step-row-label">System Error</span>
           <span style="font-size: 0.72rem; color: var(--faint); font-family: monospace; margin-left: 6px; user-select: none;">
@@ -507,7 +508,7 @@ const formattedElapsedTime = computed(() => {
     <div v-if="activeRun.status === 'failed' && !hasSystemErrorInHistory" class="system-error-accordion" :class="{ 'is-expanded': expandedErrors['trailing-error'] }">
       <header class="step-row" @click="toggleError('trailing-error')">
         <svg class="step-row-toggle" :class="{ rotated: expandedErrors['trailing-error'] }" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="m6 9 6 6 6-6"></path>
+          <path d="m9 18 6-6-6-6"></path>
         </svg>
         <span class="step-row-label">System Error</span>
         <span style="font-size: 0.72rem; color: var(--faint); font-family: monospace; margin-left: 6px; user-select: none;">
