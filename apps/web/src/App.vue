@@ -270,6 +270,12 @@ async function openAgents() {
   planPanelRef.value?.selectTab?.('agents');
 }
 
+async function openFileInReview(filePath: string) {
+  sidePanelCollapsed.value = false;
+  await nextTick();
+  planPanelRef.value?.openFileInReview?.(filePath);
+}
+
 // --- Plan approval actions (Start / Revise / Reject) ----------------------
 // While in plan mode, the panel offers three choices once a plan is presented.
 // The decision is tracked per plan version so the buttons reappear if the
@@ -473,6 +479,7 @@ onUnmounted(() => {
             @open-plan="openPlan"
             @open-agents="openAgents"
             @view-agent="openAgentTranscript"
+            @view-file-in-review="openFileInReview"
           />
         </section>
 

@@ -798,9 +798,9 @@ function formatRunAge(run: Run): string {
   left: 0;
   right: 0;
   bottom: 0;
-  background: var(--lightbox-overlay-bg);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   z-index: 99999;
 }
 
@@ -818,6 +818,7 @@ function formatRunAge(run: Run): string {
   border-radius: 24px;
   background: var(--surface-elevated);
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
+  z-index: 100000;
 }
 
 .search-palette-input-row {

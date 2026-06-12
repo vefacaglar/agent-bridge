@@ -14,6 +14,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'open-plan'): void;
+  (e: 'view-file-in-review', path: string): void;
 }>();
 
 const expanded = ref(false);
@@ -126,6 +127,7 @@ watch(expanded, (isExpanded) => {
           :tool-calls="child.toolCalls"
           :tool-responses="child.toolResponses"
           @open-plan="emit('open-plan')"
+          @view-file-in-review="emit('view-file-in-review', $event)"
         />
 
         <div

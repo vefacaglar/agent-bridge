@@ -20,6 +20,7 @@ const emit = defineEmits<{
   (e: 'open-plan'): void;
   (e: 'open-agents'): void;
   (e: 'view-agent', id: string): void;
+  (e: 'view-file-in-review', path: string): void;
 }>();
 
 const planDoneCount = computed(() => props.plan?.tasks.filter(t => t.status === 'completed').length ?? 0);
@@ -388,6 +389,7 @@ const formattedElapsedTime = computed(() => {
           :agent-role="group.message.agentRole"
           :model="group.message.model"
           @open-plan="emit('open-plan')"
+          @view-file-in-review="emit('view-file-in-review', $event)"
         />
       </template>
 

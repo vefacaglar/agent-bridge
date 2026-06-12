@@ -17,6 +17,7 @@ const isCoder = computed(() => props.agentRole === 'coder');
 
 const emit = defineEmits<{
   (e: 'open-plan'): void;
+  (e: 'view-file-in-review', path: string): void;
 }>();
 
 const detailsExpanded = ref<Record<number, boolean>>({});
@@ -342,6 +343,19 @@ function getToolPath(argumentsJson: string): string {
     return parsed.path || '';
   } catch (e) {
     return '';
+  }
+}
+
+function isFileLinkTool(name: string): boolean {
+  return name === 'edit_file' || name === 'write_file';
+}
+
+function handleRowClick(name: string, args: string, idx: number) {
+  if (isFileLinkTool(name)) {
+    const path = getToolPathCached(args);
+    emit('view-file-in-review', path);
+  } else {
+    toggleDetails(idx);
   }
 }
 
@@ -713,8 +727,13 @@ function formatToolResult(name: string, contentJson: string): string {
         class="tool-call-accordion"
         :class="{ 'is-expanded': detailsExpanded[idx], 'clustered-row': isClustered(idx) }"
       >
-        <header class="step-row" @click="toggleDetails(idx)">
-          <svg class="step-row-toggle" :class="{ rotated: detailsExpanded[idx] }" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <header class="step-row" @click="handleRowClick(tc.function?.name, tc.function?.arguments, idx)">
+          <svg v-if="isFileLinkTool(tc.function?.name)" class="step-row-icon-link" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; color: var(--primary);">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+            <polyline points="15 3 21 3 21 9"></polyline>
+            <line x1="10" y1="14" x2="21" y2="3"></line>
+          </svg>
+          <svg v-else class="step-row-toggle" :class="{ rotated: detailsExpanded[idx] }" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="m6 9 6 6 6-6"></path>
           </svg>
           

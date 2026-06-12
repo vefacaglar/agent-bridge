@@ -98,8 +98,16 @@ const actionLabels: Record<GitAction, string> = {
 
 const availableGitActions: GitAction[] = ['commit', 'commit-push', 'push'];
 
+const showCommitPopup = ref(false);
+
+function toggleCommitPopup(e: Event) {
+  e.stopPropagation();
+  showCommitPopup.value = !showCommitPopup.value;
+}
+
 function closeDropdown() {
   showActionsDropdown.value = false;
+  showCommitPopup.value = false;
 }
 
 onMounted(() => {
@@ -225,6 +233,7 @@ function resetGitForm() {
   commitMessage.value = '';
   gitError.value = null;
   commitStatus.value = 'idle';
+  showCommitPopup.value = false;
 }
 
 watch(
@@ -611,9 +620,29 @@ function selectTab(tab: PanelTab) {
   activeTab.value = tab;
 }
 
+function openFileInReview(filePath: string) {
+  if (isGitRepo.value) {
+    activeTab.value = 'review';
+    const file = gitDiffFiles.value.find(f => f.path === filePath || f.path.endsWith(filePath));
+    if (file) {
+      file.isOpen = true;
+      nextTick(() => {
+        const el = document.querySelector(`[data-file-path="${file.path}"]`);
+        el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    }
+  } else if (changes.value) {
+    const change = changes.value.find(c => c.displayPath === filePath || c.displayPath.endsWith(filePath));
+    if (change) {
+      openFile(change);
+    }
+  }
+}
+
 defineExpose({
   expandAgentTranscript,
-  selectTab
+  selectTab,
+  openFileInReview
 });
 </script>
 
@@ -784,6 +813,7 @@ defineExpose({
                   :tool-calls="child.toolCalls"
                   :tool-responses="child.toolResponses"
                   @open-plan="selectTab('plan')"
+                  @view-file-in-review="openFileInReview"
                 />
 
                 <div
@@ -807,9 +837,129 @@ defineExpose({
             <h2>Review</h2>
             <p>{{ isGitRepo ? gitDiffFiles.length : changes.length }} changed {{ (isGitRepo ? gitDiffFiles.length : changes.length) === 1 ? 'item' : 'items' }}</p>
           </div>
-          <div v-if="isGitRepo ? gitDiffFiles.length : changes.length" class="change-total">
-            <span class="add">+{{ isGitRepo ? totalGitAdded : totalAdded }}</span>
-            <span class="del">-{{ isGitRepo ? totalGitDeleted : totalDeleted }}</span>
+          
+          <div class="review-header-actions">
+            <!-- Commit Popup Trigger Wrapper -->
+            <div v-if="isGitRepo" class="commit-popup-wrapper">
+              <button
+                type="button"
+                class="commit-trigger-btn"
+                @click.stop="toggleCommitPopup"
+              >
+                <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor" style="margin-right: 4px;">
+                  <path fill-rule="evenodd" d="M11.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5zm-2.25.75a2.25 2.25 0 1 1 3 2.122V6A2.5 2.5 0 0 1 10 8.5H6a1 1 0 0 0-1 1v1.378a2.251 2.251 0 1 1-1.5 0V5.122a2.25 2.25 0 1 1 1.5 0v2.878h4A1 1 0 0 0 10 7V5.372a2.25 2.25 0 0 1-.5-1.622zM4.25 12a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5zM3.5 3.25a.75.75 0 1 1 1.5 0 .75.75 0 0 1-1.5 0z"/>
+                </svg>
+                Commit...
+              </button>
+
+              <!-- Commit Modal Teleport -->
+              <Teleport to="body">
+                <div v-if="showCommitPopup" class="commit-modal-backdrop" @click="closeDropdown">
+                  <div class="git-commit-card modal-content" @click.stop>
+                    <div class="git-header">
+                      <span class="git-icon">
+                        <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor">
+                          <path fill-rule="evenodd" d="M11.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5zm-2.25.75a2.25 2.25 0 1 1 3 2.122V6A2.5 2.5 0 0 1 10 8.5H6a1 1 0 0 0-1 1v1.378a2.251 2.251 0 1 1-1.5 0V5.122a2.25 2.25 0 1 1 1.5 0v2.878h4A1 1 0 0 0 10 7V5.372a2.25 2.25 0 0 1-.5-1.622zM4.25 12a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5zM3.5 3.25a.75.75 0 1 1 1.5 0 .75.75 0 0 1-1.5 0z"/>
+                        </svg>
+                      </span>
+                      <span class="git-branch">on branch <strong>{{ gitBranch }}</strong></span>
+                    </div>
+
+                    <div class="git-commit-form">
+                      <!-- Warning message if clean and not pushing -->
+                      <div v-if="!hasGitChanges && selectedGitAction !== 'push'" class="git-clean-msg">
+                        No local changes to commit. Make edits or select <strong>Push</strong> to push local commits.
+                      </div>
+
+                      <!-- Buttoned Input -->
+                      <div v-else class="git-input-wrapper">
+                        <textarea
+                          v-model="commitMessage"
+                          placeholder="Commit message..."
+                          class="git-commit-input"
+                          :disabled="commitStatus === 'processing'"
+                          rows="3"
+                        ></textarea>
+                        <button
+                          type="button"
+                          class="git-generate-btn"
+                          :disabled="isGenerating || commitStatus === 'processing'"
+                          @click="generateCommitMessage"
+                          title="AI Generate Message"
+                        >
+                          <span v-if="isGenerating" class="spinner-small"></span>
+                          <span v-else>Generate</span>
+                        </button>
+                      </div>
+
+                      <!-- Status Alerts -->
+                      <div v-if="commitStatus === 'error' && gitError" class="git-alert error">
+                        {{ gitError }}
+                      </div>
+                      <div v-if="commitStatus === 'success'" class="git-alert success">
+                        Successfully executed!
+                      </div>
+
+                      <!-- Action Buttons Row -->
+                      <div class="git-actions-row">
+                        <button
+                          type="button"
+                          class="git-cancel-btn"
+                          :disabled="commitStatus === 'processing'"
+                          @click="resetGitForm"
+                        >
+                          Cancel
+                        </button>
+
+                        <!-- Nested Split Button -->
+                        <div class="git-split-button-container">
+                          <button
+                            type="button"
+                            class="git-main-btn"
+                            :disabled="commitStatus === 'processing' || (!commitMessage.trim() && selectedGitAction !== 'push') || (!hasGitChanges && selectedGitAction !== 'push')"
+                            @click="executeGitAction(selectedGitAction)"
+                          >
+                            <span v-if="commitStatus === 'processing'" class="spinner-small inline"></span>
+                            <span v-else>{{ actionLabels[selectedGitAction] }}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            class="git-arrow-btn"
+                            :disabled="commitStatus === 'processing'"
+                            @click="toggleActionsDropdown"
+                            title="More actions"
+                          >
+                            <svg viewBox="0 0 16 16" width="10" height="10" fill="currentColor">
+                              <path d="M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z"/>
+                            </svg>
+                          </button>
+
+                          <!-- Action Dropdown Menu -->
+                          <div v-if="showActionsDropdown" class="git-dropdown-menu">
+                            <button
+                              v-for="action in availableGitActions"
+                              :key="action"
+                              type="button"
+                              class="git-dropdown-item"
+                              :class="{ active: selectedGitAction === action }"
+                              @click="selectGitAction(action)"
+                            >
+                              {{ actionLabels[action] }}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </Teleport>
+            </div>
+
+            <div v-if="isGitRepo ? gitDiffFiles.length : changes.length" class="change-total">
+              <span class="add">+{{ isGitRepo ? totalGitAdded : totalAdded }}</span>
+              <span class="del">-{{ isGitRepo ? totalGitDeleted : totalDeleted }}</span>
+            </div>
           </div>
         </div>
 
@@ -824,6 +974,7 @@ defineExpose({
               :key="file.path"
               class="git-file-accordion"
               :class="{ collapsed: !file.isOpen }"
+              :data-file-path="file.path"
             >
               <!-- Accordion Header -->
               <button
@@ -896,102 +1047,7 @@ defineExpose({
           </button>
         </div>
 
-        <!-- Git Commit Card -->
-        <div v-if="isGitRepo" class="git-commit-card">
-          <div class="git-header">
-            <span class="git-icon">
-              <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor">
-                <path fill-rule="evenodd" d="M11.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5zm-2.25.75a2.25 2.25 0 1 1 3 2.122V6A2.5 2.5 0 0 1 10 8.5H6a1 1 0 0 0-1 1v1.378a2.251 2.251 0 1 1-1.5 0V5.122a2.25 2.25 0 1 1 1.5 0v2.878h4A1 1 0 0 0 10 7V5.372a2.25 2.25 0 0 1-.5-1.622zM4.25 12a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5zM3.5 3.25a.75.75 0 1 1 1.5 0 .75.75 0 0 1-1.5 0z"/>
-              </svg>
-            </span>
-            <span class="git-branch">on branch <strong>{{ gitBranch }}</strong></span>
-          </div>
 
-          <div class="git-commit-form">
-            <!-- Warning message if clean and not pushing -->
-            <div v-if="!hasGitChanges && selectedGitAction !== 'push'" class="git-clean-msg">
-              No local changes to commit. Make edits or select <strong>Push</strong> to push local commits.
-            </div>
-
-            <!-- Buttoned Input -->
-            <div v-else class="git-input-wrapper">
-              <textarea
-                v-model="commitMessage"
-                placeholder="Commit message..."
-                class="git-commit-input"
-                :disabled="commitStatus === 'processing'"
-                rows="2"
-              ></textarea>
-              <button
-                type="button"
-                class="git-generate-btn"
-                :disabled="isGenerating || commitStatus === 'processing'"
-                @click="generateCommitMessage"
-                title="AI Generate Message"
-              >
-                <span v-if="isGenerating" class="spinner-small"></span>
-                <span v-else>Generate</span>
-              </button>
-            </div>
-
-            <!-- Action Buttons Row -->
-            <div class="git-actions-row">
-              <button
-                type="button"
-                class="git-cancel-btn"
-                :disabled="commitStatus === 'processing'"
-                @click="resetGitForm"
-              >
-                Cancel
-              </button>
-
-              <!-- Nested Split Button -->
-              <div class="git-split-button-container">
-                <button
-                  type="button"
-                  class="git-main-btn"
-                  :disabled="commitStatus === 'processing' || (!commitMessage.trim() && selectedGitAction !== 'push') || (!hasGitChanges && selectedGitAction !== 'push')"
-                  @click="executeGitAction(selectedGitAction)"
-                >
-                  <span v-if="commitStatus === 'processing'" class="spinner-small inline"></span>
-                  <span v-else>{{ actionLabels[selectedGitAction] }}</span>
-                </button>
-                <button
-                  type="button"
-                  class="git-arrow-btn"
-                  :disabled="commitStatus === 'processing'"
-                  @click.stop="toggleActionsDropdown"
-                >
-                  <svg viewBox="0 0 16 16" width="10" height="10" fill="currentColor">
-                    <path d="M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z"/>
-                  </svg>
-                </button>
-
-                <!-- Dropdown Popup -->
-                <div v-if="showActionsDropdown" class="git-dropdown-menu">
-                  <button
-                    v-for="action in availableGitActions"
-                    :key="action"
-                    type="button"
-                    class="git-dropdown-item"
-                    :class="{ active: action === selectedGitAction }"
-                    @click="selectGitAction(action)"
-                  >
-                    {{ actionLabels[action] }}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <!-- Status Alerts -->
-            <div v-if="gitError" class="git-alert error">
-              <span>{{ gitError }}</span>
-            </div>
-            <div v-if="commitStatus === 'success'" class="git-alert success">
-              <span>✓ Successfully executed!</span>
-            </div>
-          </div>
-        </div>
 
         <p v-if="changes.length === 0 && !isGitRepo" class="panel-empty">
           File changes will appear here after the assistant edits the workspace.
@@ -1898,17 +1954,73 @@ defineExpose({
   transform: rotate(180deg);
 }
 
+@keyframes commitFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes commitScaleUp {
+  from { transform: scale(0.97); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.commit-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: commitFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
 /* Git Commit Card Styling */
 .git-commit-card {
-  margin-top: 20px;
-  padding: 16px;
-  border-radius: 0 !important;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--border-soft);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  width: min(500px, 90vw);
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+  padding: 24px;
+  border-radius: 14px;
   display: flex;
   flex-direction: column;
+  gap: 16px;
+  animation: commitScaleUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.review-header-actions {
+  display: flex;
+  align-items: center;
   gap: 12px;
+}
+
+.commit-popup-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.commit-trigger-btn {
+  background: var(--primary);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 0.76rem;
+  font-weight: 600;
+  padding: 6px 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  transition: background 0.15s ease;
+}
+
+.commit-trigger-btn:hover {
+  background: var(--primary-hover, #585fe6);
 }
 
 .git-header {
@@ -1950,9 +2062,9 @@ defineExpose({
 .git-commit-input {
   width: 100%;
   box-sizing: border-box;
-  background: var(--control-bg, rgba(255, 255, 255, 0.03));
-  border: 1px solid var(--border-soft);
-  border-radius: 0 !important;
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  border-radius: 8px;
   padding: 10px 80px 10px 12px;
   color: var(--text);
   font-size: 0.85rem;
@@ -1974,7 +2086,7 @@ defineExpose({
   bottom: 6px;
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid var(--border-soft);
-  border-radius: 0 !important;
+  border-radius: 6px;
   color: var(--text);
   font-size: 0.72rem;
   padding: 4px 8px;
@@ -2005,7 +2117,7 @@ defineExpose({
 .git-cancel-btn {
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 0 !important;
+  border-radius: 8px;
   color: var(--muted);
   font-size: 0.8rem;
   padding: 6px 12px;
@@ -2027,15 +2139,14 @@ defineExpose({
 .git-split-button-container {
   position: relative;
   display: inline-flex;
-  border-radius: 0 !important;
+  border-radius: 8px;
   overflow: visible;
 }
 
 .git-main-btn {
   background: var(--primary);
   border: none;
-  border-top-left-radius: 0 !important;
-  border-bottom-left-radius: 0 !important;
+  border-radius: 8px 0 0 8px;
   color: #fff;
   font-size: 0.8rem;
   font-weight: 500;
@@ -2060,8 +2171,7 @@ defineExpose({
   background: var(--primary);
   border: none;
   border-left: 1px solid rgba(255, 255, 255, 0.15);
-  border-top-right-radius: 0 !important;
-  border-bottom-right-radius: 0 !important;
+  border-radius: 0 8px 8px 0;
   color: #fff;
   padding: 6px 8px;
   cursor: pointer;
@@ -2088,7 +2198,7 @@ defineExpose({
   margin-bottom: 4px;
   background: var(--card-bg, #1a1a1a);
   border: 1px solid var(--border-soft);
-  border-radius: 0 !important;
+  border-radius: 8px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
   z-index: 100;
   min-width: 140px;
@@ -2102,7 +2212,7 @@ defineExpose({
   width: 100%;
   background: transparent;
   border: none;
-  border-radius: 0 !important;
+  border-radius: 6px;
   color: var(--muted);
   font-size: 0.78rem;
   padding: 6px 10px;
@@ -2124,7 +2234,7 @@ defineExpose({
 
 /* Alerts */
 .git-alert {
-  border-radius: 0 !important;
+  border-radius: 8px;
   padding: 8px 12px;
   font-size: 0.78rem;
   display: flex;
@@ -2168,7 +2278,7 @@ defineExpose({
   color: var(--muted);
   background: rgba(255, 255, 255, 0.01);
   border: 1px dashed var(--border-soft);
-  border-radius: 0 !important;
+  border-radius: 8px;
   padding: 12px;
   text-align: center;
   line-height: 1.4;
@@ -2217,6 +2327,7 @@ defineExpose({
   color: var(--text);
   font-family: inherit;
   font-size: 0.82rem;
+  line-height: 1.4;
   cursor: pointer;
   text-align: left;
   transition: background 0.15s ease;
@@ -2254,6 +2365,9 @@ defineExpose({
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 500;
+  line-height: 1.4;
+  padding-bottom: 3px;
+  margin-bottom: -3px;
 }
 
 .git-file-badge {
