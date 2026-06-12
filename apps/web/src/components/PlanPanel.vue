@@ -8,6 +8,7 @@ import ToolGroup from './ToolGroup.vue';
 import ReasoningPanel from './ReasoningPanel.vue';
 import ThemedButton from './ThemedButton.vue';
 import { API_BASE } from '../api/client';
+import { lineDiff, filterDiffContext, type DiffRow } from '../lib/diff';
 
 const props = defineProps<{
   runId?: string | null;
@@ -65,9 +66,21 @@ const changes = ref<WorkspaceChange[]>([]);
 const agents = ref<AgentSummary[]>([]);
 
 // Git Integration State
+interface GitDiffFile {
+  path: string;
+  kind: 'created' | 'edited' | 'deleted' | 'moved';
+  oldText: string;
+  newText: string;
+  isOpen: boolean;
+  diffRows: DiffRow[];
+}
+
 const isGitRepo = ref(false);
 const hasGitChanges = ref(false);
 const gitBranch = ref('');
+const gitDiffFiles = ref<GitDiffFile[]>([]);
+const isLoadingDiffs = ref(false);
+
 const commitMessage = ref('');
 const isGenerating = ref(false);
 const commitStatus = ref<'idle' | 'processing' | 'success' | 'error'>('idle');
@@ -107,6 +120,34 @@ function selectGitAction(action: GitAction) {
   showActionsDropdown.value = false;
 }
 
+async function fetchGitDiffDetails() {
+  if (!props.projectPath) return;
+  isLoadingDiffs.value = true;
+  try {
+    const res = await fetch(`${API_BASE}/api/projects/git/diff-details?path=${encodeURIComponent(props.projectPath)}`);
+    if (!res.ok) throw new Error('Failed to fetch diff details');
+    const data = await res.json();
+    if (data.files) {
+      gitDiffFiles.value = data.files.map((file: any) => {
+        const existing = gitDiffFiles.value.find(f => f.path === file.path);
+        const isOpen = existing ? existing.isOpen : true;
+        return {
+          path: file.path,
+          kind: file.kind,
+          oldText: file.oldText,
+          newText: file.newText,
+          isOpen,
+          diffRows: filterDiffContext(lineDiff(file.oldText, file.newText))
+        };
+      });
+    }
+  } catch (err) {
+    console.error('Error fetching diff details:', err);
+  } finally {
+    isLoadingDiffs.value = false;
+  }
+}
+
 async function checkGitStatus() {
   if (!props.projectPath) return;
   try {
@@ -117,14 +158,17 @@ async function checkGitStatus() {
       isGitRepo.value = true;
       gitBranch.value = data.branch || 'main';
       hasGitChanges.value = data.hasChanges || false;
+      await fetchGitDiffDetails();
     } else {
       isGitRepo.value = false;
       hasGitChanges.value = false;
+      gitDiffFiles.value = [];
     }
   } catch (err) {
     console.error('Error checking git status:', err);
     isGitRepo.value = false;
     hasGitChanges.value = false;
+    gitDiffFiles.value = [];
   }
 }
 
@@ -211,11 +255,23 @@ const totalAdded = computed(() => changes.value.reduce((sum, c) => sum + c.added
 const totalDeleted = computed(() => changes.value.reduce((sum, c) => sum + c.deleted, 0));
 const runningAgentCount = computed(() => agents.value.filter(agent => agent.status === 'running').length);
 
+const totalGitAdded = computed(() => {
+  return gitDiffFiles.value.reduce((sum, file) => {
+    return sum + file.diffRows.filter(r => r.type === 'add').length;
+  }, 0);
+});
+
+const totalGitDeleted = computed(() => {
+  return gitDiffFiles.value.reduce((sum, file) => {
+    return sum + file.diffRows.filter(r => r.type === 'del').length;
+  }, 0);
+});
+
 const tabs = computed(() => {
   const list: { id: PanelTab; label: string }[] = [];
   if (plan.value) list.push({ id: 'plan', label: 'Plan' });
   if (agents.value.length) list.push({ id: 'agents', label: 'Agents' });
-  if (changes.value.length) list.push({ id: 'review', label: 'Review' });
+  if (changes.value.length || isGitRepo.value) list.push({ id: 'review', label: 'Review' });
   for (const id of openFileTabs.value) {
     const change = changes.value.find(c => c.id === id);
     if (change) list.push({ id: `file:${id}`, label: shortPath(change.path) });
@@ -229,10 +285,10 @@ const activeChange = computed(() => {
   return changes.value.find(c => c.id === id) ?? null;
 });
 
-const activeDiffRows = computed(() => activeChange.value ? changeDiffRows(activeChange.value) : []);
+const activeDiffRows = computed(() => activeChange.value ? filterDiffContext(changeDiffRows(activeChange.value)) : []);
 
 watch(
-  () => [plan.value?.id, agents.value.length, changes.value.length] as const,
+  () => [plan.value?.id, agents.value.length, changes.value.length, isGitRepo.value] as const,
   () => {
     if (isSwitchingRun.value) return;
     openFileTabs.value = openFileTabs.value.filter(id => changes.value.some(c => c.id === id));
@@ -749,15 +805,79 @@ defineExpose({
         <div class="panel-section-heading">
           <div>
             <h2>Review</h2>
-            <p>{{ changes.length }} changed {{ changes.length === 1 ? 'item' : 'items' }}</p>
+            <p>{{ isGitRepo ? gitDiffFiles.length : changes.length }} changed {{ (isGitRepo ? gitDiffFiles.length : changes.length) === 1 ? 'item' : 'items' }}</p>
           </div>
-          <div v-if="changes.length" class="change-total">
-            <span class="add">+{{ totalAdded }}</span>
-            <span class="del">-{{ totalDeleted }}</span>
+          <div v-if="isGitRepo ? gitDiffFiles.length : changes.length" class="change-total">
+            <span class="add">+{{ isGitRepo ? totalGitAdded : totalAdded }}</span>
+            <span class="del">-{{ isGitRepo ? totalGitDeleted : totalDeleted }}</span>
           </div>
         </div>
 
-        <div v-if="changes.length" class="change-list">
+        <!-- Git Diffs list (accordion layout) -->
+        <div v-if="isGitRepo" class="git-diff-list">
+          <div v-if="isLoadingDiffs" class="panel-empty-small">
+            <span class="spinner-small inline"></span> Loading repository changes...
+          </div>
+          <template v-else-if="gitDiffFiles.length">
+            <div
+              v-for="file in gitDiffFiles"
+              :key="file.path"
+              class="git-file-accordion"
+              :class="{ collapsed: !file.isOpen }"
+            >
+              <!-- Accordion Header -->
+              <button
+                type="button"
+                class="git-file-header"
+                @click="file.isOpen = !file.isOpen"
+              >
+                <span class="git-file-chevron" :class="{ rotated: !file.isOpen }">
+                  <svg viewBox="0 0 16 16" width="10" height="10" fill="currentColor">
+                    <path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
+                  </svg>
+                </span>
+                <span class="git-file-title">
+                  <span class="git-file-path" :title="file.path">{{ file.path }}</span>
+                  <span class="git-file-badge" :class="file.kind">{{ changeKindLabel(file.kind) }}</span>
+                </span>
+              </button>
+
+              <!-- Accordion Content (Diff View) -->
+              <div v-show="file.isOpen" class="git-file-diff-container">
+                <div v-if="file.diffRows.length" class="diff-view">
+                  <div
+                    v-for="(row, index) in file.diffRows"
+                    :key="index"
+                    class="diff-row"
+                    :class="[row.type, { 'is-separator': row.isSeparator }]"
+                  >
+                    <template v-if="row.isSeparator">
+                      <span class="diff-line old separator-line">...</span>
+                      <span class="diff-line new separator-line">...</span>
+                      <span class="diff-mark"></span>
+                      <code class="separator-text">{{ row.text }}</code>
+                    </template>
+                    <template v-else>
+                      <span class="diff-line old">{{ row.oldNo ?? '' }}</span>
+                      <span class="diff-line new">{{ row.newNo ?? '' }}</span>
+                      <span class="diff-mark">{{ row.type === 'add' ? '+' : row.type === 'del' ? '-' : ' ' }}</span>
+                      <code>{{ row.text || ' ' }}</code>
+                    </template>
+                  </div>
+                </div>
+                <p v-else class="panel-empty-small">
+                  No changes in this file.
+                </p>
+              </div>
+            </div>
+          </template>
+          <p v-else-if="!hasGitChanges" class="panel-empty-small">
+            No changed files in the workspace.
+          </p>
+        </div>
+
+        <!-- Fallback original changes list for non-git workspaces -->
+        <div v-else-if="changes.length" class="change-list">
           <button
             v-for="change in changes"
             :key="change.id"
@@ -901,12 +1021,20 @@ defineExpose({
             v-for="(row, index) in activeDiffRows"
             :key="index"
             class="diff-row"
-            :class="row.type"
+            :class="[row.type, { 'is-separator': row.isSeparator }]"
           >
-            <span class="diff-line old">{{ row.oldNo ?? '' }}</span>
-            <span class="diff-line new">{{ row.newNo ?? '' }}</span>
-            <span class="diff-mark">{{ row.type === 'add' ? '+' : row.type === 'del' ? '-' : ' ' }}</span>
-            <code>{{ row.text || ' ' }}</code>
+            <template v-if="row.isSeparator">
+              <span class="diff-line old separator-line">...</span>
+              <span class="diff-line new separator-line">...</span>
+              <span class="diff-mark"></span>
+              <code class="separator-text">{{ row.text }}</code>
+            </template>
+            <template v-else>
+              <span class="diff-line old">{{ row.oldNo ?? '' }}</span>
+              <span class="diff-line new">{{ row.newNo ?? '' }}</span>
+              <span class="diff-mark">{{ row.type === 'add' ? '+' : row.type === 'del' ? '-' : ' ' }}</span>
+              <code>{{ row.text || ' ' }}</code>
+            </template>
           </div>
         </div>
 
@@ -1095,8 +1223,11 @@ defineExpose({
   min-height: 0;
   flex: 1;
   overflow-y: auto;
-  padding: var(--card-pad-x);
   scrollbar-gutter: stable;
+}
+
+.panel-section {
+  padding: var(--card-pad-x);
 }
 
 .panel-section-heading {
@@ -1420,6 +1551,12 @@ defineExpose({
   border-radius: 8px;
   overflow: hidden;
   background: var(--bg);
+}
+
+.diff-row,
+.diff-line,
+.diff-mark {
+  border-radius: 0 !important;
 }
 
 .diff-row {
@@ -1765,7 +1902,7 @@ defineExpose({
 .git-commit-card {
   margin-top: 20px;
   padding: 16px;
-  border-radius: 12px;
+  border-radius: 0 !important;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid var(--border-soft);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
@@ -1815,7 +1952,7 @@ defineExpose({
   box-sizing: border-box;
   background: var(--control-bg, rgba(255, 255, 255, 0.03));
   border: 1px solid var(--border-soft);
-  border-radius: 8px;
+  border-radius: 0 !important;
   padding: 10px 80px 10px 12px;
   color: var(--text);
   font-size: 0.85rem;
@@ -1837,7 +1974,7 @@ defineExpose({
   bottom: 6px;
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid var(--border-soft);
-  border-radius: 6px;
+  border-radius: 0 !important;
   color: var(--text);
   font-size: 0.72rem;
   padding: 4px 8px;
@@ -1868,7 +2005,7 @@ defineExpose({
 .git-cancel-btn {
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: 0 !important;
   color: var(--muted);
   font-size: 0.8rem;
   padding: 6px 12px;
@@ -1890,15 +2027,15 @@ defineExpose({
 .git-split-button-container {
   position: relative;
   display: inline-flex;
-  border-radius: 6px;
+  border-radius: 0 !important;
   overflow: visible;
 }
 
 .git-main-btn {
   background: var(--primary);
   border: none;
-  border-top-left-radius: 6px;
-  border-bottom-left-radius: 6px;
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
   color: #fff;
   font-size: 0.8rem;
   font-weight: 500;
@@ -1923,8 +2060,8 @@ defineExpose({
   background: var(--primary);
   border: none;
   border-left: 1px solid rgba(255, 255, 255, 0.15);
-  border-top-right-radius: 6px;
-  border-bottom-right-radius: 6px;
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
   color: #fff;
   padding: 6px 8px;
   cursor: pointer;
@@ -1951,7 +2088,7 @@ defineExpose({
   margin-bottom: 4px;
   background: var(--card-bg, #1a1a1a);
   border: 1px solid var(--border-soft);
-  border-radius: 8px;
+  border-radius: 0 !important;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
   z-index: 100;
   min-width: 140px;
@@ -1965,7 +2102,7 @@ defineExpose({
   width: 100%;
   background: transparent;
   border: none;
-  border-radius: 6px;
+  border-radius: 0 !important;
   color: var(--muted);
   font-size: 0.78rem;
   padding: 6px 10px;
@@ -1987,7 +2124,7 @@ defineExpose({
 
 /* Alerts */
 .git-alert {
-  border-radius: 6px;
+  border-radius: 0 !important;
   padding: 8px 12px;
   font-size: 0.78rem;
   display: flex;
@@ -2031,9 +2168,163 @@ defineExpose({
   color: var(--muted);
   background: rgba(255, 255, 255, 0.01);
   border: 1px dashed var(--border-soft);
-  border-radius: 8px;
+  border-radius: 0 !important;
   padding: 12px;
   text-align: center;
   line-height: 1.4;
+}
+
+/* Git Accordion Styles */
+.git-diff-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-bottom: 20px;
+  margin-left: calc(-1 * var(--card-pad-x));
+  margin-right: calc(-1 * var(--card-pad-x));
+  border-top: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--border-soft);
+  background: transparent;
+  border-radius: 0 !important;
+}
+
+.git-file-accordion {
+  border: none;
+  border-bottom: 1px solid var(--border-soft);
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  transition: background 0.2s ease;
+  border-radius: 0 !important;
+}
+
+.git-file-accordion:last-child {
+  border-bottom: none;
+}
+
+.git-file-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px var(--card-pad-x);
+  background: var(--card-bg, #161616);
+  border: none;
+  border-bottom: 1px solid var(--border-soft);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease;
+  box-shadow: 0 1px 0 var(--border-soft);
+  border-radius: 0 !important;
+}
+
+.git-file-header:hover {
+  background: #1f1f1f !important;
+}
+
+.git-file-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.git-file-chevron.rotated {
+  transform: rotate(-90deg);
+}
+
+.git-file-title {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.git-file-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.git-file-badge {
+  font-size: 0.68rem;
+  padding: 2px 6px;
+  border-radius: 0 !important;
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.git-file-badge.created {
+  background: rgba(123, 216, 143, 0.12);
+  color: var(--msg-success-stroke, #4caf50);
+}
+
+.git-file-badge.edited {
+  background: rgba(100, 108, 255, 0.12);
+  color: var(--primary, #585fe6);
+}
+
+.git-file-badge.deleted {
+  background: rgba(239, 83, 80, 0.12);
+  color: var(--plan-del-color, #ef5350);
+}
+
+.git-file-badge.moved {
+  background: rgba(255, 152, 0, 0.12);
+  color: #ff9800;
+}
+
+.git-file-diff-container {
+  font-size: 0.8rem;
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.git-file-diff-container .diff-view {
+  border: none;
+  border-radius: 0 !important;
+  background: transparent;
+}
+
+.panel-empty-small {
+  padding: 16px;
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.diff-row.is-separator {
+  background: rgba(100, 108, 255, 0.04) !important;
+  color: var(--muted);
+  border-top: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--border-soft);
+  user-select: none;
+}
+
+.diff-row.is-separator .separator-line {
+  background: rgba(100, 108, 255, 0.08) !important;
+  color: var(--muted) !important;
+  font-size: 0.72rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.diff-row.is-separator .separator-text {
+  color: var(--primary, #585fe6) !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 500;
+  font-size: 0.74rem;
+  padding-left: 8px;
 }
 </style>

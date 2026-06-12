@@ -1,4 +1,5 @@
 import path from "node:path";
+import fs from "node:fs";
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
 import type { FastifyInstance } from "fastify";
@@ -100,6 +101,83 @@ export function registerProjectRoutes(server: FastifyInstance, ctx: AppContext) 
     } catch (error: any) {
       console.error("[Git Status Route Error]:", error);
       return { isGit: false };
+    }
+  });
+
+  // Get git diff details for all modified files.
+  server.get("/api/projects/git/diff-details", async (request, reply) => {
+    const { path: projectPath } = request.query as { path?: string };
+    if (!projectPath) {
+      reply.status(400);
+      return { error: "Missing required query parameter: path" };
+    }
+
+    try {
+      // Intent-to-add untracked files so they show up in status and git diff commands
+      try {
+        await execAsync("git add -N .", { cwd: projectPath });
+      } catch {}
+
+      const { stdout: status } = await execAsync("git status --porcelain", { cwd: projectPath });
+      const lines = status.split("\n").filter(line => line.trim());
+
+      const results = [];
+      for (const line of lines) {
+        const xy = line.slice(0, 2);
+        let fileSpec = line.slice(3).trim();
+        let kind: "created" | "edited" | "deleted" | "moved" = "edited";
+
+        // Handle rename formatting: "R  old -> new"
+        let oldPath = fileSpec;
+        let newPath = fileSpec;
+        if (xy.startsWith("R")) {
+          kind = "moved";
+          const parts = fileSpec.split(" -> ");
+          oldPath = parts[0].trim();
+          newPath = parts[1].trim();
+          fileSpec = newPath;
+        } else if (xy.includes("A") || xy.includes("?")) {
+          kind = "created";
+        } else if (xy.includes("D")) {
+          kind = "deleted";
+        }
+
+        let oldText = "";
+        let newText = "";
+
+        // Read old content from Git
+        if (kind !== "created") {
+          try {
+            const { stdout } = await execAsync(`git show HEAD:"${oldPath}"`, { cwd: projectPath });
+            oldText = stdout;
+          } catch {
+            // HEAD might not exist yet (e.g. initial commit)
+            oldText = "";
+          }
+        }
+
+        // Read new content from disk
+        if (kind !== "deleted") {
+          try {
+            const fullPath = path.resolve(projectPath, newPath);
+            newText = await fs.promises.readFile(fullPath, "utf-8");
+          } catch {
+            newText = "";
+          }
+        }
+
+        results.push({
+          path: fileSpec,
+          kind,
+          oldText,
+          newText
+        });
+      }
+
+      return { files: results };
+    } catch (error: any) {
+      reply.status(500);
+      return { error: error.message || "Failed to fetch diff details" };
     }
   });
 
