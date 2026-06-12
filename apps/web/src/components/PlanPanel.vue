@@ -702,6 +702,7 @@ defineExpose({
   flex-direction: column;
   min-height: 0;
   border: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 0;
   margin: 0;
   padding-top: var(--shell-inset);
@@ -758,6 +759,7 @@ defineExpose({
     pointer-events: auto !important;
     box-shadow: none;
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border-left: none !important;
   }
 
   .workspace-panel.collapsed {

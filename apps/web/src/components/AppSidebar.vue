@@ -568,8 +568,8 @@ function formatRunAge(run: Run): string {
   min-height: 30px;
   padding: 3px 8px;
   border-radius: 7px;
-  color: var(--muted);
-  font-weight: 600;
+  color: var(--faint);
+  font-weight: 700;
   cursor: pointer;
   user-select: none;
   transition: all 0.2s ease;
@@ -596,7 +596,7 @@ function formatRunAge(run: Run): string {
 }
 
 .project-header.active .folder-icon {
-  color: var(--text);
+  color: inherit;
 }
 
 .project-header:hover {
@@ -605,7 +605,7 @@ function formatRunAge(run: Run): string {
 }
 
 .project-header.active {
-  color: var(--text);
+  color: var(--faint);
   font-weight: 700;
 }
 
@@ -616,6 +616,7 @@ function formatRunAge(run: Run): string {
   white-space: nowrap;
   font-size: 0.9rem;
   line-height: 1.35;
+  font-weight: inherit;
 }
 
 .project-chats-list {

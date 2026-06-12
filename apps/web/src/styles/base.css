@@ -55,7 +55,10 @@ body,
 .app-shell::after,
 .sidebar,
 .sidebar::before,
-.sidebar::after {
+.sidebar::after,
+.workspace-panel,
+.workspace-panel::before,
+.workspace-panel::after {
   border-radius: 0 !important;
 }
 
