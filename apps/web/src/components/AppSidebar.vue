@@ -444,8 +444,8 @@ function formatRunAge(run: Run): string {
 
 .nav-action.active {
   color: var(--text);
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.07);
+  background: var(--sidebar-active);
+  border-color: var(--border-soft);
 }
 
 .sidebar-header {
@@ -468,14 +468,14 @@ function formatRunAge(run: Run): string {
   height: 28px;
   border-radius: 6px;
   background: transparent;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--faint);
   cursor: pointer;
   transition: all 0.2s ease;
   border: none;
 }
 
 .collapse-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--control-bg-hover);
   color: var(--text);
 }
 
@@ -494,7 +494,7 @@ function formatRunAge(run: Run): string {
   min-height: 30px;
   padding: 3px 8px;
   border-radius: 7px;
-  color: rgba(255, 255, 255, 0.86);
+  color: var(--muted);
 }
 
 .sidebar-nav-item svg {
@@ -502,7 +502,7 @@ function formatRunAge(run: Run): string {
 }
 
 .sidebar-nav-item:hover {
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--control-bg-hover);
   color: var(--text);
 }
 
@@ -545,7 +545,7 @@ function formatRunAge(run: Run): string {
 }
 
 .settings-action:hover {
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--control-bg-hover);
 }
 
 .project-list {
@@ -568,7 +568,8 @@ function formatRunAge(run: Run): string {
   min-height: 30px;
   padding: 3px 8px;
   border-radius: 7px;
-  color: rgba(255, 255, 255, 0.88);
+  color: var(--muted);
+  font-weight: 600;
   cursor: pointer;
   user-select: none;
   transition: all 0.2s ease;
@@ -585,8 +586,9 @@ function formatRunAge(run: Run): string {
 
 .folder-icon {
   flex-shrink: 0;
-  color: rgba(255, 255, 255, 0.82);
+  color: inherit;
   transition: color 0.2s ease;
+  opacity: 0.85;
 }
 
 .project-header:hover .folder-icon {
@@ -598,13 +600,13 @@ function formatRunAge(run: Run): string {
 }
 
 .project-header:hover {
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--control-bg-hover);
   color: var(--text);
 }
 
 .project-header.active {
   color: var(--text);
-  font-weight: 500;
+  font-weight: 700;
 }
 
 .project-name-text {
@@ -635,7 +637,7 @@ function formatRunAge(run: Run): string {
   min-height: 0;
   padding: 2px 8px 3px 0;
   border-radius: 6px;
-  color: rgba(255, 255, 255, 0.84);
+  color: var(--muted);
   font-size: 0.82rem;
   line-height: 1.45;
   overflow: visible;
@@ -654,14 +656,14 @@ function formatRunAge(run: Run): string {
   height: 6px;
   border-radius: 999px;
   background: var(--text);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.16);
+  box-shadow: 0 0 0 1px var(--control-border);
 }
 
 .session-spinner {
   width: 12px;
   height: 12px;
   border-radius: 999px;
-  border: 2px solid rgba(255, 255, 255, 0.24);
+  border: 2px solid var(--border-soft);
   border-top-color: var(--text);
   animation: sidebar-session-spin 0.75s linear infinite;
 }
@@ -694,7 +696,7 @@ function formatRunAge(run: Run): string {
 }
 
 .chat-age {
-  color: rgba(255, 255, 255, 0.48);
+  color: var(--faint);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   line-height: 1.45;
@@ -710,7 +712,7 @@ function formatRunAge(run: Run): string {
 .new-chat-project-btn,
 .delete-project-btn {
   background: transparent;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--faint);
   cursor: pointer;
   padding: 3px;
   border-radius: 4px;
@@ -728,7 +730,7 @@ function formatRunAge(run: Run): string {
 
 .new-chat-project-btn:hover {
   color: var(--text);
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--control-bg-hover);
 }
 
 .delete-project-btn:hover {
@@ -752,7 +754,7 @@ function formatRunAge(run: Run): string {
 
 .load-more-btn {
   background: transparent;
-  color: rgba(255, 255, 255, 0.48);
+  color: var(--faint);
   font-size: 0.82rem;
   padding: 2px 8px 2px 0;
   text-align: left;
@@ -764,39 +766,48 @@ function formatRunAge(run: Run): string {
 }
 
 .load-more-btn:hover {
-  color: rgba(255, 255, 255, 0.72);
+  color: var(--text);
   background: transparent;
 }
 
 .sidebar-label {
   padding: 0 8px;
-  color: rgba(255, 255, 255, 0.42);
+  color: var(--faint);
   font-size: 0.9rem;
   line-height: 1.2;
 }
 
 .add-project-btn {
   opacity: 0;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--faint);
 }
 
 .projects-accordion:hover .add-project-btn {
   opacity: 1;
 }
 
+.add-project-btn:hover {
+  color: var(--text);
+  background: var(--control-bg-hover);
+}
+
 .search-palette-backdrop {
   position: fixed;
-  inset: 0;
-  z-index: 5000;
-  background: rgba(0, 0, 0, 0.18);
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--lightbox-overlay-bg);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  z-index: 99999;
 }
 
 .search-palette {
   position: fixed;
-  top: 26%;
+  top: 96px;
   left: 50%;
-  z-index: 5001;
-  width: min(680px, calc(100vw - 40px));
+  width: min(600px, 90vw);
   max-height: min(560px, calc(100vh - 96px));
   transform: translateX(-50%);
   display: flex;
@@ -824,12 +835,12 @@ function formatRunAge(run: Run): string {
 }
 
 .search-palette-input-row input::placeholder {
-  color: rgba(255, 255, 255, 0.44);
+  color: var(--faint);
 }
 
 .search-palette-section-label {
   padding: 0 24px 8px;
-  color: rgba(255, 255, 255, 0.44);
+  color: var(--faint);
   font-size: 0.9rem;
 }
 
@@ -852,7 +863,7 @@ function formatRunAge(run: Run): string {
   border: 0;
   border-radius: 16px;
   background: transparent;
-  color: rgba(255, 255, 255, 0.84);
+  color: var(--muted);
   cursor: pointer;
   text-align: left;
   font: inherit;
@@ -860,7 +871,7 @@ function formatRunAge(run: Run): string {
 
 .search-palette-result.active,
 .search-palette-result:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--control-bg-hover);
   color: var(--text);
 }
 
@@ -878,13 +889,13 @@ function formatRunAge(run: Run): string {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: rgba(255, 255, 255, 0.48);
+  color: var(--faint);
   font-size: 0.9rem;
 }
 
 .search-palette-empty {
   padding: 18px 24px 24px;
-  color: rgba(255, 255, 255, 0.48);
+  color: var(--faint);
   font-size: 0.92rem;
 }
 </style>
