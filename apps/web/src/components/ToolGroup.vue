@@ -347,7 +347,7 @@ function getToolPath(argumentsJson: string): string {
 }
 
 function isFileLinkTool(name: string): boolean {
-  return name === 'edit_file' || name === 'write_file';
+  return name === 'edit_file' || name === 'write_file' || name === 'delete_file';
 }
 
 function handleRowClick(name: string, args: string, idx: number) {

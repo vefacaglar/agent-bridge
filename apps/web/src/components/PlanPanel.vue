@@ -646,16 +646,18 @@ function selectTab(tab: PanelTab) {
 
 function openFileInReview(filePath: string) {
   if (isGitRepo.value) {
-    activeTab.value = 'review';
     const file = gitDiffFiles.value.find(f => f.path === filePath || f.path.endsWith(filePath));
     if (file) {
+      activeTab.value = 'review';
       file.isOpen = true;
       nextTick(() => {
         const el = document.querySelector(`[data-file-path="${file.path}"]`);
         el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       });
+      return;
     }
-  } else if (changes.value) {
+  }
+  if (changes.value) {
     const change = changes.value.find(c => c.displayPath === filePath || c.displayPath.endsWith(filePath));
     if (change) {
       openFile(change);

@@ -46,11 +46,10 @@
 .step-row-label {
   flex-shrink: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-weight: 300;
   color: inherit;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 /* Identity icon on the left (tool type / reasoning dot / sub-agent). */
