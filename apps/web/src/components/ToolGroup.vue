@@ -683,15 +683,13 @@ function formatToolResult(name: string, contentJson: string): string {
         <svg class="step-row-toggle" :class="{ rotated: isClusterExpanded(idx) }" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="m6 9 6 6 6-6"></path>
         </svg>
-        <span class="step-row-label">{{ clusterLabel(clusterStart(idx)!) }}</span>
-        <svg v-if="clusterStatus(clusterStart(idx)!) === 'success'" class="status-icon success" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" title="Success">
-          <polyline points="20 6 9 17 4 12"></polyline>
-        </svg>
-        <svg v-else-if="clusterStatus(clusterStart(idx)!) === 'failed'" class="status-icon error" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" title="Error">
-          <line x1="18" y1="6" x2="6" y2="18"></line>
-          <line x1="6" y1="6" x2="18" y2="18"></line>
-        </svg>
-        <span v-else class="status-dot pending" title="Running..."></span>
+        <span
+          class="step-row-label"
+          :style="{ color: clusterStatus(clusterStart(idx)!) === 'failed' ? 'var(--danger)' : undefined }"
+        >
+          {{ clusterLabel(clusterStart(idx)!) }}
+        </span>
+        <span v-if="clusterStatus(clusterStart(idx)!) === 'pending'" class="status-dot pending" title="Running..."></span>
       </header>
 
       <!-- update_plan renders as a clickable card that opens the plan panel -->
@@ -724,18 +722,14 @@ function formatToolResult(name: string, contentJson: string): string {
             <path d="m6 9 6 6 6-6"></path>
           </svg>
           
-          <span class="step-row-label">{{ getStepLabelCached(tc.function?.name, tc.function?.arguments, idx) }}</span>
+          <span
+            class="step-row-label"
+            :style="{ color: (toolResponses[idx] && !isToolSuccessCached(toolResponses[idx].content)) ? 'var(--danger)' : undefined }"
+          >
+            {{ getStepLabelCached(tc.function?.name, tc.function?.arguments, idx) }}
+          </span>
           
-          <template v-if="toolResponses[idx]">
-            <svg v-if="isToolSuccessCached(toolResponses[idx].content)" class="status-icon success" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" title="Success">
-              <polyline points="20 6 9 17 4 12"></polyline>
-            </svg>
-            <svg v-else class="status-icon error" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" title="Error">
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-          </template>
-          <span v-else class="status-dot pending" title="Running..."></span>
+          <span v-if="!toolResponses[idx]" class="status-dot pending" title="Running..."></span>
         </header>
 
         <div v-if="detailsExpanded[idx]" class="tool-call-details">
