@@ -29,9 +29,7 @@ const emit = defineEmits<{
       <span class="step-row-label">Reasoning</span>
     </header>
     <div v-if="expanded" class="reasoning-details">
-      <div class="code-block-wrapper">
-        <pre class="reasoning-text plan-body"><code>{{ content }}</code></pre>
-      </div>
+      <div class="reasoning-text plan-body">{{ content }}</div>
     </div>
   </div>
 </template>
@@ -45,29 +43,23 @@ const emit = defineEmits<{
 }
 
 .reasoning-details {
-  padding: 8px 0 12px;
-  border-top: 1px solid var(--border-soft);
-  font-style: normal;
+  padding: 6px 0 8px;
 }
 
-.reasoning-details .code-block-wrapper {
-  margin: 8px 0 0;
-}
-
-/* The expanded body, styled like a tool result block (faint-code). */
+/* The expanded body — plain faded text, no card/chrome. */
 .reasoning-text {
   margin: 0;
   max-height: 220px;
   overflow-y: auto;
   scroll-behavior: smooth;
-  font-family: monospace;
-  font-size: 0.75rem;
-  line-height: 1.5;
-  color: var(--muted);
+  font-family: inherit;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--faint);
   white-space: pre-wrap;
   word-break: break-word;
   background: transparent;
-  padding: 14px;
+  padding: 0;
   border-radius: 0;
   border: none;
 }
