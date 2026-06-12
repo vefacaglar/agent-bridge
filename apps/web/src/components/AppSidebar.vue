@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import type { Run } from '@locagens/shared';
 import { DEFAULT_PROJECT_PATH } from '../lib/format';
 
@@ -39,6 +39,22 @@ const expandedProjects = ref<Record<string, boolean>>((() => {
   }
 })());
 const visibleLimits = ref<Record<string, number>>({});
+const isSearchOpen = ref(false);
+const searchQuery = ref('');
+const searchInput = ref<HTMLInputElement | null>(null);
+const selectedSearchIndex = ref(0);
+
+const normalizedSearchQuery = computed(() => searchQuery.value.trim().toLowerCase());
+const isSearching = computed(() => normalizedSearchQuery.value.length > 0);
+const searchHeading = computed(() => isSearching.value ? 'Search results' : 'Recent chats');
+const searchResults = computed(() => {
+  const query = normalizedSearchQuery.value;
+  return props.runs
+    .filter(run => !query || runMatchesSearch(run))
+    .slice()
+    .sort((a, b) => Date.parse(b.lastActiveAt || b.updatedAt || b.createdAt) - Date.parse(a.lastActiveAt || a.updatedAt || a.createdAt))
+    .slice(0, 9);
+});
 
 // Keep the active project expanded automatically
 watch(
@@ -59,12 +75,26 @@ watch(
   { deep: true }
 );
 
+watch(searchQuery, () => {
+  selectedSearchIndex.value = 0;
+});
+
+watch(searchResults, (results) => {
+  if (selectedSearchIndex.value >= results.length) {
+    selectedSearchIndex.value = Math.max(0, results.length - 1);
+  }
+});
+
 function handleProjectClick(path: string) {
   expandedProjects.value[path] = !expandedProjects.value[path];
 }
 
-function getRunsForProject(projectPath: string): Run[] {
+function getBaseRunsForProject(projectPath: string): Run[] {
   return props.runs.filter(run => (run.projectPath || DEFAULT_PROJECT_PATH) === projectPath);
+}
+
+function getRunsForProject(projectPath: string): Run[] {
+  return getBaseRunsForProject(projectPath);
 }
 
 function getLimitForProject(projectPath: string): number {
@@ -83,6 +113,59 @@ function hasMoreRunsForProject(projectPath: string): boolean {
 
 function loadMoreForProject(projectPath: string) {
   visibleLimits.value[projectPath] = getLimitForProject(projectPath) + 10;
+}
+
+function isProjectOpen(projectPath: string): boolean {
+  return !!expandedProjects.value[projectPath];
+}
+
+function toggleSearch() {
+  isSearchOpen.value = true;
+  nextTick(() => {
+    searchInput.value?.focus();
+    searchInput.value?.select();
+  });
+}
+
+function closeSearch() {
+  searchQuery.value = '';
+  isSearchOpen.value = false;
+  selectedSearchIndex.value = 0;
+}
+
+function moveSearchSelection(delta: number) {
+  if (searchResults.value.length === 0) return;
+  const next = selectedSearchIndex.value + delta;
+  selectedSearchIndex.value = (next + searchResults.value.length) % searchResults.value.length;
+}
+
+function selectHighlightedSearchRun() {
+  const run = searchResults.value[selectedSearchIndex.value];
+  if (run) selectSearchRun(run);
+}
+
+function selectSearchRun(run: Run) {
+  closeSearch();
+  emit('select-run', run);
+}
+
+function runMatchesSearch(run: Run): boolean {
+  const query = normalizedSearchQuery.value;
+  if (!query) return true;
+  return [run.title, run.task, run.projectName, run.model]
+    .filter(Boolean)
+    .some(value => String(value).toLowerCase().includes(query));
+}
+
+function projectNameForRun(run: Run): string {
+  if (run.projectName) return run.projectName;
+  const projectPath = run.projectPath || DEFAULT_PROJECT_PATH;
+  const project = props.projectOptions.find(p => p.path === projectPath);
+  return project?.name || projectPath.split(/[\\/]/).filter(Boolean).pop() || 'Project';
+}
+
+function searchRunTitle(run: Run): string {
+  return run.title || run.task || 'Untitled chat';
 }
 
 function onNewChatForProject(path: string, event: Event) {
@@ -139,7 +222,12 @@ function formatRunAge(run: Run): string {
         <span>New chat</span>
       </button>
 
-      <button class="nav-action sidebar-nav-item search-action" type="button">
+      <button
+        class="nav-action sidebar-nav-item search-action"
+        :class="{ active: isSearchOpen }"
+        type="button"
+        @click="toggleSearch"
+      >
         <svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="11" cy="11" r="8"/>
           <path d="m21 21-4.3-4.3"/>
@@ -182,7 +270,7 @@ function formatRunAge(run: Run): string {
           >
             <div class="project-header-left">
               <!-- Open Folder SVG when expanded -->
-              <svg v-if="expandedProjects[project.path]" class="folder-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg v-if="isProjectOpen(project.path)" class="folder-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="m6 14 1.45-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.55 6a2 2 0 0 1-1.94 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2A2 2 0 0 0 12.07 6H20a2 2 0 0 1 2 2v2"/>
               </svg>
               <!-- Closed Folder SVG when collapsed -->
@@ -209,7 +297,7 @@ function formatRunAge(run: Run): string {
           </div>
 
           <Transition name="expand">
-            <div v-if="expandedProjects[project.path]" class="project-chats-list">
+            <div v-if="isProjectOpen(project.path)" class="project-chats-list">
               <div v-if="getRunsForProject(project.path).length === 0" class="empty-sidebar">No chats in this project.</div>
               <button
                 v-for="run in getDisplayedRunsForProject(project.path)"
@@ -243,6 +331,41 @@ function formatRunAge(run: Run): string {
       <span>Settings</span>
     </button>
   </aside>
+
+  <Teleport to="body">
+    <div v-if="isSearchOpen" class="search-palette-backdrop" @click="closeSearch"></div>
+    <section v-if="isSearchOpen" class="search-palette" @click.stop>
+      <div class="search-palette-input-row">
+        <input
+          ref="searchInput"
+          v-model="searchQuery"
+          type="search"
+          placeholder="Search chats"
+          @keydown.esc="closeSearch"
+          @keydown.down.prevent="moveSearchSelection(1)"
+          @keydown.up.prevent="moveSearchSelection(-1)"
+          @keydown.enter.prevent="selectHighlightedSearchRun"
+        />
+      </div>
+
+      <div class="search-palette-section-label">{{ searchHeading }}</div>
+      <div class="search-palette-results">
+        <button
+          v-for="(run, idx) in searchResults"
+          :key="run.id"
+          type="button"
+          class="search-palette-result"
+          :class="{ active: idx === selectedSearchIndex }"
+          @mouseenter="selectedSearchIndex = idx"
+          @click="selectSearchRun(run)"
+        >
+          <span class="search-result-title">{{ searchRunTitle(run) }}</span>
+          <span class="search-result-project">{{ projectNameForRun(run) }}</span>
+        </button>
+        <div v-if="searchResults.length === 0" class="search-palette-empty">No matching chats.</div>
+      </div>
+    </section>
+  </Teleport>
 </template>
 
 
@@ -566,5 +689,109 @@ function formatRunAge(run: Run): string {
 
 .projects-accordion:hover .add-project-btn {
   opacity: 1;
+}
+
+.search-palette-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.search-palette {
+  position: fixed;
+  top: 26%;
+  left: 50%;
+  z-index: 5001;
+  width: min(680px, calc(100vw - 40px));
+  max-height: min(560px, calc(100vh - 96px));
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 24px;
+  background: #2d2d2e;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
+}
+
+.search-palette-input-row {
+  padding: 18px 24px 12px;
+}
+
+.search-palette-input-row input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 1.02rem;
+  line-height: 1.45;
+}
+
+.search-palette-input-row input::placeholder {
+  color: rgba(255, 255, 255, 0.44);
+}
+
+.search-palette-section-label {
+  padding: 0 24px 8px;
+  color: rgba(255, 255, 255, 0.44);
+  font-size: 0.9rem;
+}
+
+.search-palette-results {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 8px 12px;
+}
+
+.search-palette-result {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.84);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+
+.search-palette-result.active,
+.search-palette-result:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text);
+}
+
+.search-result-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.98rem;
+  line-height: 1.35;
+}
+
+.search-result-project {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 0.9rem;
+}
+
+.search-palette-empty {
+  padding: 18px 24px 24px;
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 0.92rem;
 }
 </style>
