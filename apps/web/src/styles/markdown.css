@@ -53,17 +53,12 @@
 
 .markdown-body th,
 .markdown-body td {
-  border: 1px solid var(--border);
   padding: 8px 12px;
 }
 
 .markdown-body th {
-  background: var(--surface-strong);
   font-weight: 600;
-}
-
-.markdown-body tr:nth-child(even) {
-  background: var(--markdown-table-row-even-bg);
+  border-bottom: 1px solid var(--border);
 }
 
 .markdown-body code {
