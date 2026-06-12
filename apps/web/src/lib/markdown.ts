@@ -1,6 +1,5 @@
 import { Marked } from 'marked';
 import hljs from 'highlight.js';
-import 'highlight.js/styles/github-dark.css';
 
 const marked = new Marked({ gfm: true, breaks: true });
 

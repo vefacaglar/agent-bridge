@@ -88,57 +88,11 @@
   font-size: 0.9rem;
 }
 
-/* Minimalist Syntax Highlighting (Consolidated Colors) */
-.hljs {
-  filter: none;
+.markdown-body pre code,
+.markdown-body pre code * {
+  color: inherit !important;
   background: transparent !important;
-  color: var(--muted) !important;
-}
-
-/* Comments & Muted Elements */
-.hljs-comment,
-.hljs-comment *,
-.hljs-quote,
-.hljs-quote *,
-.hljs-doctag {
-  color: var(--faint) !important;
-  font-style: italic !important;
-}
-
-/* Accent 1: Keywords, Types, Declarations (Warm Yellow) */
-.hljs-keyword,
-.hljs-selector-tag,
-.hljs-built_in,
-.hljs-title,
-.hljs-section,
-.hljs-name,
-.hljs-type,
-.hljs-class,
-.hljs-meta,
-.hljs-meta .hljs-keyword {
-  color: var(--planner) !important;
-}
-
-/* Accent 2: Strings, Numbers, Values (Muted Green) */
-.hljs-string,
-.hljs-symbol,
-.hljs-bullet,
-.hljs-addition,
-.hljs-number,
-.hljs-literal,
-.hljs-attr,
-.hljs-attribute,
-.hljs-variable {
-  color: var(--success) !important;
-}
-
-/* Normal Texts / Unformatted Symbols */
-.hljs-subst,
-.hljs-operator,
-.hljs-punctuation,
-.hljs-property,
-.hljs-params {
-  color: var(--text) !important;
+  text-shadow: none !important;
 }
 
 .markdown-body pre {
