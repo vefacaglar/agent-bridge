@@ -1114,7 +1114,7 @@ defineExpose({
   flex-direction: column;
   min-height: 0;
   border: none;
-  border-left: 1px solid var(--review-border-soft-white);
+  border-left: 1px solid var(--control-border);
   border-radius: 0;
   margin: 0;
   padding-top: var(--shell-inset);
@@ -1341,8 +1341,8 @@ defineExpose({
   padding: 16px;
   border: 1px solid var(--agent-row-border);
   border-radius: 12px;
-  background: var(--review-card-bg-subtle);
-  box-shadow: 0 4px 12px var(--review-shadow-soft);
+  background: var(--shimmer-glow);
+  box-shadow: 0 4px 12px var(--attachment-shadow);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -1354,20 +1354,20 @@ defineExpose({
 
 .agent-row:hover {
   border-color: var(--border);
-  background: var(--review-card-bg-hover);
-  box-shadow: 0 6px 16px var(--review-shadow-strong);
+  background: var(--surface);
+  box-shadow: 0 6px 16px var(--composer-shadow);
   transform: translateY(-1px);
 }
 
 .agent-row.running {
-  border-color: var(--review-border-green-soft);
-  background: var(--review-bg-green-soft);
+  border-color: var(--success-border);
+  background: var(--success-soft);
 }
 
 .agent-row.expanded {
-  background: var(--review-bg-white-02);
+  background: var(--shimmer-glow);
   border-color: var(--border);
-  box-shadow: inset 0 1px 0 var(--review-inset-shadow-white), 0 8px 24px var(--review-shadow-large);
+  box-shadow: inset 0 1px 0 var(--control-border), 0 8px 24px var(--composer-shadow);
 }
 
 .agent-row-header {
@@ -1420,7 +1420,7 @@ defineExpose({
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: var(--review-bg-green-strong);
+  background: var(--success-border);
   animation: agent-pulse-ring 2s infinite ease-out;
   z-index: 1;
 }
@@ -1534,12 +1534,12 @@ defineExpose({
 }
 
 .meta-item.status-badge.running {
-  background: var(--review-bg-green-medium);
+  background: var(--success-soft);
   color: var(--success);
 }
 
 .meta-item.status-badge.done {
-  background: var(--review-border-soft-white);
+  background: var(--control-border);
   color: var(--faint);
 }
 
@@ -1921,12 +1921,12 @@ defineExpose({
   padding: 6px 8px !important;
   border-radius: 6px !important;
   font-size: 0.8rem !important;
-  background: var(--review-bg-white-005);
+  background: var(--shimmer-glow);
 }
 
 .agent-transcript-body :deep(.step-row:hover) {
   color: var(--text);
-  background: var(--review-bg-white-02);
+  background: var(--surface);
 }
 
 .agent-transcript-body :deep(.coder-tool-model) {
@@ -1938,7 +1938,7 @@ defineExpose({
   line-height: 1.55;
   font-size: 0.84rem;
   margin: 4px 0;
-  background: var(--review-bg-white-005);
+  background: var(--shimmer-glow);
   padding: 10px 12px;
   border-radius: 8px;
   border: 1px solid var(--border-soft);
@@ -1970,7 +1970,7 @@ defineExpose({
   left: 0;
   right: 0;
   bottom: 0;
-  background: var(--git-overlay-bg);
+  background: var(--backdrop-bg);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   z-index: 9999;
@@ -1985,7 +1985,7 @@ defineExpose({
   width: min(500px, 90vw);
   background: var(--surface-elevated);
   border: 1px solid var(--border);
-  box-shadow: 0 20px 50px var(--git-modal-shadow);
+  box-shadow: 0 20px 50px var(--composer-shadow);
   padding: 24px;
   border-radius: 14px;
   display: flex;
@@ -2077,14 +2077,14 @@ defineExpose({
 
 .git-commit-input:focus {
   border-color: var(--btn-primary-bg);
-  box-shadow: 0 0 0 2px var(--git-input-focus-shadow);
+  box-shadow: 0 0 0 2px var(--btn-primary-shadow);
 }
 
 .git-generate-btn {
   position: absolute;
   right: 6px;
   bottom: 6px;
-  background: var(--git-generate-btn-bg);
+  background: var(--control-border);
   border: 1px solid var(--border-soft);
   border-radius: 6px;
   color: var(--text);
@@ -2097,7 +2097,7 @@ defineExpose({
 }
 
 .git-generate-btn:hover:not(:disabled) {
-  background: var(--git-generate-btn-hover);
+  background: var(--control-border-focus);
   border-color: var(--muted);
 }
 
@@ -2127,7 +2127,7 @@ defineExpose({
 
 .git-cancel-btn:hover:not(:disabled) {
   color: var(--text);
-  background: var(--git-cancel-btn-hover);
+  background: var(--control-bg-hover);
 }
 
 .git-cancel-btn:disabled {
@@ -2170,7 +2170,7 @@ defineExpose({
 .git-arrow-btn {
   background: var(--btn-primary-bg);
   border: none;
-  border-left: 1px solid var(--git-split-btn-border);
+  border-left: 1px solid var(--control-border-focus);
   border-radius: 0 8px 8px 0 !important;
   color: var(--text);
   padding: 6px 8px;
@@ -2199,7 +2199,7 @@ defineExpose({
   background: var(--card-bg);
   border: 1px solid var(--border-soft);
   border-radius: 8px;
-  box-shadow: 0 4px 16px var(--git-dropdown-shadow);
+  box-shadow: 0 4px 16px var(--composer-dropdown-shadow);
   z-index: 100;
   min-width: 140px;
   padding: 4px;
@@ -2222,12 +2222,12 @@ defineExpose({
 }
 
 .git-dropdown-item:hover {
-  background: var(--git-dropdown-hover-bg);
+  background: var(--composer-dropdown-item-hover);
   color: var(--text);
 }
 
 .git-dropdown-item.active {
-  background: var(--git-dropdown-active-bg);
+  background: var(--btn-primary-shadow);
   color: var(--btn-primary-bg);
   font-weight: 500;
 }
@@ -2243,15 +2243,15 @@ defineExpose({
 }
 
 .git-alert.error {
-  background: var(--git-alert-error-bg);
-  border: 1px solid var(--git-alert-error-border);
-  color: var(--git-alert-error-color);
+  background: var(--danger-soft);
+  border: 1px solid var(--danger-border);
+  color: var(--danger);
 }
 
 .git-alert.success {
-  background: var(--git-alert-success-bg);
-  border: 1px solid var(--git-alert-success-border);
-  color: var(--git-alert-success-color);
+  background: var(--success-soft);
+  border: 1px solid var(--success-border);
+  color: var(--success);
 }
 
 /* Small loading spinner */
@@ -2259,7 +2259,7 @@ defineExpose({
   display: inline-block;
   width: 12px;
   height: 12px;
-  border: 2px solid var(--review-white-30);
+  border: 2px solid var(--control-border-focus);
   border-radius: 50%;
   border-top-color: var(--text);
   animation: spin 0.8s linear infinite;
@@ -2276,7 +2276,7 @@ defineExpose({
 .git-clean-msg {
   font-size: 0.8rem;
   color: var(--muted);
-  background: var(--git-clean-msg-bg);
+  background: var(--shimmer-glow);
   border: 1px dashed var(--border-soft);
   border-radius: 8px;
   padding: 12px;
@@ -2385,23 +2385,23 @@ defineExpose({
 }
 
 .git-file-badge.edited {
-  background: var(--git-badge-edited-bg);
+  background: var(--btn-primary-shadow);
   color: var(--btn-primary-bg);
 }
 
 .git-file-badge.deleted {
-  background: var(--git-badge-deleted-bg);
+  background: var(--danger-soft);
   color: var(--plan-del-color);
 }
 
 .git-file-badge.moved {
-  background: var(--git-badge-moved-bg);
-  color: var(--git-badge-moved-color);
+  background: var(--status-warning-bg);
+  color: var(--warning);
 }
 
 .git-file-diff-container {
   font-size: 0.8rem;
-  background: var(--git-diff-overlay-bg);
+  background: var(--attachment-shadow);
 }
 
 .git-file-diff-container .diff-view {
@@ -2418,7 +2418,7 @@ defineExpose({
 }
 
 .diff-row.is-separator {
-  background: var(--git-separator-bg) !important;
+  background: var(--shimmer-glow) !important;
   color: var(--muted);
   border-top: 1px solid var(--border-soft);
   border-bottom: 1px solid var(--border-soft);
@@ -2426,7 +2426,7 @@ defineExpose({
 }
 
 .diff-row.is-separator .separator-line {
-  background: var(--git-separator-line-bg) !important;
+  background: var(--control-border) !important;
   color: var(--muted) !important;
   font-size: 0.72rem;
   display: flex;

@@ -149,7 +149,7 @@
 
 .review-pill {
   color: var(--planner);
-  background: var(--review-pill-bg);
+  background: var(--status-warning-bg);
 }
 
 .status-pill {
