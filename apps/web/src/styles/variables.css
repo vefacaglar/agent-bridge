@@ -285,4 +285,48 @@
   --agent-status-done-shadow: rgba(123, 216, 143, 0.1);
   --diff-add-bg: rgba(123, 216, 143, 0.08);
   --diff-del-bg: rgba(255, 138, 128, 0.08);
+
+  /* Git / Review / Diff Panel semantic color tokens */
+  --review-border-soft-white: rgba(255, 255, 255, 0.05);
+  --review-card-bg-subtle: rgba(255, 255, 255, 0.015);
+  --review-shadow-soft: rgba(0, 0, 0, 0.1);
+  --review-card-bg-hover: rgba(255, 255, 255, 0.025);
+  --review-shadow-strong: rgba(0, 0, 0, 0.18);
+  --review-border-green-soft: rgba(123, 216, 143, 0.25);
+  --review-bg-green-soft: rgba(123, 216, 143, 0.01);
+  --review-bg-green-medium: rgba(123, 216, 143, 0.15);
+  --review-bg-green-strong: rgba(123, 216, 143, 0.25);
+  --review-bg-white-02: rgba(255, 255, 255, 0.02);
+  --review-inset-shadow-white: rgba(255, 255, 255, 0.05);
+  --review-shadow-large: rgba(0, 0, 0, 0.25);
+  --review-bg-white-005: rgba(255, 255, 255, 0.005);
+  --review-white-30: rgba(255, 255, 255, 0.3);
+  
+  --git-overlay-bg: rgba(0, 0, 0, 0.5);
+  --git-modal-shadow: rgba(0, 0, 0, 0.4);
+  --git-input-focus-shadow: rgba(10, 132, 255, 0.15);
+  --git-generate-btn-bg: rgba(255, 255, 255, 0.08);
+  --git-generate-btn-hover: rgba(255, 255, 255, 0.15);
+  --git-cancel-btn-hover: rgba(255, 255, 255, 0.05);
+  --git-split-btn-border: rgba(255, 255, 255, 0.15);
+  --git-dropdown-shadow: rgba(0, 0, 0, 0.3);
+  --git-dropdown-hover-bg: rgba(255, 255, 255, 0.05);
+  --git-dropdown-active-bg: rgba(10, 132, 255, 0.15);
+  --git-alert-error-bg: rgba(239, 83, 80, 0.1);
+  --git-alert-error-border: rgba(239, 83, 80, 0.2);
+  --git-alert-error-color: #ef5350;
+  --git-alert-success-bg: rgba(102, 187, 106, 0.1);
+  --git-alert-success-border: rgba(102, 187, 106, 0.2);
+  --git-alert-success-color: #66bb6a;
+  --git-clean-msg-bg: rgba(255, 255, 255, 0.01);
+  
+  --git-badge-edited-bg: rgba(10, 132, 255, 0.12);
+  --git-badge-deleted-bg: rgba(239, 83, 80, 0.12);
+  --git-badge-moved-bg: rgba(255, 152, 0, 0.12);
+  --git-badge-moved-color: #ff9800;
+  
+  --git-diff-overlay-bg: rgba(0, 0, 0, 0.1);
+  
+  --git-separator-bg: rgba(10, 132, 255, 0.04);
+  --git-separator-line-bg: rgba(10, 132, 255, 0.08);
 }

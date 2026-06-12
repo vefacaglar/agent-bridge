@@ -1114,7 +1114,7 @@ defineExpose({
   flex-direction: column;
   min-height: 0;
   border: none;
-  border-left: 1px solid rgba(255, 255, 255, 0.05);
+  border-left: 1px solid var(--review-border-soft-white);
   border-radius: 0;
   margin: 0;
   padding-top: var(--shell-inset);
@@ -1341,8 +1341,8 @@ defineExpose({
   padding: 16px;
   border: 1px solid var(--agent-row-border);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.015);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  background: var(--review-card-bg-subtle);
+  box-shadow: 0 4px 12px var(--review-shadow-soft);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -1354,20 +1354,20 @@ defineExpose({
 
 .agent-row:hover {
   border-color: var(--border);
-  background: rgba(255, 255, 255, 0.025);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+  background: var(--review-card-bg-hover);
+  box-shadow: 0 6px 16px var(--review-shadow-strong);
   transform: translateY(-1px);
 }
 
 .agent-row.running {
-  border-color: rgba(123, 216, 143, 0.25);
-  background: rgba(123, 216, 143, 0.01);
+  border-color: var(--review-border-green-soft);
+  background: var(--review-bg-green-soft);
 }
 
 .agent-row.expanded {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--review-bg-white-02);
   border-color: var(--border);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 8px 24px rgba(0, 0, 0, 0.25);
+  box-shadow: inset 0 1px 0 var(--review-inset-shadow-white), 0 8px 24px var(--review-shadow-large);
 }
 
 .agent-row-header {
@@ -1420,7 +1420,7 @@ defineExpose({
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: rgba(123, 216, 143, 0.25);
+  background: var(--review-bg-green-strong);
   animation: agent-pulse-ring 2s infinite ease-out;
   z-index: 1;
 }
@@ -1534,12 +1534,12 @@ defineExpose({
 }
 
 .meta-item.status-badge.running {
-  background: rgba(123, 216, 143, 0.15);
+  background: var(--review-bg-green-medium);
   color: var(--success);
 }
 
 .meta-item.status-badge.done {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--review-border-soft-white);
   color: var(--faint);
 }
 
@@ -1921,12 +1921,12 @@ defineExpose({
   padding: 6px 8px !important;
   border-radius: 6px !important;
   font-size: 0.8rem !important;
-  background: rgba(255, 255, 255, 0.005);
+  background: var(--review-bg-white-005);
 }
 
 .agent-transcript-body :deep(.step-row:hover) {
   color: var(--text);
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--review-bg-white-02);
 }
 
 .agent-transcript-body :deep(.coder-tool-model) {
@@ -1938,7 +1938,7 @@ defineExpose({
   line-height: 1.55;
   font-size: 0.84rem;
   margin: 4px 0;
-  background: rgba(255, 255, 255, 0.005);
+  background: var(--review-bg-white-005);
   padding: 10px 12px;
   border-radius: 8px;
   border: 1px solid var(--border-soft);
@@ -1970,7 +1970,7 @@ defineExpose({
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--git-overlay-bg);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   z-index: 9999;
@@ -1985,7 +1985,7 @@ defineExpose({
   width: min(500px, 90vw);
   background: var(--surface-elevated);
   border: 1px solid var(--border);
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 20px 50px var(--git-modal-shadow);
   padding: 24px;
   border-radius: 14px;
   display: flex;
@@ -2006,10 +2006,10 @@ defineExpose({
 }
 
 .commit-trigger-btn {
-  background: var(--primary);
+  background: var(--btn-primary-bg);
   border: none;
   border-radius: 8px;
-  color: #fff;
+  color: var(--text);
   font-size: 0.76rem;
   font-weight: 600;
   padding: 6px 12px;
@@ -2020,7 +2020,7 @@ defineExpose({
 }
 
 .commit-trigger-btn:hover {
-  background: var(--primary-hover, #585fe6);
+  background: var(--btn-primary-hover-bg);
 }
 
 .git-header {
@@ -2032,7 +2032,7 @@ defineExpose({
 }
 
 .git-icon {
-  color: var(--primary);
+  color: var(--btn-primary-bg);
   display: flex;
   align-items: center;
 }
@@ -2076,15 +2076,15 @@ defineExpose({
 }
 
 .git-commit-input:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 2px rgba(100, 108, 255, 0.15);
+  border-color: var(--btn-primary-bg);
+  box-shadow: 0 0 0 2px var(--git-input-focus-shadow);
 }
 
 .git-generate-btn {
   position: absolute;
   right: 6px;
   bottom: 6px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--git-generate-btn-bg);
   border: 1px solid var(--border-soft);
   border-radius: 6px;
   color: var(--text);
@@ -2097,7 +2097,7 @@ defineExpose({
 }
 
 .git-generate-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--git-generate-btn-hover);
   border-color: var(--muted);
 }
 
@@ -2127,7 +2127,7 @@ defineExpose({
 
 .git-cancel-btn:hover:not(:disabled) {
   color: var(--text);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--git-cancel-btn-hover);
 }
 
 .git-cancel-btn:disabled {
@@ -2144,10 +2144,10 @@ defineExpose({
 }
 
 .git-main-btn {
-  background: var(--primary);
+  background: var(--btn-primary-bg);
   border: none;
-  border-radius: 8px 0 0 8px;
-  color: #fff;
+  border-radius: 8px 0 0 8px !important;
+  color: var(--text);
   font-size: 0.8rem;
   font-weight: 500;
   padding: 6px 12px;
@@ -2159,7 +2159,7 @@ defineExpose({
 }
 
 .git-main-btn:hover:not(:disabled) {
-  background: var(--primary-hover, #585fe6);
+  background: var(--btn-primary-hover-bg);
 }
 
 .git-main-btn:disabled {
@@ -2168,11 +2168,11 @@ defineExpose({
 }
 
 .git-arrow-btn {
-  background: var(--primary);
+  background: var(--btn-primary-bg);
   border: none;
-  border-left: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 0 8px 8px 0;
-  color: #fff;
+  border-left: 1px solid var(--git-split-btn-border);
+  border-radius: 0 8px 8px 0 !important;
+  color: var(--text);
   padding: 6px 8px;
   cursor: pointer;
   transition: background 0.2s ease;
@@ -2182,7 +2182,7 @@ defineExpose({
 }
 
 .git-arrow-btn:hover:not(:disabled) {
-  background: var(--primary-hover, #585fe6);
+  background: var(--btn-primary-hover-bg);
 }
 
 .git-arrow-btn:disabled {
@@ -2196,10 +2196,10 @@ defineExpose({
   bottom: 100%;
   right: 0;
   margin-bottom: 4px;
-  background: var(--card-bg, #1a1a1a);
+  background: var(--card-bg);
   border: 1px solid var(--border-soft);
   border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 16px var(--git-dropdown-shadow);
   z-index: 100;
   min-width: 140px;
   padding: 4px;
@@ -2222,13 +2222,13 @@ defineExpose({
 }
 
 .git-dropdown-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--git-dropdown-hover-bg);
   color: var(--text);
 }
 
 .git-dropdown-item.active {
-  background: rgba(100, 108, 255, 0.15);
-  color: var(--primary);
+  background: var(--git-dropdown-active-bg);
+  color: var(--btn-primary-bg);
   font-weight: 500;
 }
 
@@ -2243,15 +2243,15 @@ defineExpose({
 }
 
 .git-alert.error {
-  background: rgba(239, 83, 80, 0.1);
-  border: 1px solid rgba(239, 83, 80, 0.2);
-  color: #ef5350;
+  background: var(--git-alert-error-bg);
+  border: 1px solid var(--git-alert-error-border);
+  color: var(--git-alert-error-color);
 }
 
 .git-alert.success {
-  background: rgba(102, 187, 106, 0.1);
-  border: 1px solid rgba(102, 187, 106, 0.2);
-  color: #66bb6a;
+  background: var(--git-alert-success-bg);
+  border: 1px solid var(--git-alert-success-border);
+  color: var(--git-alert-success-color);
 }
 
 /* Small loading spinner */
@@ -2259,9 +2259,9 @@ defineExpose({
   display: inline-block;
   width: 12px;
   height: 12px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  border: 2px solid var(--review-white-30);
   border-radius: 50%;
-  border-top-color: #fff;
+  border-top-color: var(--text);
   animation: spin 0.8s linear infinite;
 }
 
@@ -2276,7 +2276,7 @@ defineExpose({
 .git-clean-msg {
   font-size: 0.8rem;
   color: var(--muted);
-  background: rgba(255, 255, 255, 0.01);
+  background: var(--git-clean-msg-bg);
   border: 1px dashed var(--border-soft);
   border-radius: 8px;
   padding: 12px;
@@ -2321,7 +2321,7 @@ defineExpose({
   align-items: center;
   gap: 10px;
   padding: 12px var(--card-pad-x);
-  background: var(--card-bg, #161616);
+  background: var(--card-bg);
   border: none;
   border-bottom: 1px solid var(--border-soft);
   color: var(--text);
@@ -2336,7 +2336,7 @@ defineExpose({
 }
 
 .git-file-header:hover {
-  background: #1f1f1f !important;
+  background: var(--control-bg-hover) !important;
 }
 
 .git-file-chevron {
@@ -2380,28 +2380,28 @@ defineExpose({
 }
 
 .git-file-badge.created {
-  background: rgba(123, 216, 143, 0.12);
-  color: var(--msg-success-stroke, #4caf50);
+  background: var(--success-soft);
+  color: var(--success);
 }
 
 .git-file-badge.edited {
-  background: rgba(100, 108, 255, 0.12);
-  color: var(--primary, #585fe6);
+  background: var(--git-badge-edited-bg);
+  color: var(--btn-primary-bg);
 }
 
 .git-file-badge.deleted {
-  background: rgba(239, 83, 80, 0.12);
-  color: var(--plan-del-color, #ef5350);
+  background: var(--git-badge-deleted-bg);
+  color: var(--plan-del-color);
 }
 
 .git-file-badge.moved {
-  background: rgba(255, 152, 0, 0.12);
-  color: #ff9800;
+  background: var(--git-badge-moved-bg);
+  color: var(--git-badge-moved-color);
 }
 
 .git-file-diff-container {
   font-size: 0.8rem;
-  background: rgba(0, 0, 0, 0.1);
+  background: var(--git-diff-overlay-bg);
 }
 
 .git-file-diff-container .diff-view {
@@ -2418,7 +2418,7 @@ defineExpose({
 }
 
 .diff-row.is-separator {
-  background: rgba(100, 108, 255, 0.04) !important;
+  background: var(--git-separator-bg) !important;
   color: var(--muted);
   border-top: 1px solid var(--border-soft);
   border-bottom: 1px solid var(--border-soft);
@@ -2426,7 +2426,7 @@ defineExpose({
 }
 
 .diff-row.is-separator .separator-line {
-  background: rgba(100, 108, 255, 0.08) !important;
+  background: var(--git-separator-line-bg) !important;
   color: var(--muted) !important;
   font-size: 0.72rem;
   display: flex;
@@ -2435,7 +2435,7 @@ defineExpose({
 }
 
 .diff-row.is-separator .separator-text {
-  color: var(--primary, #585fe6) !important;
+  color: var(--btn-primary-bg) !important;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-weight: 500;
   font-size: 0.74rem;
