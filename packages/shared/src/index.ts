@@ -67,6 +67,7 @@ export interface ProviderModelSettings extends ModelReasoningSettings {
   reasoning?: ModelReasoningSettings;
   contextLimit?: number;    // max context window in tokens (display/metadata)
   pricing?: ModelPricing;   // user-entered cost rates; falls back to built-in sheet when absent
+  temperature?: number;     // per-model temperature override (0-2); omit for provider default
 }
 
 export interface ResolvedReasoningConfig {

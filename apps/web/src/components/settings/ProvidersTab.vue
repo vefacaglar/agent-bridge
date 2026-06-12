@@ -67,6 +67,7 @@ type ModelRow = {
   reasoningStyle: ReasoningStyle;
   reasoningOptions: ReasoningOption[];
   contextLimit: number | null;
+  temperature: number | null;
   pricingTiers: PriceTierRow[];
 };
 
@@ -75,7 +76,7 @@ function defaultReasoningStyle(): ReasoningStyle {
 }
 
 function emptyModelRow(name = ''): ModelRow {
-  return { name, reasoningStyle: defaultReasoningStyle(), reasoningOptions: [], contextLimit: null, pricingTiers: [] };
+  return { name, reasoningStyle: defaultReasoningStyle(), reasoningOptions: [], contextLimit: null, temperature: null, pricingTiers: [] };
 }
 
 function emptyPriceTierRow(): PriceTierRow {
@@ -162,7 +163,7 @@ function modelRowFromSettings(name: string, settings?: ProviderModelSettings): M
     cacheReadRate: tier.cacheReadRate ?? null,
     cacheWriteRate: tier.cacheWriteRate ?? null
   }));
-  return { name, reasoningStyle: style, reasoningOptions: options, contextLimit: settings?.contextLimit ?? null, pricingTiers };
+  return { name, reasoningStyle: style, reasoningOptions: options, contextLimit: settings?.contextLimit ?? null, temperature: settings?.temperature ?? null, pricingTiers };
 }
 
 function defaultReasoningOption(style: ReasoningStyle, id: ReasoningEffort): ReasoningOption {
@@ -204,6 +205,12 @@ function contextSummary(settings?: ProviderModelSettings): string {
   return limit >= 1000 ? `${Math.round(limit / 1000)}k ctx` : `${limit} ctx`;
 }
 
+function temperatureSummary(settings?: ProviderModelSettings): string {
+  const temp = settings?.temperature;
+  if (temp === undefined || temp === null) return '';
+  return `temp: ${temp}`;
+}
+
 async function handleDeleteProvider() {
   if (!editingProviderId.value) return;
   if (!(await showConfirm(`Are you sure you want to delete the provider "${editingProviderId.value}"?`))) return;
@@ -242,6 +249,7 @@ async function handleSave() {
       reasoningStyle: row.reasoningStyle,
       reasoningOptions: row.reasoningOptions,
       contextLimit: row.contextLimit,
+      temperature: row.temperature,
       pricingTiers: row.pricingTiers
     }))
     .filter(row => row.name);
@@ -256,6 +264,9 @@ async function handleSave() {
       }
       if (row.contextLimit && row.contextLimit > 0) {
         settings.contextLimit = row.contextLimit;
+      }
+      if (row.temperature !== null && row.temperature >= 0 && row.temperature <= 2) {
+        settings.temperature = row.temperature;
       }
       const tiers = row.pricingTiers
         .filter(tier => tier.inputRate != null && tier.outputRate != null)
@@ -446,6 +457,10 @@ async function handleFetchModels() {
                     <span>Context limit (tokens)</span>
                     <input v-model.number="row.contextLimit" type="number" min="0" step="1000" placeholder="e.g. 1000000" />
                   </label>
+                  <label class="pricing-field">
+                    <span>Temperature (0-2)</span>
+                    <input v-model.number="row.temperature" type="number" min="0" max="2" step="0.1" placeholder="provider default" />
+                  </label>
                 </div>
 
                 <div class="pricing-head">
@@ -557,6 +572,9 @@ async function handleFetchModels() {
             </template>
             <template v-if="contextSummary(provider.modelSettings?.[model])">
               · {{ contextSummary(provider.modelSettings?.[model]) }}
+            </template>
+            <template v-if="temperatureSummary(provider.modelSettings?.[model])">
+              · {{ temperatureSummary(provider.modelSettings?.[model]) }}
             </template>
             <template v-if="pricingSummary(provider.modelSettings?.[model])">
               · {{ pricingSummary(provider.modelSettings?.[model]) }}

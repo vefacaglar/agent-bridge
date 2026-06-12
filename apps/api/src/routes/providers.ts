@@ -52,6 +52,7 @@ export function registerProviderRoutes(server: FastifyInstance, ctx: AppContext)
       const provider = ctx.registry.getProvider(providerId);
       const result = await provider.complete({
         model,
+        temperature: ctx.registry.resolveTemperature(providerId, model),
         messages: [{ role: "user", content: prompt }]
       });
       return { success: true, content: result.content, usage: result.usage };

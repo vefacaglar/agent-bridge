@@ -353,6 +353,7 @@ export class AgentLoop {
       model: opts.model,
       reasoningEffort: opts.reasoningEffort,
       reasoning: this.registry.resolveReasoning(opts.providerId, opts.model, opts.reasoningEffort),
+      temperature: this.registry.resolveTemperature(opts.providerId, opts.model),
       systemPrompt: opts.systemPrompt,
       messages,
       tools: opts.tools

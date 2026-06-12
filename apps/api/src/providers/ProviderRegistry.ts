@@ -19,6 +19,7 @@ interface ModelSettingsBlock {
   reasoningEfforts?: ReasoningEffort[];
   contextLimit?: number;
   pricing?: ModelPricing;
+  temperature?: number;
 }
 
 interface PersistedProviderConfigBlock extends Omit<ProviderConfigBlock, "apiKey"> {
@@ -337,10 +338,13 @@ export class ProviderRegistry {
         }
         if (pricing) clean.pricing = pricing;
         if (contextLimit !== undefined) clean.contextLimit = contextLimit;
+        if (typeof settings.temperature === 'number' && settings.temperature >= 0 && settings.temperature <= 2) {
+          clean.temperature = settings.temperature;
+        }
         return [model, clean] as const;
       })
       // Keep a model entry only if it carries at least one usable setting.
-      .filter(([, settings]) => (settings.reasoning?.options?.length ?? 0) > 0 || !!settings.pricing || settings.contextLimit !== undefined);
+      .filter(([, settings]) => (settings.reasoning?.options?.length ?? 0) > 0 || !!settings.pricing || settings.contextLimit !== undefined || settings.temperature !== undefined);
     return Object.fromEntries(entries);
   }
 
@@ -385,6 +389,14 @@ export class ProviderRegistry {
     const block = this.configs[providerId];
     if (!block) return undefined;
     return this.safeContextLimit(this.safeModelSettings(block)[model]?.contextLimit);
+  }
+
+  /** The user-entered temperature override for a model; undefined = provider default. */
+  resolveTemperature(providerId: string, model: string): number | undefined {
+    const block = this.configs[providerId];
+    if (!block) return undefined;
+    const temp = this.safeModelSettings(block)[model]?.temperature;
+    return temp !== undefined ? temp : undefined;
   }
 
   private safeReasoningSettings(providerType: ProviderConfigBlock["type"], settings: ModelSettingsBlock): ModelReasoningSettings | undefined {

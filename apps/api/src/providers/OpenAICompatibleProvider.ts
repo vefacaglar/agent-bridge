@@ -194,6 +194,14 @@ export class OpenAICompatibleProvider implements ModelProvider {
             await sleep(backoffDelay(attempt));
             continue;
           }
+          // Auto-fix: some models only accept a specific temperature (e.g.
+          // temperature=1). If the upstream returns a 400 with a temperature
+          // error message, silently pin the value and retry once.
+          if (response.status === 400 && /temperature/i.test(errText) && body.temperature !== 1) {
+            body.temperature = 1;
+            clearTimeout(timeoutId);
+            continue;
+          }
           throw new Error(`OpenAI API returned status ${response.status}: ${errText}`);
         }
 
