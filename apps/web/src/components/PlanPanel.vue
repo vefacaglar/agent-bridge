@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch, nextTick } from 'vue';
+import { computed, ref, watch, nextTick, onMounted, onUnmounted } from 'vue';
 import type { Plan } from '@locagens/shared';
 import type { AgentSummary } from '../lib/messageGroups';
 import { renderMarkdown, cleanMessageContent } from '../lib/markdown';
@@ -7,9 +7,11 @@ import { changeDiffRows, type WorkspaceChange } from '../lib/workspaceChanges';
 import ToolGroup from './ToolGroup.vue';
 import ReasoningPanel from './ReasoningPanel.vue';
 import ThemedButton from './ThemedButton.vue';
+import { API_BASE } from '../api/client';
 
 const props = defineProps<{
   runId?: string | null;
+  projectPath?: string | null;
   plan: Plan | null;
   changes?: WorkspaceChange[];
   agents?: AgentSummary[];
@@ -61,6 +63,135 @@ const isSwitchingRun = ref(false);
 const plan = ref<Plan | null>(null);
 const changes = ref<WorkspaceChange[]>([]);
 const agents = ref<AgentSummary[]>([]);
+
+// Git Integration State
+const isGitRepo = ref(false);
+const hasGitChanges = ref(false);
+const gitBranch = ref('');
+const commitMessage = ref('');
+const isGenerating = ref(false);
+const commitStatus = ref<'idle' | 'processing' | 'success' | 'error'>('idle');
+const gitError = ref<string | null>(null);
+const showActionsDropdown = ref(false);
+
+type GitAction = 'commit' | 'commit-push' | 'push';
+const selectedGitAction = ref<GitAction>('commit');
+
+const actionLabels: Record<GitAction, string> = {
+  commit: 'Commit',
+  'commit-push': 'Commit & Push',
+  push: 'Push'
+};
+
+const availableGitActions: GitAction[] = ['commit', 'commit-push', 'push'];
+
+function closeDropdown() {
+  showActionsDropdown.value = false;
+}
+
+onMounted(() => {
+  document.addEventListener('click', closeDropdown);
+});
+
+onUnmounted(() => {
+  document.removeEventListener('click', closeDropdown);
+});
+
+function toggleActionsDropdown(e: Event) {
+  e.stopPropagation();
+  showActionsDropdown.value = !showActionsDropdown.value;
+}
+
+function selectGitAction(action: GitAction) {
+  selectedGitAction.value = action;
+  showActionsDropdown.value = false;
+}
+
+async function checkGitStatus() {
+  if (!props.projectPath) return;
+  try {
+    const res = await fetch(`${API_BASE}/api/projects/git/status?path=${encodeURIComponent(props.projectPath)}`);
+    if (!res.ok) throw new Error('Failed to fetch status');
+    const data = await res.json();
+    if (data.isGit) {
+      isGitRepo.value = true;
+      gitBranch.value = data.branch || 'main';
+      hasGitChanges.value = data.hasChanges || false;
+    } else {
+      isGitRepo.value = false;
+      hasGitChanges.value = false;
+    }
+  } catch (err) {
+    console.error('Error checking git status:', err);
+    isGitRepo.value = false;
+    hasGitChanges.value = false;
+  }
+}
+
+async function generateCommitMessage() {
+  if (!props.runId) return;
+  isGenerating.value = true;
+  gitError.value = null;
+  try {
+    const res = await fetch(`${API_BASE}/api/projects/git/generate-message`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ runId: props.runId })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to generate message');
+    commitMessage.value = data.message;
+  } catch (err: any) {
+    gitError.value = err.message || 'Failed to generate commit message';
+  } finally {
+    isGenerating.value = false;
+  }
+}
+
+async function executeGitAction(action: GitAction) {
+  if (!props.projectPath) return;
+  commitStatus.value = 'processing';
+  gitError.value = null;
+  try {
+    const res = await fetch(`${API_BASE}/api/projects/git/commit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        path: props.projectPath,
+        message: commitMessage.value,
+        action
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to execute git action');
+    
+    commitStatus.value = 'success';
+    commitMessage.value = '';
+    setTimeout(() => {
+      checkGitStatus();
+      commitStatus.value = 'idle';
+    }, 3000);
+  } catch (err: any) {
+    commitStatus.value = 'error';
+    gitError.value = err.message || 'Git operation failed';
+  }
+}
+
+function resetGitForm() {
+  commitMessage.value = '';
+  gitError.value = null;
+  commitStatus.value = 'idle';
+}
+
+watch(
+  () => [activeTab.value, props.projectPath] as const,
+  ([tab, path]) => {
+    if (tab === 'review' && path) {
+      checkGitStatus();
+    }
+  },
+  { immediate: true }
+);
 
 watch(
   () => [props.plan, props.changes, props.agents, props.isOpen] as const,
@@ -645,7 +776,104 @@ defineExpose({
           </button>
         </div>
 
-        <p v-else class="panel-empty">
+        <!-- Git Commit Card -->
+        <div v-if="isGitRepo" class="git-commit-card">
+          <div class="git-header">
+            <span class="git-icon">
+              <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor">
+                <path fill-rule="evenodd" d="M11.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5zm-2.25.75a2.25 2.25 0 1 1 3 2.122V6A2.5 2.5 0 0 1 10 8.5H6a1 1 0 0 0-1 1v1.378a2.251 2.251 0 1 1-1.5 0V5.122a2.25 2.25 0 1 1 1.5 0v2.878h4A1 1 0 0 0 10 7V5.372a2.25 2.25 0 0 1-.5-1.622zM4.25 12a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5zM3.5 3.25a.75.75 0 1 1 1.5 0 .75.75 0 0 1-1.5 0z"/>
+              </svg>
+            </span>
+            <span class="git-branch">on branch <strong>{{ gitBranch }}</strong></span>
+          </div>
+
+          <div class="git-commit-form">
+            <!-- Warning message if clean and not pushing -->
+            <div v-if="!hasGitChanges && selectedGitAction !== 'push'" class="git-clean-msg">
+              No local changes to commit. Make edits or select <strong>Push</strong> to push local commits.
+            </div>
+
+            <!-- Buttoned Input -->
+            <div v-else class="git-input-wrapper">
+              <textarea
+                v-model="commitMessage"
+                placeholder="Commit message..."
+                class="git-commit-input"
+                :disabled="commitStatus === 'processing'"
+                rows="2"
+              ></textarea>
+              <button
+                type="button"
+                class="git-generate-btn"
+                :disabled="isGenerating || commitStatus === 'processing'"
+                @click="generateCommitMessage"
+                title="AI Generate Message"
+              >
+                <span v-if="isGenerating" class="spinner-small"></span>
+                <span v-else>Generate</span>
+              </button>
+            </div>
+
+            <!-- Action Buttons Row -->
+            <div class="git-actions-row">
+              <button
+                type="button"
+                class="git-cancel-btn"
+                :disabled="commitStatus === 'processing'"
+                @click="resetGitForm"
+              >
+                Cancel
+              </button>
+
+              <!-- Nested Split Button -->
+              <div class="git-split-button-container">
+                <button
+                  type="button"
+                  class="git-main-btn"
+                  :disabled="commitStatus === 'processing' || (!commitMessage.trim() && selectedGitAction !== 'push') || (!hasGitChanges && selectedGitAction !== 'push')"
+                  @click="executeGitAction(selectedGitAction)"
+                >
+                  <span v-if="commitStatus === 'processing'" class="spinner-small inline"></span>
+                  <span v-else>{{ actionLabels[selectedGitAction] }}</span>
+                </button>
+                <button
+                  type="button"
+                  class="git-arrow-btn"
+                  :disabled="commitStatus === 'processing'"
+                  @click.stop="toggleActionsDropdown"
+                >
+                  <svg viewBox="0 0 16 16" width="10" height="10" fill="currentColor">
+                    <path d="M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z"/>
+                  </svg>
+                </button>
+
+                <!-- Dropdown Popup -->
+                <div v-if="showActionsDropdown" class="git-dropdown-menu">
+                  <button
+                    v-for="action in availableGitActions"
+                    :key="action"
+                    type="button"
+                    class="git-dropdown-item"
+                    :class="{ active: action === selectedGitAction }"
+                    @click="selectGitAction(action)"
+                  >
+                    {{ actionLabels[action] }}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Status Alerts -->
+            <div v-if="gitError" class="git-alert error">
+              <span>{{ gitError }}</span>
+            </div>
+            <div v-if="commitStatus === 'success'" class="git-alert success">
+              <span>✓ Successfully executed!</span>
+            </div>
+          </div>
+        </div>
+
+        <p v-if="changes.length === 0 && !isGitRepo" class="panel-empty">
           File changes will appear here after the assistant edits the workspace.
         </p>
       </section>
@@ -1531,5 +1759,281 @@ defineExpose({
 
 .chevron-icon.rotated {
   transform: rotate(180deg);
+}
+
+/* Git Commit Card Styling */
+.git-commit-card {
+  margin-top: 20px;
+  padding: 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-soft);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.git-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.git-icon {
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+}
+
+.git-branch {
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.git-branch strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.git-commit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Buttoned Input */
+.git-input-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.git-commit-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--control-bg, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  padding: 10px 80px 10px 12px;
+  color: var(--text);
+  font-size: 0.85rem;
+  font-family: inherit;
+  resize: vertical;
+  line-height: 1.4;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.git-commit-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(100, 108, 255, 0.15);
+}
+
+.git-generate-btn {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 0.72rem;
+  padding: 4px 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 2;
+  font-weight: 500;
+}
+
+.git-generate-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: var(--muted);
+}
+
+.git-generate-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Action Buttons Row */
+.git-actions-row {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+.git-cancel-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.git-cancel-btn:hover:not(:disabled) {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.git-cancel-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Nested Split Button */
+.git-split-button-container {
+  position: relative;
+  display: inline-flex;
+  border-radius: 6px;
+  overflow: visible;
+}
+
+.git-main-btn {
+  background: var(--primary);
+  border: none;
+  border-top-left-radius: 6px;
+  border-bottom-left-radius: 6px;
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.git-main-btn:hover:not(:disabled) {
+  background: var(--primary-hover, #585fe6);
+}
+
+.git-main-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.git-arrow-btn {
+  background: var(--primary);
+  border: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.15);
+  border-top-right-radius: 6px;
+  border-bottom-right-radius: 6px;
+  color: #fff;
+  padding: 6px 8px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.git-arrow-btn:hover:not(:disabled) {
+  background: var(--primary-hover, #585fe6);
+}
+
+.git-arrow-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Dropdown Popup */
+.git-dropdown-menu {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  margin-bottom: 4px;
+  background: var(--card-bg, #1a1a1a);
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  z-index: 100;
+  min-width: 140px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.git-dropdown-item {
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  padding: 6px 10px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.git-dropdown-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+}
+
+.git-dropdown-item.active {
+  background: rgba(100, 108, 255, 0.15);
+  color: var(--primary);
+  font-weight: 500;
+}
+
+/* Alerts */
+.git-alert {
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 0.78rem;
+  display: flex;
+  align-items: center;
+  line-height: 1.4;
+}
+
+.git-alert.error {
+  background: rgba(239, 83, 80, 0.1);
+  border: 1px solid rgba(239, 83, 80, 0.2);
+  color: #ef5350;
+}
+
+.git-alert.success {
+  background: rgba(102, 187, 106, 0.1);
+  border: 1px solid rgba(102, 187, 106, 0.2);
+  color: #66bb6a;
+}
+
+/* Small loading spinner */
+.spinner-small {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: #fff;
+  animation: spin 0.8s linear infinite;
+}
+
+.spinner-small.inline {
+  margin-right: 4px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.git-clean-msg {
+  font-size: 0.8rem;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.01);
+  border: 1px dashed var(--border-soft);
+  border-radius: 8px;
+  padding: 12px;
+  text-align: center;
+  line-height: 1.4;
 }
 </style>

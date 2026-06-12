@@ -554,6 +554,7 @@ onUnmounted(() => {
       ref="planPanelRef"
       v-if="sidePanelOpen && !showUsageLogsPage"
       :run-id="activeRunId"
+      :project-path="activeRun?.projectPath || projects.activeProjectPath.value"
       :isOpen="sidePanelOpen && !showUsageLogsPage"
       :plan="currentPlan"
       :changes="workspaceChanges"
