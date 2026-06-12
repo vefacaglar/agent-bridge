@@ -426,13 +426,13 @@ function formatRunAge(run: Run): string {
 .sidebar {
   gap: 0;
   padding: 12px 14px 14px !important;
-  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  border-right: 1px solid var(--border);
   border-radius: 0 !important;
   border-top-left-radius: 0 !important;
   border-top-right-radius: 0 !important;
   border-bottom-left-radius: 0 !important;
   border-bottom-right-radius: 0 !important;
-  background: #202122;
+  background: var(--sidebar);
   outline: none;
   box-shadow: none;
 }
@@ -802,9 +802,9 @@ function formatRunAge(run: Run): string {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--border);
   border-radius: 24px;
-  background: #2d2d2e;
+  background: var(--surface-elevated);
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
 }
 

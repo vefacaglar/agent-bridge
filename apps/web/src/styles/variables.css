@@ -7,7 +7,7 @@
 :root {
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #ffffff;
-  background: #000000;
+  background: #1c1c1c;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -15,30 +15,30 @@
   /* --- Core Base Palette --- */
 
   /* Layer Backgrounds */
-  --bg: #000000;                      /* Layer 0: Root app background */
-  --sidebar: #0b0b0d;                 /* Layer 1: App sidebar, side cards */
-  --card-bg: #0b0b0d;
-  --sidebar-active: #26262a;
-  --surface-elevated: #151518;        /* Layer 2: Modals, settings panels, dropdowns */
-  --control-bg: #1e1e21;              /* Layer 3: Buttons, inputs, chips */
-  --control-bg-hover: #26262a;        /* Layer 4: Hover state for inputs/buttons */
-  --control-bg-active: #2f2f34;
+  --bg: #1c1c1c;                      /* Layer 0: Root app background */
+  --sidebar: #181818;                 /* Layer 1: App sidebar, side cards */
+  --card-bg: #181818;
+  --sidebar-active: #2b2b2b;
+  --surface-elevated: #252526;        /* Layer 2: Modals, settings panels, dropdowns */
+  --control-bg: #252526;              /* Layer 3: Buttons, inputs, chips */
+  --control-bg-hover: #2d2d2d;        /* Layer 4: Hover state for inputs/buttons */
+  --control-bg-active: #37373d;
 
   /* Surfaces & Containers */
   --surface: rgba(255, 255, 255, 0.035);
-  --surface-strong: #2a2a2e;
+  --surface-strong: #333333;
   
   /* Borders */
-  --border: #35353a;
-  --border-soft: #202024;
-  --control-border: rgba(255, 255, 255, 0.08);
-  --control-border-focus: rgba(255, 255, 255, 0.2);
-  --control-accent: #a0a0a5;
+  --border: #2b2b2b;
+  --border-soft: #222222;
+  --control-border: rgba(255, 255, 255, 0.06);
+  --control-border-focus: rgba(255, 255, 255, 0.18);
+  --control-accent: #858585;
 
   /* Typography */
   --text: #ffffff;
-  --muted: #cfcfd4;
-  --faint: #8e8e93;
+  --muted: #cccccc;
+  --faint: #858585;
 
   /* Semantics */
   --planner: #ffd18a;
@@ -94,7 +94,7 @@
   --msg-danger-text: var(--danger);
 
   /* Composer & Dropdowns (ChatComposer.vue, ThemedSelect.vue) */
-  --composer-queued-msg-bg: #09090b;
+  --composer-queued-msg-bg: #1c1c1c;
   --composer-queued-msg-border: var(--border-soft);
   --composer-token-inactive: var(--border-soft);
   --composer-menu-border: var(--border-soft);
@@ -123,7 +123,7 @@
   --settings-overlay-bg: var(--modal-overlay-bg);
   --settings-card-bg: var(--surface-elevated);
   --settings-sidebar-bg: var(--sidebar);
-  --settings-main-bg: #101012;
+  --settings-main-bg: #1e1e1e;
   --settings-card-border: var(--border-soft);
   --settings-card-shadow: var(--modal-card-shadow);
   --settings-card-inset-shadow: transparent;
@@ -147,12 +147,12 @@
   --plan-task-progress-hover-bg: var(--control-bg-hover);
 
   /* Themed Buttons (ThemedButton.vue, style.css) */
-  --btn-primary-bg: #ffffff;
-  --btn-primary-color: #000000;
-  --btn-primary-hover-bg: #f2f2f7;
-  --btn-primary-active-bg: #e5e5ea;
-  --btn-primary-shadow: rgba(255, 255, 255, 0.1);
-  --btn-primary-hover-shadow: rgba(255, 255, 255, 0.15);
+  --btn-primary-bg: #0a84ff;
+  --btn-primary-color: #ffffff;
+  --btn-primary-hover-bg: #2693ff;
+  --btn-primary-active-bg: #0073e6;
+  --btn-primary-shadow: rgba(10, 132, 255, 0.2);
+  --btn-primary-hover-shadow: rgba(10, 132, 255, 0.35);
 
   --btn-secondary-bg: var(--control-bg);
   --btn-secondary-color: var(--muted);

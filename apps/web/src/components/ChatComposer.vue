@@ -1178,10 +1178,10 @@ onBeforeUnmount(() => {
   justify-content: center;
   width: 32px;
   height: 32px;
-  background: var(--text);
-  color: var(--bg);
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-color);
   border: none;
-  border-radius: 9px;
+  border-radius: 50%;
   cursor: pointer;
   box-shadow: 0 8px 18px var(--composer-shadow);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
