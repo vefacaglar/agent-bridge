@@ -374,7 +374,7 @@ export class AgentLoop {
     const promptTotal = this.recordUsage(turn, messages, response, startTime);
 
     const finalMsg = this.buildAssistantMessage(turn, msgId, {
-      content: response.content || (response.toolCalls ? "Calling workspace tools..." : ""),
+      content: response.content || "",
       reasoningContent: response.reasoningContent,
       rawResponse: response.toolCalls ? JSON.stringify(response.toolCalls) : undefined
     });

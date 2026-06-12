@@ -654,6 +654,15 @@
           "contextLimit": 1000000
         },
         "moonshotai/Kimi-K2.7-Code": {
+          "pricing": {
+            "tiers": [
+              {
+                "inputRate": 0.95,
+                "outputRate": 4,
+                "cacheReadRate": 0.19
+              }
+            ]
+          },
           "contextLimit": 256000,
           "temperature": 1
         }

@@ -184,33 +184,6 @@ function defaultBudgetTokens(id: ReasoningEffort): number {
   return 1024;
 }
 
-function reasoningSummary(settings?: ProviderModelSettings): string {
-  const reasoning = settings?.reasoning || settings;
-  const options = reasoning?.options?.length
-    ? reasoning.options
-    : (reasoning?.reasoningEfforts || []).map(id => defaultReasoningOption(reasoning?.style || defaultReasoningStyle(), id));
-  return options.map(option => option.label || option.id).join(', ');
-}
-
-function pricingSummary(settings?: ProviderModelSettings): string {
-  const tiers = settings?.pricing?.tiers;
-  if (!tiers?.length) return '';
-  if (tiers.length === 1) return `$${tiers[0].inputRate}/$${tiers[0].outputRate} per 1M`;
-  return `${tiers.length} tiers`;
-}
-
-function contextSummary(settings?: ProviderModelSettings): string {
-  const limit = settings?.contextLimit;
-  if (!limit) return '';
-  return limit >= 1000 ? `${Math.round(limit / 1000)}k ctx` : `${limit} ctx`;
-}
-
-function temperatureSummary(settings?: ProviderModelSettings): string {
-  const temp = settings?.temperature;
-  if (temp === undefined || temp === null) return '';
-  return `temp: ${temp}`;
-}
-
 async function handleDeleteProvider() {
   if (!editingProviderId.value) return;
   if (!(await showConfirm(`Are you sure you want to delete the provider "${editingProviderId.value}"?`))) return;
@@ -604,61 +577,20 @@ async function handleFetchModels() {
       No providers configured. Click "Add Provider" to create one.
     </div>
 
-    <ul v-else class="provider-list">
-      <li v-for="(provider, id) in configs" :key="id" class="provider-card-item">
-        <div class="provider-card-head">
-          <div class="provider-meta-info">
-            <span class="provider-status-dot" :class="provider.type"></span>
-            <span class="provider-name">{{ provider.displayName }}</span>
-            <span class="provider-type-badge">{{ provider.type }}</span>
-            <span class="provider-id-badge">ID: {{ id }}</span>
-          </div>
-          <ThemedButton 
-            variant="secondary"
-            size="sm"
-            @click="handleEditProvider(id)"
-          >
-            Edit
-          </ThemedButton>
-        </div>
-        
-        <div class="provider-card-details">
-          <div class="detail-item">
-            <span class="detail-label">Base URL:</span>
-            <code>{{ provider.baseUrl }}</code>
-          </div>
-          <div class="detail-item">
-            <span class="detail-label">API Key:</span>
-            <span class="key-status-badge" :class="{ configured: provider.hasApiKey }">
-              {{ provider.hasApiKey ? 'Configured' : 'Not set' }}
-            </span>
-          </div>
-        </div>
-        
-        <div class="provider-card-models">
-          <div class="models-title">Available Models:</div>
-          <div class="models-grid-layout">
-            <div v-for="model in provider.models" :key="model" class="provider-model-card">
-              <div class="model-card-name">{{ model }}</div>
-              <div class="model-card-badges">
-                <span v-if="contextSummary(provider.modelSettings?.[model])" class="model-badge">
-                  {{ contextSummary(provider.modelSettings?.[model]) }}
-                </span>
-                <span v-if="temperatureSummary(provider.modelSettings?.[model])" class="model-badge">
-                  {{ temperatureSummary(provider.modelSettings?.[model]) }}
-                </span>
-                <span v-if="reasoningSummary(provider.modelSettings?.[model])" class="model-badge" :title="'Reasoning: ' + reasoningSummary(provider.modelSettings?.[model])">
-                  {{ reasoningSummary(provider.modelSettings?.[model]) }}
-                </span>
-                <span v-if="pricingSummary(provider.modelSettings?.[model])" class="model-badge">
-                  {{ pricingSummary(provider.modelSettings?.[model]) }}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </li>
-    </ul>
+    <div v-else class="provider-plain-list">
+      <div v-for="(provider, id) in configs" :key="id" class="provider-plain-row">
+        <span class="provider-plain-text">
+          {{ provider.displayName }} <span class="provider-plain-meta">({{ provider.type }}, ID: {{ id }})</span>
+        </span>
+        <ThemedButton 
+          variant="secondary"
+          size="sm"
+          @click="handleEditProvider(id)"
+        >
+          Edit
+        </ThemedButton>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -725,193 +657,37 @@ async function handleFetchModels() {
 }
 
 /* Provider List View Mode */
-.provider-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+.provider-plain-list {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 2px;
+  border-top: 1px solid var(--border-soft);
+  padding-top: 12px;
 }
 
-.provider-card-item {
-  padding: 20px;
-  background: var(--card-bg);
-  border: 1px solid var(--border);
-  border-radius: 12px;
+.provider-plain-row {
   display: flex;
-  flex-direction: column;
-  gap: 16px;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.provider-card-item:hover {
-  border-color: var(--control-border-focus);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
-  transform: translateY(-1px);
-}
-
-.provider-card-head {
-  display: flex;
-  align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  align-items: center;
+  padding: 8px 0;
   border-bottom: 1px solid var(--border-soft);
-  padding-bottom: 12px;
 }
 
-.provider-meta-info {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.provider-status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--muted);
-}
-
-.provider-status-dot.openai-compatible {
-  background: #2196f3;
-  box-shadow: 0 0 8px rgba(33, 150, 243, 0.5);
-}
-
-.provider-status-dot.anthropic {
-  background: #f2994a;
-  box-shadow: 0 0 8px rgba(242, 153, 74, 0.5);
-}
-
-.provider-name {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.provider-type-badge {
-  font-size: 0.7rem;
-  font-weight: 500;
+.provider-plain-text {
+  font-size: 0.88rem;
   color: var(--muted);
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border);
-  padding: 2px 8px;
-  border-radius: 20px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
 }
 
-.provider-id-badge {
-  font-size: 0.72rem;
+.provider-plain-meta {
+  font-size: 0.78rem;
   color: var(--faint);
-  font-family: monospace;
+  margin-left: 4px;
 }
 
-.provider-card-details {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 12px;
-  font-size: 0.82rem;
-  color: var(--muted);
-  background: rgba(0, 0, 0, 0.15);
-  padding: 12px;
-  border-radius: 8px;
-  border: 1px solid var(--border-soft);
-}
 
-.detail-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
 
-.detail-label {
-  font-weight: 500;
-  color: var(--faint);
-}
 
-.provider-card-details code {
-  font-family: monospace;
-  background: var(--surface-strong);
-  padding: 2px 6px;
-  border-radius: 4px;
-  color: var(--text);
-  word-break: break-all;
-}
 
-.key-status-badge {
-  font-size: 0.75rem;
-  font-weight: 550;
-  color: var(--danger);
-  background: var(--danger-soft);
-  padding: 2px 8px;
-  border-radius: 6px;
-}
-
-.key-status-badge.configured {
-  color: var(--success);
-  background: var(--success-soft);
-}
-
-.provider-card-models {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.models-title {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.models-grid-layout {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 10px;
-}
-
-.provider-model-card {
-  background: rgba(255, 255, 255, 0.015);
-  border: 1px solid var(--border-soft);
-  border-radius: 8px;
-  padding: 10px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  transition: all 0.2s ease;
-}
-
-.provider-model-card:hover {
-  background: rgba(255, 255, 255, 0.03);
-  border-color: var(--border);
-}
-
-.model-card-name {
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--text);
-  font-family: monospace;
-}
-
-.model-card-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.model-badge {
-  font-size: 0.7rem;
-  padding: 2px 6px;
-  border-radius: 4px;
-  border: 1px solid var(--border);
-  color: var(--muted);
-  background: var(--control-bg);
-  font-family: monospace;
-}
 
 /* Edit form styling */
 .edit-form-card {
