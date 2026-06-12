@@ -7,6 +7,7 @@ import { useComposerSettings } from './useComposerSettings';
 import { useProjects } from './useProjects';
 import { usePermissions } from './usePermissions';
 import { useMemories } from './useMemories';
+import { ACTIVE_STATUSES } from '../lib/format';
 
 export function useAppShell() {
   const providers = ref<ProviderMetadata[]>([]);
@@ -19,6 +20,7 @@ export function useAppShell() {
   const activeRunId = ref<string | null>(localStorage.getItem('activeRunId'));
   const activeRun = ref<Run | null>(null);
   const showUsageLogsPage = ref(false);
+  let runsRefreshTimer: ReturnType<typeof setInterval> | null = null;
 
   watch(activeRunId, () => {
     if (activeRunId.value) {
@@ -86,6 +88,26 @@ export function useAppShell() {
 
   useChatAutoScroll(messagesContainer, chat.messages, chat.isRunning, chat.activeRunId);
 
+  function stopRunsRefreshTimer() {
+    if (runsRefreshTimer) {
+      clearInterval(runsRefreshTimer);
+      runsRefreshTimer = null;
+    }
+  }
+
+  watch(
+    () => runs.value.some(run => ACTIVE_STATUSES.includes(run.status)),
+    (hasActiveRun) => {
+      stopRunsRefreshTimer();
+      if (!hasActiveRun) return;
+
+      runsRefreshTimer = setInterval(() => {
+        void chat.loadRuns();
+      }, 3000);
+    },
+    { immediate: true }
+  );
+
   function setMessagesContainer(el: unknown) {
     messagesContainer.value = el instanceof HTMLElement ? el : null;
   }
@@ -132,7 +154,10 @@ export function useAppShell() {
   }
 
   onMounted(initialize);
-  onBeforeUnmount(() => chat.disconnect());
+  onBeforeUnmount(() => {
+    stopRunsRefreshTimer();
+    chat.disconnect();
+  });
 
   return {
     runs,

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
 import type { Run } from '@locagens/shared';
-import { DEFAULT_PROJECT_PATH } from '../lib/format';
+import { ACTIVE_STATUSES, DEFAULT_PROJECT_PATH } from '../lib/format';
 
 interface ProjectOption {
   path: string;
@@ -43,6 +43,7 @@ const isSearchOpen = ref(false);
 const searchQuery = ref('');
 const searchInput = ref<HTMLInputElement | null>(null);
 const selectedSearchIndex = ref(0);
+const readRunStamps = ref<Record<string, number>>(loadReadRunStamps());
 
 const normalizedSearchQuery = computed(() => searchQuery.value.trim().toLowerCase());
 const isSearching = computed(() => normalizedSearchQuery.value.length > 0);
@@ -84,6 +85,12 @@ watch(searchResults, (results) => {
     selectedSearchIndex.value = Math.max(0, results.length - 1);
   }
 });
+
+watch(
+  () => [props.activeRunId, props.runs] as const,
+  () => markActiveRunRead(),
+  { immediate: true, deep: true }
+);
 
 function handleProjectClick(path: string) {
   expandedProjects.value[path] = !expandedProjects.value[path];
@@ -147,6 +154,50 @@ function selectHighlightedSearchRun() {
 function selectSearchRun(run: Run) {
   closeSearch();
   emit('select-run', run);
+}
+
+function loadReadRunStamps(): Record<string, number> {
+  try {
+    const stored = localStorage.getItem('sidebarReadRunStamps');
+    return stored ? JSON.parse(stored) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveReadRunStamps() {
+  localStorage.setItem('sidebarReadRunStamps', JSON.stringify(readRunStamps.value));
+}
+
+function runActivityTime(run: Run): number {
+  const time = Date.parse(run.lastActiveAt || run.updatedAt || run.createdAt);
+  return Number.isFinite(time) ? time : 0;
+}
+
+function markActiveRunRead() {
+  if (!props.activeRunId) return;
+  const run = props.runs.find(r => r.id === props.activeRunId);
+  if (!run) return;
+  const stamp = runActivityTime(run);
+  if (!stamp) return;
+  if (readRunStamps.value[run.id] === stamp) return;
+
+  readRunStamps.value = {
+    ...readRunStamps.value,
+    [run.id]: stamp
+  };
+  saveReadRunStamps();
+}
+
+function isRunActive(run: Run): boolean {
+  return ACTIVE_STATUSES.includes(run.status);
+}
+
+function isRunUnread(run: Run): boolean {
+  if (run.id === props.activeRunId || isRunActive(run)) return false;
+  const readStamp = readRunStamps.value[run.id];
+  if (!readStamp) return false;
+  return runActivityTime(run) > readStamp;
 }
 
 function runMatchesSearch(run: Run): boolean {
@@ -306,6 +357,8 @@ function formatRunAge(run: Run): string {
                 :class="{ active: run.id === activeRunId }"
                 @click="emit('select-run', run)"
               >
+                <span v-if="isRunActive(run)" class="session-state session-spinner" aria-label="Running"></span>
+                <span v-else-if="isRunUnread(run)" class="session-state session-unread-dot" aria-label="Unread"></span>
                 <span class="chat-title">{{ run.title }}</span>
                 <span class="chat-age">{{ formatRunAge(run) }}</span>
               </button>
@@ -566,6 +619,7 @@ function formatRunAge(run: Run): string {
 }
 
 .chat-history-item {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: baseline;
@@ -577,6 +631,37 @@ function formatRunAge(run: Run): string {
   font-size: 0.82rem;
   line-height: 1.45;
   overflow: visible;
+}
+
+.session-state {
+  position: absolute;
+  left: -18px;
+  top: 50%;
+  transform: translateY(-50%);
+  flex-shrink: 0;
+}
+
+.session-unread-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--text);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.16);
+}
+
+.session-spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.24);
+  border-top-color: var(--text);
+  animation: sidebar-session-spin 0.75s linear infinite;
+}
+
+@keyframes sidebar-session-spin {
+  to {
+    transform: translateY(-50%) rotate(360deg);
+  }
 }
 
 .chat-history-item:hover {
