@@ -654,6 +654,7 @@
           "contextLimit": 1000000
         },
         "moonshotai/Kimi-K2.7-Code": {
+          "contextLimit": 256000,
           "temperature": 1
         }
       },

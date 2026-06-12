@@ -50,8 +50,8 @@ const reasoningEffortChoices: { id: ReasoningEffort; label: string }[] = [
 ];
 
 const reasoningStyleChoices: { id: ReasoningStyle; label: string }[] = [
-  { id: 'openai-chat', label: 'OpenAI-compatible reasoning_effort' },
-  { id: 'anthropic-budget', label: 'Anthropic thinking budget' }
+  { id: 'openai-chat', label: 'Reasoning Effort' },
+  { id: 'anthropic-budget', label: 'Thinking Budget' }
 ];
 
 type PriceTierRow = {
@@ -355,7 +355,7 @@ async function handleFetchModels() {
 <template>
   <div class="settings-tab-panel">
     <header class="settings-section-head">
-      <div>
+      <div class="header-info">
         <h3 class="settings-section-title">Providers</h3>
         <p class="settings-section-desc">
           Configure model providers and API keys. Secrets are stored in macOS Keychain when available.
@@ -372,7 +372,8 @@ async function handleFetchModels() {
     </header>
 
     <div v-if="isLoading" class="settings-empty">
-      Loading configurations...
+      <div class="spinner-spinner"></div>
+      <span>Loading configurations...</span>
     </div>
 
     <div v-else-if="isEditing" class="edit-form-card">
@@ -382,7 +383,7 @@ async function handleFetchModels() {
 
       <div class="form-grid">
         <div class="form-group">
-          <label>Provider ID (slug, e.g. openai, custom-ollama)</label>
+          <label>Provider ID <span class="label-desc">(slug, e.g. custom-ollama)</span></label>
           <input 
             v-model="formId" 
             type="text" 
@@ -401,115 +402,173 @@ async function handleFetchModels() {
           <ThemedSelect v-model="formType" :options="providerTypeOptions" />
         </div>
 
-        <div class="form-group">
+        <div class="form-group url-group">
           <label>Base URL</label>
           <input v-model="formBaseUrl" type="text" placeholder="e.g. http://localhost:11434/v1" />
         </div>
 
-        <div class="form-group">
+        <div class="form-group key-group">
           <label>API Key</label>
           <input v-model="formApiKey" type="password" :placeholder="editingProviderId && configs[editingProviderId]?.hasApiKey ? 'Leave blank to keep existing key' : 'API Key or secret token'" />
         </div>
 
-        <div class="form-group full-width">
-          <label>Available Models</label>
+        <div class="form-group full-width models-section">
+          <div class="models-header-row">
+            <label class="section-label">Available Models</label>
+            <span class="models-count-badge">{{ formModelRows.length }} {{ formModelRows.length === 1 ? 'model' : 'models' }}</span>
+          </div>
+          
           <div class="models-edit-list">
-            <div v-for="(row, index) in formModelRows" :key="index" class="model-input-row">
-              <input 
-                v-model="row.name" 
-                type="text" 
-                placeholder="e.g. gpt-4o or deepseek/deepseek-chat" 
-              />
-              <div class="reasoning-style-toggle">
-                <ThemedButton
-                  v-for="style in reasoningStyleChoices"
-                  :key="style.id"
-                  variant="chip"
-                  size="sm"
-                  :active="row.reasoningStyle === style.id"
-                  @click="setReasoningStyle(row, style.id)"
+            <div v-for="(row, index) in formModelRows" :key="index" class="model-card">
+              
+              <!-- Model Card Header -->
+              <div class="model-card-header">
+                <div class="model-card-title-input">
+                  <input 
+                    v-model="row.name" 
+                    type="text" 
+                    placeholder="e.g. gpt-4o or deepseek/deepseek-chat" 
+                    class="model-name-field"
+                  />
+                </div>
+                <button
+                  type="button" 
+                  class="delete-model-btn-modern" 
+                  @click="removeModelInput(index)"
+                  title="Remove model"
                 >
-                  {{ style.label }}
-                </ThemedButton>
-              </div>
-              <div class="reasoning-effort-checks">
-                <ThemedButton
-                  v-for="effort in reasoningEffortChoices"
-                  :key="effort.id"
-                  variant="chip"
-                  size="sm"
-                  :active="isReasoningEffortSelected(row, effort.id)"
-                  @click="toggleReasoningEffort(index, effort.id)"
-                >
-                  {{ effort.label }}
-                </ThemedButton>
-              </div>
-              <div v-if="row.reasoningStyle === 'anthropic-budget' && row.reasoningOptions.length" class="budget-inputs">
-                <label v-for="option in row.reasoningOptions" :key="option.id" class="budget-input">
-                  <span>{{ option.label || option.id }}</span>
-                  <input v-model.number="option.budgetTokens" type="number" min="1024" step="1024" />
-                </label>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                  </svg>
+                </button>
               </div>
 
-              <div class="pricing-editor">
-                <div class="pricing-row context-row">
-                  <label class="pricing-field">
-                    <span>Context limit (tokens)</span>
-                    <input v-model.number="row.contextLimit" type="number" min="0" step="1000" placeholder="e.g. 1000000" />
-                  </label>
-                  <label class="pricing-field">
-                    <span>Temperature (0-2)</span>
+              <!-- Model Card Body -->
+              <div class="model-card-body">
+                
+                <!-- Parameters Subgrid -->
+                <div class="model-settings-grid">
+                  <div class="setting-group">
+                    <label>Context limit (tokens)</label>
+                    <input v-model.number="row.contextLimit" type="number" min="0" step="1000" placeholder="e.g. 128000" />
+                  </div>
+                  <div class="setting-group">
+                    <label>Temperature (0-2)</label>
                     <input v-model.number="row.temperature" type="number" min="0" max="2" step="0.1" placeholder="provider default" />
-                  </label>
+                  </div>
                 </div>
 
-                <div class="pricing-head">
-                  <span class="pricing-label">Pricing (USD per 1M tokens)</span>
-                  <span class="pricing-hint">Add multiple tiers for size-based rates (e.g. ≤250k vs &gt;250k). Leave the last tier's threshold blank.</span>
+                <!-- Reasoning Settings -->
+                <div class="reasoning-settings-block">
+                  <div class="reasoning-block-header">Reasoning Configuration</div>
+                  
+                  <div class="reasoning-row-field">
+                    <span class="field-sub-label">Style:</span>
+                    <div class="reasoning-style-toggle">
+                      <ThemedButton
+                        v-for="style in reasoningStyleChoices"
+                        :key="style.id"
+                        variant="chip"
+                        size="sm"
+                        :active="row.reasoningStyle === style.id"
+                        @click="setReasoningStyle(row, style.id)"
+                      >
+                        {{ style.label }}
+                      </ThemedButton>
+                    </div>
+                  </div>
+
+                  <div class="reasoning-row-field">
+                    <span class="field-sub-label">Efforts:</span>
+                    <div class="reasoning-effort-checks">
+                      <ThemedButton
+                        v-for="effort in reasoningEffortChoices"
+                        :key="effort.id"
+                        variant="chip"
+                        size="sm"
+                        :active="isReasoningEffortSelected(row, effort.id)"
+                        @click="toggleReasoningEffort(index, effort.id)"
+                      >
+                        {{ effort.label }}
+                      </ThemedButton>
+                    </div>
+                  </div>
+
+                  <!-- Budgets (if anthropic-budget) -->
+                  <div v-if="row.reasoningStyle === 'anthropic-budget' && row.reasoningOptions.length" class="budget-inputs-block">
+                    <div class="budget-title">Thinking Budgets (tokens)</div>
+                    <div class="budget-grid">
+                      <label v-for="option in row.reasoningOptions" :key="option.id" class="budget-input-item">
+                        <span class="budget-label">{{ option.label || option.id }}</span>
+                        <input v-model.number="option.budgetTokens" type="number" min="1024" step="1024" />
+                      </label>
+                    </div>
+                  </div>
                 </div>
 
-                <div v-for="(tier, tIndex) in row.pricingTiers" :key="tIndex" class="pricing-row tier-row">
-                  <label class="pricing-field">
-                    <span>≤ prompt tokens</span>
-                    <input v-model.number="tier.upToInputTokens" type="number" min="0" step="1000" placeholder="∞ (last)" />
-                  </label>
-                  <label class="pricing-field">
-                    <span>Input</span>
-                    <input v-model.number="tier.inputRate" type="number" min="0" step="0.01" placeholder="0.00" />
-                  </label>
-                  <label class="pricing-field">
-                    <span>Output</span>
-                    <input v-model.number="tier.outputRate" type="number" min="0" step="0.01" placeholder="0.00" />
-                  </label>
-                  <label class="pricing-field">
-                    <span>Cache read</span>
-                    <input v-model.number="tier.cacheReadRate" type="number" min="0" step="0.01" placeholder="—" />
-                  </label>
-                  <label class="pricing-field">
-                    <span>Cache write</span>
-                    <input v-model.number="tier.cacheWriteRate" type="number" min="0" step="0.01" placeholder="—" />
-                  </label>
-                  <button type="button" class="danger-button tier-remove-btn" @click="removePricingTier(row, tIndex)" title="Remove tier">×</button>
+                <!-- Pricing Section -->
+                <div class="pricing-editor-block">
+                  <div class="pricing-block-header">
+                    <span class="pricing-label">Pricing Tiers (USD per 1M tokens)</span>
+                    <span class="pricing-hint">Add tiers based on token size threshold. Leave the last threshold's value empty.</span>
+                  </div>
+
+                  <div class="pricing-tiers-wrapper">
+                    <!-- Column Headers -->
+                    <div v-if="row.pricingTiers.length" class="pricing-tier-row headers">
+                      <span class="tier-col">Prompt Threshold (≤)</span>
+                      <span class="tier-col">Input Rate</span>
+                      <span class="tier-col">Output Rate</span>
+                      <span class="tier-col">Cache Read</span>
+                      <span class="tier-col">Cache Write</span>
+                      <span class="tier-col actions"></span>
+                    </div>
+
+                    <!-- Tier Rows -->
+                    <div v-for="(tier, tIndex) in row.pricingTiers" :key="tIndex" class="pricing-tier-row inputs">
+                      <div class="tier-col">
+                        <input v-model.number="tier.upToInputTokens" type="number" min="0" step="1000" placeholder="∞ (last)" />
+                      </div>
+                      <div class="tier-col">
+                        <input v-model.number="tier.inputRate" type="number" min="0" step="0.01" placeholder="0.00" />
+                      </div>
+                      <div class="tier-col">
+                        <input v-model.number="tier.outputRate" type="number" min="0" step="0.01" placeholder="0.00" />
+                      </div>
+                      <div class="tier-col">
+                        <input v-model.number="tier.cacheReadRate" type="number" min="0" step="0.01" placeholder="—" />
+                      </div>
+                      <div class="tier-col">
+                        <input v-model.number="tier.cacheWriteRate" type="number" min="0" step="0.01" placeholder="—" />
+                      </div>
+                      <div class="tier-col actions">
+                        <button type="button" class="delete-tier-btn" @click="removePricingTier(row, tIndex)" title="Remove tier">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div v-if="!row.pricingTiers.length" class="no-pricing-notice">
+                      No pricing tiers defined. Standard rates will not be calculated.
+                    </div>
+                  </div>
+
+                  <div class="pricing-actions">
+                    <ThemedButton variant="secondary" size="sm" @click="addPricingTier(row)">
+                      {{ row.pricingTiers.length ? 'Add Pricing Tier' : 'Add Pricing' }}
+                    </ThemedButton>
+                  </div>
                 </div>
 
-                <ThemedButton variant="secondary" size="sm" @click="addPricingTier(row)">
-                  {{ row.pricingTiers.length ? 'Add Pricing Tier' : 'Add Pricing' }}
-                </ThemedButton>
               </div>
-
-              <button
-                type="button" 
-                class="danger-button delete-model-btn" 
-                @click="removeModelInput(index)"
-                title="Remove model"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M3 6h18"/>
-                  <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
-                </svg>
-              </button>
             </div>
-            <div style="display: flex; gap: 8px;">
+
+            <!-- Add/Fetch actions -->
+            <div class="models-actions-row">
               <ThemedButton 
                 variant="secondary"
                 size="sm"
@@ -523,9 +582,9 @@ async function handleFetchModels() {
                 size="sm"
                 :disabled="isFetchingModels"
                 @click="handleFetchModels"
-                style="color: var(--success);"
+                class="fetch-models-btn"
               >
-                {{ isFetchingModels ? 'Fetching...' : '⚡ Fetch Models from API' }}
+                {{ isFetchingModels ? 'Fetching...' : 'Fetch Models from API' }}
               </ThemedButton>
             </div>
           </div>
@@ -546,40 +605,57 @@ async function handleFetchModels() {
     </div>
 
     <ul v-else class="provider-list">
-      <li v-for="(provider, id) in configs" :key="id" class="provider-item">
-        <div class="provider-head">
-          <span class="provider-name">{{ provider.displayName }}</span>
-          <span class="provider-type">{{ provider.type }}</span>
-          <span class="provider-id-badge">ID: {{ id }}</span>
+      <li v-for="(provider, id) in configs" :key="id" class="provider-card-item">
+        <div class="provider-card-head">
+          <div class="provider-meta-info">
+            <span class="provider-status-dot" :class="provider.type"></span>
+            <span class="provider-name">{{ provider.displayName }}</span>
+            <span class="provider-type-badge">{{ provider.type }}</span>
+            <span class="provider-id-badge">ID: {{ id }}</span>
+          </div>
           <ThemedButton 
             variant="secondary"
             size="sm"
-            style="margin-left: auto;"
             @click="handleEditProvider(id)"
           >
             Edit
           </ThemedButton>
         </div>
-        <div class="provider-details">
-          <div class="detail-item"><strong>Base URL:</strong> <code>{{ provider.baseUrl }}</code></div>
-          <div class="detail-item"><strong>API Key:</strong> <code>{{ provider.hasApiKey ? '••••••••••••••••' : 'Not set' }}</code></div>
+        
+        <div class="provider-card-details">
+          <div class="detail-item">
+            <span class="detail-label">Base URL:</span>
+            <code>{{ provider.baseUrl }}</code>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">API Key:</span>
+            <span class="key-status-badge" :class="{ configured: provider.hasApiKey }">
+              {{ provider.hasApiKey ? 'Configured' : 'Not set' }}
+            </span>
+          </div>
         </div>
-        <div class="provider-models">
-          <span v-for="model in provider.models" :key="model" class="provider-model-pill">
-            {{ model }}
-            <template v-if="reasoningSummary(provider.modelSettings?.[model])">
-              · effort: {{ reasoningSummary(provider.modelSettings?.[model]) }}
-            </template>
-            <template v-if="contextSummary(provider.modelSettings?.[model])">
-              · {{ contextSummary(provider.modelSettings?.[model]) }}
-            </template>
-            <template v-if="temperatureSummary(provider.modelSettings?.[model])">
-              · {{ temperatureSummary(provider.modelSettings?.[model]) }}
-            </template>
-            <template v-if="pricingSummary(provider.modelSettings?.[model])">
-              · {{ pricingSummary(provider.modelSettings?.[model]) }}
-            </template>
-          </span>
+        
+        <div class="provider-card-models">
+          <div class="models-title">Available Models:</div>
+          <div class="models-grid-layout">
+            <div v-for="model in provider.models" :key="model" class="provider-model-card">
+              <div class="model-card-name">{{ model }}</div>
+              <div class="model-card-badges">
+                <span v-if="contextSummary(provider.modelSettings?.[model])" class="model-badge">
+                  {{ contextSummary(provider.modelSettings?.[model]) }}
+                </span>
+                <span v-if="temperatureSummary(provider.modelSettings?.[model])" class="model-badge">
+                  {{ temperatureSummary(provider.modelSettings?.[model]) }}
+                </span>
+                <span v-if="reasoningSummary(provider.modelSettings?.[model])" class="model-badge" :title="'Reasoning: ' + reasoningSummary(provider.modelSettings?.[model])">
+                  {{ reasoningSummary(provider.modelSettings?.[model]) }}
+                </span>
+                <span v-if="pricingSummary(provider.modelSettings?.[model])" class="model-badge">
+                  {{ pricingSummary(provider.modelSettings?.[model]) }}
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
       </li>
     </ul>
@@ -587,45 +663,143 @@ async function handleFetchModels() {
 </template>
 
 <style scoped>
+.settings-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+  gap: 16px;
+}
+
+.header-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settings-section-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0;
+}
+
+.settings-section-desc {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.plus-icon {
+  font-size: 1.1rem;
+  margin-right: 2px;
+  font-weight: bold;
+}
+
+.settings-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  color: var(--muted);
+  gap: 12px;
+  font-size: 0.9rem;
+}
+
+.spinner-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-top-color: var(--btn-primary-bg);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Provider List View Mode */
 .provider-list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
 
-.provider-item {
-  padding: 16px;
-  background: var(--surface);
+.provider-card-item {
+  padding: 20px;
+  background: var(--card-bg);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 12px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.provider-head {
+.provider-card-item:hover {
+  border-color: var(--control-border-focus);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  transform: translateY(-1px);
+}
+
+.provider-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--border-soft);
+  padding-bottom: 12px;
+}
+
+.provider-meta-info {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
+}
+
+.provider-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.provider-status-dot.openai-compatible {
+  background: #2196f3;
+  box-shadow: 0 0 8px rgba(33, 150, 243, 0.5);
+}
+
+.provider-status-dot.anthropic {
+  background: #f2994a;
+  box-shadow: 0 0 8px rgba(242, 153, 74, 0.5);
 }
 
 .provider-name {
-  font-size: 0.92rem;
+  font-size: 1rem;
   font-weight: 600;
   color: var(--text);
 }
 
-.provider-type {
-  font-size: 0.72rem;
+.provider-type-badge {
+  font-size: 0.7rem;
+  font-weight: 500;
   color: var(--muted);
-  background: var(--surface-strong);
+  background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--border);
   padding: 2px 8px;
   border-radius: 20px;
-  font-family: monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .provider-id-badge {
@@ -634,62 +808,137 @@ async function handleFetchModels() {
   font-family: monospace;
 }
 
-.provider-details {
+.provider-card-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  font-size: 0.82rem;
+  color: var(--muted);
+  background: rgba(0, 0, 0, 0.15);
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-soft);
+}
+
+.detail-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.detail-label {
+  font-weight: 500;
+  color: var(--faint);
+}
+
+.provider-card-details code {
+  font-family: monospace;
+  background: var(--surface-strong);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--text);
+  word-break: break-all;
+}
+
+.key-status-badge {
+  font-size: 0.75rem;
+  font-weight: 550;
+  color: var(--danger);
+  background: var(--danger-soft);
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.key-status-badge.configured {
+  color: var(--success);
+  background: var(--success-soft);
+}
+
+.provider-card-models {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.models-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.models-grid-layout {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
+}
+
+.provider-model-card {
+  background: rgba(255, 255, 255, 0.015);
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
   gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.provider-model-card:hover {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: var(--border);
+}
+
+.model-card-name {
   font-size: 0.82rem;
-  color: var(--muted);
-}
-
-.provider-details code {
-  font-family: monospace;
-  background: var(--surface-strong);
-  padding: 1px 6px;
-  border-radius: 4px;
+  font-weight: 600;
   color: var(--text);
+  font-family: monospace;
 }
 
-.provider-models {
+.model-card-badges {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  border-top: 1px dashed var(--border);
-  padding-top: 10px;
-  margin-top: 2px;
+  gap: 4px;
 }
 
-.provider-model-pill {
-  font-size: 0.75rem;
-  font-family: monospace;
-  color: var(--muted);
-  background: var(--surface);
+.model-badge {
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 4px;
   border: 1px solid var(--border);
-  padding: 3px 8px;
-  border-radius: 6px;
+  color: var(--muted);
+  background: var(--control-bg);
+  font-family: monospace;
 }
 
 /* Edit form styling */
 .edit-form-card {
-  background: var(--surface);
+  background: var(--card-bg);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 20px;
-  margin-bottom: 20px;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 .form-title {
-  margin: 0 0 18px 0;
-  font-size: 1rem;
-  font-weight: 400;
-  color: var(--muted);
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text);
+  border-bottom: 1px solid var(--border-soft);
+  padding-bottom: 12px;
 }
 
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 16px;
-  margin-bottom: 20px;
 }
 
 .form-group {
@@ -698,43 +947,62 @@ async function handleFetchModels() {
   gap: 6px;
 }
 
+.form-group.url-group {
+  grid-column: span 2;
+}
+
+.form-group.key-group {
+  grid-column: span 2;
+}
+
 .form-group.full-width {
   grid-column: span 2;
 }
 
 .form-group label {
   font-size: 0.78rem;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.label-desc {
+  font-weight: normal;
+  color: var(--faint);
 }
 
 .form-group input {
   background: var(--control-bg);
   border: 1px solid var(--control-border);
-  border-radius: 6px;
-  padding: 8px 12px;
+  border-radius: 8px;
+  padding: 10px 14px;
   color: var(--text);
   outline: none;
   font-size: 0.88rem;
-  transition: border-color 0.2s ease;
+  transition: all 0.2s ease;
 }
 
 .form-group input:focus {
   border-color: var(--control-border-focus);
+  background: var(--control-bg-hover);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.03);
 }
 
 .form-group input:disabled {
-  background: var(--control-bg);
+  background: rgba(255, 255, 255, 0.02);
   color: var(--faint);
+  border-color: var(--border-soft);
   cursor: not-allowed;
 }
 
 .form-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
-  border-top: 1px solid var(--border);
-  padding-top: 16px;
+  gap: 12px;
+  border-top: 1px solid var(--border-soft);
+  padding-top: 20px;
   margin-top: 10px;
 }
 
@@ -742,161 +1010,397 @@ async function handleFetchModels() {
   margin-right: auto;
 }
 
-/* Dynamic models list editor styles */
+/* Models Edit List Section */
+.models-section {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.models-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.section-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.models-count-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
 .models-edit-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  background: var(--perm-content-bg);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 12px;
+  gap: 16px;
+  background: rgba(0, 0, 0, 0.12);
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  padding: 16px;
 }
 
-.model-input-row {
+.models-actions-row {
   display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
 }
 
-.model-input-row input {
+.fetch-models-btn {
+  color: var(--success);
+  border-color: var(--success-border) !important;
+}
+
+.fetch-models-btn:hover:not(:disabled) {
+  background: var(--success-soft) !important;
+}
+
+/* Model Card Editor */
+.model-card {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: relative;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.model-card:hover {
+  border-color: var(--control-border-focus);
+}
+
+.model-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--border-soft);
+  padding-bottom: 12px;
+}
+
+.model-card-title-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   flex: 1;
-  min-width: 180px;
+}
+
+.model-icon {
+  font-size: 1.1rem;
+  opacity: 0.8;
+}
+
+.model-name-field {
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 1.5px solid var(--border) !important;
+  border-radius: 0 !important;
+  padding: 4px 0 !important;
+  font-family: monospace;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+  outline: none !important;
+  width: 100%;
+  max-width: 320px;
+  transition: border-color 0.2s ease !important;
+}
+
+.model-name-field:focus {
+  border-color: var(--btn-primary-bg) !important;
+  box-shadow: none !important;
+}
+
+.delete-model-btn-modern {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: transparent;
+  border: 1px solid var(--border-soft);
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.delete-model-btn-modern:hover {
+  color: var(--danger);
+  background: var(--danger-soft);
+  border-color: var(--danger-border);
+  transform: scale(1.05);
+}
+
+.model-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.model-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.setting-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.setting-group label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.setting-group input {
+  background: var(--control-bg);
+  border: 1px solid var(--control-border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: var(--text);
+  outline: none;
+  font-size: 0.82rem;
+}
+
+.setting-group input:focus {
+  border-color: var(--control-border-focus);
+}
+
+/* Reasoning configuration card section */
+.reasoning-settings-block {
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.reasoning-block-header {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  border-bottom: 1px solid var(--border-soft);
+  padding-bottom: 6px;
+  margin-bottom: 2px;
+}
+
+.reasoning-row-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.field-sub-label {
+  font-size: 0.75rem;
+  color: var(--faint);
+  width: 50px;
+  flex-shrink: 0;
 }
 
 .reasoning-style-toggle {
   display: flex;
+  gap: 6px;
   flex-wrap: wrap;
-  gap: 4px;
-  flex: 1 1 100%;
 }
 
 .reasoning-effort-checks {
   display: flex;
-  flex-wrap: wrap;
   gap: 4px;
-  max-width: 320px;
-}
-
-.budget-inputs {
-  display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  flex: 1 1 100%;
-  padding-left: 2px;
 }
 
-.budget-input {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--faint);
-  font-size: 0.72rem;
-}
-
-.budget-input input {
-  width: 96px;
-  min-width: 96px;
-  padding: 5px 7px;
-  font-size: 0.75rem;
-}
-
-.pricing-editor {
+.budget-inputs-block {
+  border-top: 1px dashed var(--border-soft);
+  padding-top: 10px;
+  margin-top: 4px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  flex: 1 1 100%;
-  border-top: 1px dashed var(--border);
-  padding-top: 10px;
-  margin-top: 2px;
 }
 
-.pricing-head {
+.budget-title {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--faint);
+}
+
+.budget-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 8px;
+}
+
+.budget-input-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.budget-label {
+  font-size: 0.68rem;
+  color: var(--muted);
+  text-transform: capitalize;
+}
+
+.budget-input-item input {
+  background: var(--control-bg);
+  border: 1px solid var(--control-border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  color: var(--text);
+  outline: none;
+  font-size: 0.8rem;
+  font-family: monospace;
+}
+
+.budget-input-item input:focus {
+  border-color: var(--control-border-focus);
+}
+
+/* Pricing Grid Editor */
+.pricing-editor-block {
+  border-top: 1px solid var(--border-soft);
+  padding-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pricing-block-header {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
 .pricing-label {
-  font-size: 0.74rem;
-  font-weight: 500;
+  font-size: 0.75rem;
+  font-weight: 600;
   color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 
 .pricing-hint {
   font-size: 0.68rem;
   color: var(--faint);
+  line-height: 1.3;
 }
 
-.pricing-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: flex-end;
-}
-
-.pricing-field {
+.pricing-tiers-wrapper {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  color: var(--faint);
-  font-size: 0.68rem;
+  gap: 6px;
 }
 
-.pricing-field input {
-  width: 110px;
-  min-width: 90px;
-  padding: 5px 7px;
-  font-size: 0.75rem;
+.pricing-tier-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr) 32px;
+  gap: 8px;
+  align-items: center;
+}
+
+.pricing-tier-row.headers {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--faint);
+  padding-bottom: 2px;
+  border-bottom: 1px solid var(--border-soft);
+  text-align: center;
+}
+
+.pricing-tier-row.headers .tier-col {
+  text-align: left;
+}
+
+.pricing-tier-row.headers .tier-col:not(:first-child) {
+  text-align: center;
+}
+
+.tier-col input {
+  width: 100%;
   background: var(--control-bg);
   border: 1px solid var(--control-border);
   border-radius: 6px;
+  padding: 6px 10px;
   color: var(--text);
   outline: none;
-}
-
-.pricing-field input:focus {
-  border-color: var(--control-border-focus);
-}
-
-.tier-remove-btn {
-  height: 28px;
-  width: 28px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  font-size: 1rem;
-  line-height: 1;
-}
-
-.tier-remove-btn:hover {
-  color: var(--danger);
-  background: var(--danger-soft);
-  border-color: var(--danger-border);
-}
-
-.delete-model-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 8px;
-  width: 36px;
-  height: 36px;
-  border-radius: 6px;
-  flex-shrink: 0;
-  cursor: pointer;
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--muted);
+  font-size: 0.8rem;
+  font-family: monospace;
+  text-align: center;
   transition: all 0.2s ease;
 }
 
-.delete-model-btn:hover {
+.tier-col input:first-child {
+  text-align: left;
+}
+
+.tier-col input:focus {
+  border-color: var(--control-border-focus);
+  background: var(--control-bg-hover);
+}
+
+.pricing-tier-row.inputs .tier-col.actions {
+  display: flex;
+  justify-content: center;
+}
+
+.delete-tier-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 1px solid var(--border-soft);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.delete-tier-btn:hover {
   color: var(--danger);
   background: var(--danger-soft);
   border-color: var(--danger-border);
+}
+
+.no-pricing-notice {
+  padding: 16px;
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--faint);
+  border: 1px dashed var(--border-soft);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.pricing-actions {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 4px;
 }
 </style>
