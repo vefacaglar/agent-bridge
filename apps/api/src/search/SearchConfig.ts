@@ -16,14 +16,15 @@ export interface PersistedSearchSettings {
   googleSearchEngineId?: string;
 }
 
-export interface ResolvedSearchSettings extends SearchSettings {
-  braveApiKeyRef?: string;
-  googleApiKeyRef?: string;
-  /** Override: resolved settings never exposes raw keys. */
+export interface ResolvedSearchSettings {
+  engine: SearchEngine;
   braveApiKey?: never;
   googleApiKey?: never;
   hasBraveApiKey?: never;
   hasGoogleApiKey?: never;
+  braveApiKeyRef?: string;
+  googleApiKeyRef?: string;
+  googleSearchEngineId?: string;
 }
 
 export interface RawSearchSettingsInput {
@@ -33,7 +34,7 @@ export interface RawSearchSettingsInput {
   googleSearchEngineId?: string;
 }
 
-export function normalizeSearchSettings(settings: unknown): RawSearchSettingsInput & { engine: SearchEngine } {
+export function normalizeSearchSettings(settings: unknown): Required<Pick<RawSearchSettingsInput, "braveApiKey" | "googleApiKey" | "googleSearchEngineId">> & { engine: SearchEngine } {
   const raw = (settings ?? {}) as Record<string, unknown>;
   return {
     engine: normalizeSearchEngine(raw.engine),

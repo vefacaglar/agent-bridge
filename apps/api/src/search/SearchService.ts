@@ -1,5 +1,6 @@
 import type { SearchEngine, SearchSettings } from "@locagens/shared";
 import type { ProviderSecretStore } from "../providers/ProviderSecretStore.js";
+import type { ResolvedSearchSettings } from "./SearchConfig.js";
 
 export interface SearchResult {
   title: string;
@@ -16,14 +17,10 @@ export interface SearchResponse {
   status?: number;
 }
 
-export interface ResolvedSearchSettings extends SearchSettings {
-  braveApiKeyRef?: string;
-  googleApiKeyRef?: string;
-}
-
 const SEARCH_KEYCHAIN_PREFIX = "macos-keychain:";
 const BRAVE_REF = "search:brave";
 const GOOGLE_REF = "search:google";
+const REQUEST_TIMEOUT_MS = 30_000;
 
 function resolveKey(value: string | undefined, ref: string | undefined, store: ProviderSecretStore): string {
   if (value && value.trim()) return value.trim();
@@ -37,6 +34,24 @@ function normalizeMaxResults(raw?: number): number {
   return Math.min(Math.max(Math.floor(raw ?? 5), 1), 10);
 }
 
+function isAbortError(err: unknown): err is DOMException {
+  return err instanceof Error && err.name === "AbortError";
+}
+
+async function withTimeout<T>(fn: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    return await fn(controller.signal);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function createFailureResponse(source: SearchEngine, query: string, error: string, status?: number): SearchResponse {
+  return { success: false, source, query, results: [], error, status };
+}
+
 export class SearchService {
   constructor(
     private settings: ResolvedSearchSettings,
@@ -46,7 +61,7 @@ export class SearchService {
   async search(rawQuery: string, rawMaxResults?: number): Promise<SearchResponse> {
     const query = rawQuery.trim();
     if (!query) {
-      return { success: false, source: this.settings.engine, query, results: [], error: "Missing parameter: query" };
+      return createFailureResponse(this.settings.engine, query, "Missing parameter: query");
     }
 
     const maxResults = normalizeMaxResults(rawMaxResults);
@@ -68,8 +83,8 @@ export class SearchService {
       }
 
       return await searchDuckDuckGo(query, maxResults);
-    } catch (err: any) {
-      return { success: false, source: engine, query, results: [], error: err.message || "Search failed." };
+    } catch (err) {
+      return createFailureResponse(engine, query, isAbortError(err) ? "Search timed out after 30s." : errorMessage(err));
     }
   }
 
@@ -88,15 +103,14 @@ export class SearchService {
 async function searchDuckDuckGo(query: string, maxResults: number): Promise<SearchResponse> {
   const searchUrl = `https://html.duckduckgo.com/html/?${new URLSearchParams({ q: query }).toString()}`;
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30_000);
   try {
-    const response = await fetch(searchUrl, {
+    const response = await withTimeout((signal) => fetch(searchUrl, {
       method: "GET",
       redirect: "follow",
-      signal: controller.signal,
+      signal,
       headers: { "User-Agent": "Locagens/1.0 (+local workspace assistant)" }
-    });
+    }));
+
     const body = await response.text();
     const results = parseDuckDuckGoResults(body).slice(0, maxResults);
     return {
@@ -106,11 +120,8 @@ async function searchDuckDuckGo(query: string, maxResults: number): Promise<Sear
       status: response.status,
       results
     };
-  } catch (err: any) {
-    const aborted = err?.name === "AbortError";
-    return { success: false, source: "duckduckgo", query, results: [], error: aborted ? "Search timed out after 30s." : (err?.message ?? "Search failed.") };
-  } finally {
-    clearTimeout(timeout);
+  } catch (err) {
+    return createFailureResponse("duckduckgo", query, isAbortError(err) ? "Search timed out after 30s." : errorMessage(err));
   }
 }
 
@@ -133,45 +144,67 @@ function parseDuckDuckGoResults(html: string): SearchResult[] {
   return results;
 }
 
+interface BraveSearchResult {
+  title: string;
+  url: string;
+  description: string;
+}
+
+interface BraveSearchPayload {
+  web?: { results?: unknown[] };
+}
+
 async function searchBrave(query: string, maxResults: number, apiKey: string): Promise<SearchResponse> {
   const url = new URL("https://api.search.brave.com/res/v1/web/search");
   url.searchParams.set("q", query);
   url.searchParams.set("count", String(Math.min(maxResults, 20)));
   url.searchParams.set("offset", "0");
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30_000);
   try {
-    const response = await fetch(url.toString(), {
+    const response = await withTimeout((signal) => fetch(url.toString(), {
       method: "GET",
-      signal: controller.signal,
+      signal,
       headers: {
         "Accept": "application/json",
         "Accept-Encoding": "gzip",
         "X-Subscription-Token": apiKey
       }
-    });
+    }));
 
     if (!response.ok) {
       const text = await response.text().catch(() => "Unknown error");
-      return { success: false, source: "brave", query, status: response.status, results: [], error: `Brave API returned ${response.status}: ${text}` };
+      return createFailureResponse("brave", query, `Brave API returned ${response.status}: ${text}`, response.status);
     }
 
-    const data = (await response.json()) as any;
-    const rawResults = data?.web?.results ?? [];
-    const results: SearchResult[] = rawResults.slice(0, maxResults).map((r: any) => ({
-      title: String(r.title || ""),
-      url: String(r.url || ""),
-      snippet: String(r.description || "")
-    })).filter((r: SearchResult) => r.title && r.url);
+    const data = (await response.json()) as BraveSearchPayload;
+    const rawResults = data.web?.results ?? [];
+    const results = rawResults
+      .map(toBraveSearchResult)
+      .filter((r): r is SearchResult => Boolean(r.title && r.url));
 
-    return { success: true, source: "brave", query, status: response.status, results };
-  } catch (err: any) {
-    const aborted = err?.name === "AbortError";
-    return { success: false, source: "brave", query, results: [], error: aborted ? "Search timed out after 30s." : (err?.message ?? "Brave search failed.") };
-  } finally {
-    clearTimeout(timeout);
+    return { success: true, source: "brave", query, status: response.status, results: results.slice(0, maxResults) };
+  } catch (err) {
+    return createFailureResponse("brave", query, isAbortError(err) ? "Search timed out after 30s." : errorMessage(err));
   }
+}
+
+function toBraveSearchResult(raw: unknown): BraveSearchResult {
+  const r = raw as Record<string, unknown>;
+  return {
+    title: String(r.title ?? ""),
+    url: String(r.url ?? ""),
+    description: String(r.description ?? "")
+  };
+}
+
+interface GoogleSearchResult {
+  title: string;
+  link: string;
+  snippet: string;
+}
+
+interface GoogleSearchPayload {
+  items?: unknown[];
 }
 
 async function searchGoogle(query: string, maxResults: number, apiKey: string, searchEngineId: string): Promise<SearchResponse> {
@@ -181,35 +214,37 @@ async function searchGoogle(query: string, maxResults: number, apiKey: string, s
   url.searchParams.set("q", query);
   url.searchParams.set("num", String(Math.min(maxResults, 10)));
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30_000);
   try {
-    const response = await fetch(url.toString(), {
+    const response = await withTimeout((signal) => fetch(url.toString(), {
       method: "GET",
-      signal: controller.signal,
+      signal,
       headers: { "Accept": "application/json" }
-    });
+    }));
 
     if (!response.ok) {
       const text = await response.text().catch(() => "Unknown error");
-      return { success: false, source: "google", query, status: response.status, results: [], error: `Google API returned ${response.status}: ${text}` };
+      return createFailureResponse("google", query, `Google API returned ${response.status}: ${text}`, response.status);
     }
 
-    const data = (await response.json()) as any;
-    const rawResults = data?.items ?? [];
-    const results: SearchResult[] = rawResults.slice(0, maxResults).map((r: any) => ({
-      title: String(r.title || ""),
-      url: String(r.link || ""),
-      snippet: String(r.snippet || "")
-    })).filter((r: SearchResult) => r.title && r.url);
+    const data = (await response.json()) as GoogleSearchPayload;
+    const rawResults = data.items ?? [];
+    const results = rawResults
+      .map(toGoogleSearchResult)
+      .filter((r): r is SearchResult => Boolean(r.title && r.url));
 
-    return { success: true, source: "google", query, status: response.status, results };
-  } catch (err: any) {
-    const aborted = err?.name === "AbortError";
-    return { success: false, source: "google", query, results: [], error: aborted ? "Search timed out after 30s." : (err?.message ?? "Google search failed.") };
-  } finally {
-    clearTimeout(timeout);
+    return { success: true, source: "google", query, status: response.status, results: results.slice(0, maxResults) };
+  } catch (err) {
+    return createFailureResponse("google", query, isAbortError(err) ? "Search timed out after 30s." : errorMessage(err));
   }
+}
+
+function toGoogleSearchResult(raw: unknown): GoogleSearchResult {
+  const r = raw as Record<string, unknown>;
+  return {
+    title: String(r.title ?? ""),
+    link: String(r.link ?? ""),
+    snippet: String(r.snippet ?? "")
+  };
 }
 
 function normalizeSearchResultUrl(rawUrl: string): string {
@@ -235,4 +270,9 @@ function decodeHtml(value: string): string {
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">");
+}
+
+function errorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  return "Search failed.";
 }

@@ -24,7 +24,7 @@ const ENGINE_OPTIONS: { value: SearchEngine; label: string }[] = [
   { value: 'brave', label: 'Brave Search API' },
   { value: 'google', label: 'Google Custom Search' },
   { value: 'disabled', label: 'Disabled' }
-];
+] as const;
 
 const engine = ref<SearchEngine>('duckduckgo');
 const braveApiKey = ref('');
@@ -48,6 +48,12 @@ function keyPlaceholder(hasKey: boolean): string {
   return hasKey ? 'Leave blank to keep existing key' : 'Paste API key here';
 }
 
+function apiKeyPayload(inputValue: string, hasStoredKey: boolean): string {
+  const trimmed = inputValue.trim();
+  if (trimmed) return trimmed;
+  return hasStoredKey ? PRESERVE_API_KEY_VALUE : '';
+}
+
 async function handleSave() {
   isSaving.value = true;
   try {
@@ -55,8 +61,8 @@ async function handleSave() {
       port: props.settings?.port ?? 4321,
       search: {
         engine: engine.value,
-        braveApiKey: braveApiKey.value.trim() || (hasBraveApiKey.value ? PRESERVE_API_KEY_VALUE : ''),
-        googleApiKey: googleApiKey.value.trim() || (hasGoogleApiKey.value ? PRESERVE_API_KEY_VALUE : ''),
+        braveApiKey: apiKeyPayload(braveApiKey.value, hasBraveApiKey.value),
+        googleApiKey: apiKeyPayload(googleApiKey.value, hasGoogleApiKey.value),
         googleSearchEngineId: googleSearchEngineId.value.trim() || undefined
       }
     };
@@ -69,19 +75,9 @@ async function handleSave() {
   }
 }
 
-async function handleClearBraveKey() {
-  if (!hasBraveApiKey.value) return;
-  if (!(await showConfirm('Clear the stored Brave Search API key?'))) return;
-  braveApiKey.value = '';
-  hasBraveApiKey.value = false;
-  await handleSave();
-}
-
-async function handleClearGoogleKey() {
-  if (!hasGoogleApiKey.value) return;
-  if (!(await showConfirm('Clear the stored Google API key?'))) return;
-  googleApiKey.value = '';
-  hasGoogleApiKey.value = false;
+async function clearStoredKey(clear: () => void) {
+  if (!(await showConfirm('Clear the stored API key?'))) return;
+  clear();
   await handleSave();
 }
 </script>
@@ -128,7 +124,7 @@ async function handleClearGoogleKey() {
                 v-if="hasBraveApiKey"
                 variant="danger"
                 size="sm"
-                @click="handleClearBraveKey"
+                @click="clearStoredKey(() => { braveApiKey.value = ''; hasBraveApiKey.value = false; })"
               >
                 Clear
               </ThemedButton>
@@ -153,7 +149,7 @@ async function handleClearGoogleKey() {
                 v-if="hasGoogleApiKey"
                 variant="danger"
                 size="sm"
-                @click="handleClearGoogleKey"
+                @click="clearStoredKey(() => { googleApiKey.value = ''; hasGoogleApiKey.value = false; })"
               >
                 Clear
               </ThemedButton>

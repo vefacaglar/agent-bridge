@@ -10,14 +10,36 @@ export const SEARCH_PRESERVE_API_KEY_VALUE = "__LOCAGENS_PRESERVE_API_KEY__";
 const MIN_PORT = 1;
 const MAX_PORT = 65535;
 
-const SEARCH_KEYCHAIN_SERVICE = "Locagens Search API Key";
-
 function createSearchSecretStore(): ProviderSecretStore {
-  return process.platform === "darwin" ? new MacOSKeychainProviderSecretStore() : {
+  if (process.platform === "darwin") {
+    return new MacOSKeychainProviderSecretStore();
+  }
+  return {
     supportsSecurePersistence: false,
     get: () => "",
     set: () => { throw new Error("Secure search secret storage is only available on macOS Keychain."); }
   };
+}
+
+function createFileProvider(filePath: string): SettingsFileProvider {
+  return {
+    read: () => {
+      try {
+        return JSON.parse(fs.readFileSync(filePath, "utf-8")) as unknown;
+      } catch {
+        return undefined;
+      }
+    },
+    write: (data) => {
+      fs.mkdirSync(path.dirname(filePath), { recursive: true });
+      fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
+    }
+  };
+}
+
+interface SettingsFileProvider {
+  read(): unknown;
+  write(data: AppSettings): void;
 }
 
 /**
@@ -27,11 +49,12 @@ function createSearchSecretStore(): ProviderSecretStore {
  * non-sensitive settings and keychain references are persisted.
  */
 export class AppSettingsStore {
-  private readonly filePath: string;
+  private readonly fileProvider: SettingsFileProvider;
   private readonly secretStore: ProviderSecretStore;
 
   constructor(filePathOverride?: string, secretStore?: ProviderSecretStore) {
-    this.filePath = filePathOverride || AppSettingsStore.defaultPath();
+    const filePath = filePathOverride || AppSettingsStore.defaultPath();
+    this.fileProvider = createFileProvider(filePath);
     this.secretStore = secretStore || createSearchSecretStore();
   }
 
@@ -63,80 +86,88 @@ export class AppSettingsStore {
    * built-in default.
    */
   resolvePort(): number {
-    return this.readPortFromFile() ?? AppSettingsStore.normalizePort(process.env.PORT) ?? DEFAULT_PORT;
+    return this.readPort() ?? AppSettingsStore.normalizePort(process.env.PORT) ?? DEFAULT_PORT;
   }
 
   read(): AppSettings {
-    const resolved = this.readSearchSettings();
+    const file = this.readFile();
+    const search = this.readSearchFromFile(file);
     return {
-      port: this.readPortFromFile() ?? DEFAULT_PORT,
+      port: this.readPortFromFile(file) ?? DEFAULT_PORT,
       search: {
-        engine: resolved.engine,
+        engine: search.engine,
         braveApiKey: "",
         googleApiKey: "",
-        googleSearchEngineId: resolved.googleSearchEngineId,
-        hasBraveApiKey: !!resolved.braveApiKey,
-        hasGoogleApiKey: !!resolved.googleApiKey
+        googleSearchEngineId: search.googleSearchEngineId,
+        hasBraveApiKey: this.hasKey(search.braveApiKeyRef),
+        hasGoogleApiKey: this.hasKey(search.googleApiKeyRef)
       }
     };
   }
 
   readResolvedSearch(): ResolvedSearchSettings {
-    const settings = this.readSearchSettings();
+    const file = this.readFile();
+    const search = this.readSearchFromFile(file);
     return {
-      engine: settings.engine,
-      braveApiKeyRef: settings.braveApiKeyRef,
-      googleApiKeyRef: settings.googleApiKeyRef,
-      googleSearchEngineId: settings.googleSearchEngineId
-    } as ResolvedSearchSettings;
-  }
-
-  /** Whether a search API key exists in secure storage. */
-  hasSearchKey(ref?: string): boolean {
-    if (!ref) return false;
-    return !!this.secretStore.get(ref);
-  }
-
-  /**
-   * The search section stored in the config file, with secret values resolved
-   * from the keychain when references are present.
-   */
-  private readSearchSettings(): SearchSettings & { braveApiKeyRef?: string; googleApiKeyRef?: string } {
-    const persisted = this.readSearchFromFile();
-    return {
-      engine: persisted?.engine ?? "duckduckgo",
-      braveApiKey: this.resolveKey(persisted?.braveApiKeyRef),
-      googleApiKey: this.resolveKey(persisted?.googleApiKeyRef),
-      googleSearchEngineId: persisted?.googleSearchEngineId,
-      braveApiKeyRef: persisted?.braveApiKeyRef,
-      googleApiKeyRef: persisted?.googleApiKeyRef
+      engine: search.engine,
+      braveApiKeyRef: search.braveApiKeyRef,
+      googleApiKeyRef: search.googleApiKeyRef,
+      googleSearchEngineId: search.googleSearchEngineId
     };
-  }
-
-  private resolveKey(ref?: string): string | undefined {
-    if (!ref) return undefined;
-    if (ref.startsWith("macos-keychain:")) {
-      return this.secretStore.get(ref) || undefined;
-    }
-    return undefined;
   }
 
   /** Persists settings, returning the stored (normalized) values. */
   save(settings: AppSettings): AppSettings {
     const port = AppSettingsStore.normalizePort(settings.port);
-    if (!port) throw new Error(`Invalid port: ${settings.port}. Use an integer between ${MIN_PORT} and ${MAX_PORT}.`);
+    if (!port) {
+      throw new Error(`Invalid port: ${settings.port}. Use an integer between ${MIN_PORT} and ${MAX_PORT}.`);
+    }
 
+    const file = this.readFile();
     const next: AppSettings = { port };
-    const search = this.persistSearchSettings(settings.search);
+    const search = this.persistSearchSettings(settings.search, file.search);
     if (search) next.search = search;
 
-    fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
-    fs.writeFileSync(this.filePath, JSON.stringify(next, null, 2), "utf-8");
+    this.fileProvider.write(next);
     return next;
   }
 
-  private persistSearchSettings(search?: SearchSettings): SearchSettings | undefined {
+  private readFile(): Partial<AppSettings> {
+    const data = this.fileProvider.read();
+    if (!data || typeof data !== "object") return {};
+    return data as Partial<AppSettings>;
+  }
+
+  private readPort(): number | undefined {
+    return this.readPortFromFile(this.readFile());
+  }
+
+  private readPortFromFile(file: Partial<AppSettings>): number | undefined {
+    return AppSettingsStore.normalizePort(file.port);
+  }
+
+  private readSearchFromFile(file: Partial<AppSettings>): PersistedSearchSettings {
+    const raw = file.search;
+    if (!raw || typeof raw !== "object") {
+      return { engine: "duckduckgo" };
+    }
+    const cast = raw as Record<string, unknown>;
+    return {
+      engine: SEARCH_ENGINE_OPTIONS.includes(cast.engine as any) ? (cast.engine as any) : "duckduckgo",
+      braveApiKeyRef: typeof cast.braveApiKeyRef === "string" ? cast.braveApiKeyRef : undefined,
+      googleApiKeyRef: typeof cast.googleApiKeyRef === "string" ? cast.googleApiKeyRef : undefined,
+      googleSearchEngineId: typeof cast.googleSearchEngineId === "string" ? cast.googleSearchEngineId : undefined
+    };
+  }
+
+  private hasKey(ref: string | undefined): boolean {
+    if (!ref) return false;
+    return !!this.secretStore.get(ref);
+  }
+
+  private persistSearchSettings(search: SearchSettings | undefined, existingSearch: SearchSettings | undefined): SearchSettings | undefined {
     if (!search) return undefined;
+
     const normalized = normalizeSearchSettings(search);
     const persisted: PersistedSearchSettings = { engine: normalized.engine };
 
@@ -153,46 +184,26 @@ export class AppSettingsStore {
       }
     }
 
-    // Preserve existing keychain references when the UI sends the preserve
-    // marker and no new value was provided.
+    const existingPersisted = this.toPersistedRefs(existingSearch);
     if (normalized.braveApiKey === SEARCH_PRESERVE_API_KEY_VALUE) {
-      persisted.braveApiKeyRef = this.readSearchFromFile()?.braveApiKeyRef;
+      persisted.braveApiKeyRef = existingPersisted.braveApiKeyRef;
     }
     if (normalized.googleApiKey === SEARCH_PRESERVE_API_KEY_VALUE) {
-      persisted.googleApiKeyRef = this.readSearchFromFile()?.googleApiKeyRef;
+      persisted.googleApiKeyRef = existingPersisted.googleApiKeyRef;
     }
 
-    // We intentionally do NOT preserve plain API keys in the JSON file. On
-    // non-macOS platforms the keys are simply not persisted.
     return {
       engine: persisted.engine,
       googleSearchEngineId: persisted.googleSearchEngineId
     };
   }
 
-  /** The port stored in the config file, or undefined when absent/invalid. */
-  private readPortFromFile(): number | undefined {
-    try {
-      const parsed = JSON.parse(fs.readFileSync(this.filePath, "utf-8")) as Partial<AppSettings>;
-      return AppSettingsStore.normalizePort(parsed?.port);
-    } catch {
-      return undefined;
-    }
-  }
-
-  private readSearchFromFile(): PersistedSearchSettings | undefined {
-    try {
-      const parsed = JSON.parse(fs.readFileSync(this.filePath, "utf-8")) as Partial<AppSettings>;
-      if (!parsed?.search) return undefined;
-      const engine = SEARCH_ENGINE_OPTIONS.includes(parsed.search.engine as any) ? (parsed.search.engine as any) : "duckduckgo";
-      return {
-        engine,
-        braveApiKeyRef: typeof (parsed.search as any).braveApiKeyRef === "string" ? (parsed.search as any).braveApiKeyRef : undefined,
-        googleApiKeyRef: typeof (parsed.search as any).googleApiKeyRef === "string" ? (parsed.search as any).googleApiKeyRef : undefined,
-        googleSearchEngineId: typeof parsed.search.googleSearchEngineId === "string" ? parsed.search.googleSearchEngineId : undefined
-      };
-    } catch {
-      return undefined;
-    }
+  private toPersistedRefs(existing?: SearchSettings): Pick<PersistedSearchSettings, "braveApiKeyRef" | "googleApiKeyRef"> {
+    if (!existing || typeof existing !== "object") return {};
+    const cast = existing as Record<string, unknown>;
+    return {
+      braveApiKeyRef: typeof cast.braveApiKeyRef === "string" ? cast.braveApiKeyRef : undefined,
+      googleApiKeyRef: typeof cast.googleApiKeyRef === "string" ? cast.googleApiKeyRef : undefined
+    };
   }
 }
