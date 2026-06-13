@@ -1,7 +1,25 @@
+export type SearchEngine = "duckduckgo" | "brave" | "google" | "disabled";
+
+export interface SearchSettings {
+  engine: SearchEngine;
+  /** Brave Search API key. Never persisted as plain text in config files. */
+  braveApiKey?: string;
+  /** Google Custom Search JSON API key. Never persisted as plain text. */
+  googleApiKey?: string;
+  /** Google Custom Search Engine ID (cx). Not a secret. */
+  googleSearchEngineId?: string;
+  /** Whether a Brave API key is already stored in the system keychain. */
+  hasBraveApiKey?: boolean;
+  /** Whether a Google API key is already stored in the system keychain. */
+  hasGoogleApiKey?: boolean;
+}
+
 /** Local application settings (not provider config). Held in settings.json. */
 export interface AppSettings {
   /** TCP port the backend HTTP server listens on. */
   port: number;
+  /** Web search configuration (engine + optional API keys). */
+  search?: SearchSettings;
 }
 
 export type RunStatus =

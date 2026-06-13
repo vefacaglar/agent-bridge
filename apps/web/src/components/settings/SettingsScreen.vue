@@ -6,6 +6,7 @@ import ProvidersTab from './ProvidersTab.vue';
 import AgentPresetsTab from './AgentPresetsTab.vue';
 import MemoryTab from './MemoryTab.vue';
 import ServerTab from './ServerTab.vue';
+import SearchTab from './SearchTab.vue';
 
 const props = defineProps<{
   show: boolean;
@@ -20,6 +21,8 @@ const props = defineProps<{
   activeProjectPath: string;
   activeProjectName: string;
   activeTab?: TabId;
+  settings: any;
+  settingsLoading: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -28,6 +31,7 @@ const emit = defineEmits<{
   (e: 'clear-all'): void;
   (e: 'providers-saved'): void;
   (e: 'presets-saved'): void;
+  (e: 'settings-saved'): void;
   (e: 'add-memory', payload: { scope: MemoryScope; category: MemoryCategory; content: string; projectPath?: string }): void;
   (e: 'update-memory', payload: { id: number; content: string }): void;
   (e: 'delete-memory', id: number): void;
@@ -39,6 +43,7 @@ const TABS = [
   { id: 'permissions', label: 'Permissions' },
   { id: 'memory', label: 'Memory' },
   { id: 'providers', label: 'Providers' },
+  { id: 'search', label: 'Search' },
   { id: 'agents', label: 'Agents' },
   { id: 'server', label: 'Server' }
 ] as const;
@@ -177,6 +182,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
                 :providers-config="providersConfig"
                 :is-loading="providersConfigLoading"
                 @saved="emit('providers-saved')"
+              />
+              <SearchTab
+                v-else-if="localActiveTab === 'search'"
+                :settings="settings"
+                :is-loading="settingsLoading"
+                @saved="emit('settings-saved')"
               />
               <AgentPresetsTab
                 v-else-if="localActiveTab === 'agents'"

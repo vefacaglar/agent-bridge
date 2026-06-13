@@ -3,7 +3,8 @@ import type { IRunRepository, IMessageRepository, IPlanRepository, IMemoryReposi
 import { ProviderRegistry } from "../providers/ProviderRegistry.js";
 import { eventBus } from "./eventBus.js";
 import { buildSystemPrompt, formatMemoryContext, formatActivePlan, getModeStrategy } from "./systemPrompt.js";
-import { DELEGATE_TASKS_TOOL, DELEGATE_UTILITY_TOOL } from "./workspaceTools.js";
+import { DELEGATE_TASKS_TOOL, DELEGATE_UTILITY_TOOL, configureSearchService } from "./workspaceTools.js";
+import type { AppSettingsStore } from "../config/AppSettingsStore.js";
 import { availableSchemas } from "./tools/index.js";
 import type { OrchestratorToolContext } from "./tools/index.js";
 import { RunMessageStream } from "./RunMessageStream.js";
@@ -37,7 +38,8 @@ export class Orchestrator {
     private registry: ProviderRegistry,
     private planRepo: IPlanRepository,
     private memoryRepo: IMemoryRepository,
-    private usageLogRepo: IUsageLogRepository
+    private usageLogRepo: IUsageLogRepository,
+    settingsStore?: AppSettingsStore
   ) {
     this.messages = new RunMessageStream(this.runRepo, this.messageRepo);
     this.permissions = new PermissionCoordinator(this.activeRuns, this.messages);
@@ -57,6 +59,12 @@ export class Orchestrator {
     this.agentLoop = new AgentLoop(this.activeRuns, this.messages, this.permissions, this.toolContext, this.registry, this.usageLogRepo);
     this.delegation = new DelegationCoordinator(this.registry, this.agentLoop, this.memoryRepo);
     this.agentLoop.setDelegator(this.delegation);
+
+    if (settingsStore) {
+      const resolved = settingsStore.readResolvedSearch();
+      const store = (settingsStore as any).secretStore;
+      configureSearchService(resolved, store);
+    }
   }
 
   // --- Permission / question pass-throughs (owned by the coordinators) -----

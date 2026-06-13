@@ -4,6 +4,9 @@ import type { Run, ToolCall } from "@locagens/shared";
 import { truncateOutput } from "./pathGuards.js";
 import { commandScansOutsideWorkspace } from "./permissionPreview.js";
 import { executeWorkspaceTool } from "./fileToolExecutor.js";
+import type { ResolvedSearchSettings } from "../../search/SearchConfig.js";
+import { SearchService } from "../../search/SearchService.js";
+import type { ProviderSecretStore } from "../../providers/ProviderSecretStore.js";
 
 /**
  * The async tools (shell + network) and the orchestrator's execution entry
@@ -11,6 +14,12 @@ import { executeWorkspaceTool } from "./fileToolExecutor.js";
  * the orchestrator always executes tools through executeWorkspaceToolAsync;
  * synchronous filesystem tools fall through to executeWorkspaceTool.
  */
+
+let searchService: SearchService | null = null;
+
+export function configureSearchService(settings: ResolvedSearchSettings, secretStore: ProviderSecretStore): void {
+  searchService = new SearchService(settings, secretStore);
+}
 
 /**
  * Async variant of executeWorkspaceTool. Identical for synchronous tools, but
@@ -31,7 +40,7 @@ export async function executeWorkspaceToolAsync(run: Run, toolCall: ToolCall): P
     if (toolCall.function.name === "search_web") {
       try {
         const args = JSON.parse(toolCall.function.arguments);
-        return await searchWeb(
+        return await executeSearchWeb(
           typeof args.query === "string" ? args.query : "",
           typeof args.max_results === "number" ? args.max_results : undefined
         );
@@ -47,6 +56,14 @@ export async function executeWorkspaceToolAsync(run: Run, toolCall: ToolCall): P
   } catch (err: any) {
     return JSON.stringify({ success: false, error: err.message });
   }
+}
+
+async function executeSearchWeb(query: string, maxResults?: number): Promise<string> {
+  if (!searchService) {
+    return JSON.stringify({ success: false, error: "Search service is not configured." });
+  }
+  const response = await searchService.search(query, maxResults);
+  return JSON.stringify(response);
 }
 
 /** Runs shell commands without blocking the orchestrator's event loop. */
@@ -130,82 +147,4 @@ async function fetchUrl(rawUrl: string): Promise<string> {
   } finally {
     clearTimeout(timeout);
   }
-}
-
-async function searchWeb(rawQuery: string, rawMaxResults?: number): Promise<string> {
-  const query = rawQuery.trim();
-  if (query === "") {
-    return JSON.stringify({ success: false, error: "Missing parameter: query" });
-  }
-  const maxResults = Math.min(Math.max(Math.floor(rawMaxResults ?? 5), 1), 10);
-  const searchUrl = `https://html.duckduckgo.com/html/?${new URLSearchParams({ q: query }).toString()}`;
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30_000);
-  try {
-    const response = await fetch(searchUrl, {
-      method: "GET",
-      redirect: "follow",
-      signal: controller.signal,
-      headers: { "User-Agent": "Locagens/1.0 (+local workspace assistant)" }
-    });
-    const body = await response.text();
-    const results = parseDuckDuckGoResults(body).slice(0, maxResults);
-    return JSON.stringify({
-      success: response.ok,
-      status: response.status,
-      query,
-      source: "duckduckgo_html",
-      results
-    });
-  } catch (err: any) {
-    const aborted = err?.name === "AbortError";
-    return JSON.stringify({ success: false, error: aborted ? "Search timed out after 30s." : (err?.message ?? "Search failed.") });
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-function parseDuckDuckGoResults(html: string): Array<{ title: string; url: string; snippet: string }> {
-  const results: Array<{ title: string; url: string; snippet: string }> = [];
-  const blocks = html.match(/<div class="result[\s\S]*?(?=<div class="result|<\/body>)/g) ?? [];
-  for (const block of blocks) {
-    const linkMatch = block.match(/<a[^>]*class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/);
-    if (!linkMatch) continue;
-    const url = normalizeSearchResultUrl(decodeHtml(linkMatch[1]));
-    const title = stripHtml(linkMatch[2]);
-    if (!url || !title) continue;
-    const snippetMatch = block.match(/<a[^>]*class="result__snippet"[^>]*>([\s\S]*?)<\/a>|<div[^>]*class="result__snippet"[^>]*>([\s\S]*?)<\/div>/);
-    results.push({
-      title,
-      url,
-      snippet: stripHtml(snippetMatch?.[1] ?? snippetMatch?.[2] ?? "")
-    });
-  }
-  return results;
-}
-
-function normalizeSearchResultUrl(rawUrl: string): string {
-  try {
-    const parsed = new URL(rawUrl, "https://duckduckgo.com");
-    const redirected = parsed.searchParams.get("uddg");
-    return redirected ? decodeURIComponent(redirected) : parsed.toString();
-  } catch {
-    return rawUrl;
-  }
-}
-
-function stripHtml(value: string): string {
-  return decodeHtml(value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim());
-}
-
-function decodeHtml(value: string): string {
-  return value
-    .replace(/&#(\d+);/g, (_m, code) => String.fromCharCode(Number(code)))
-    .replace(/&#x([0-9a-f]+);/gi, (_m, code) => String.fromCharCode(Number.parseInt(code, 16)))
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">");
 }

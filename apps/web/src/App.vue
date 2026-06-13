@@ -31,7 +31,10 @@ const {
   providersConfig,
   isProvidersConfigLoading,
   reloadProviders,
-  showUsageLogsPage
+  showUsageLogsPage,
+  appSettings,
+  isAppSettingsLoading,
+  loadAppSettings
 } = useAppShell();
 
 const {
@@ -59,15 +62,16 @@ import { useCustomDialog } from './composables/useCustomDialog';
 
 const { activeDialog } = useCustomDialog();
 
-const settingsTab = ref<'permissions' | 'memory' | 'providers' | 'agents' | 'server'>('permissions');
+const settingsTab = ref<'permissions' | 'memory' | 'providers' | 'search' | 'agents' | 'server'>('permissions');
 
 async function handleOpenSettings(tab?: string) {
-  if (tab === 'permissions' || tab === 'memory' || tab === 'providers' || tab === 'agents' || tab === 'server') {
+  if (tab === 'permissions' || tab === 'memory' || tab === 'providers' || tab === 'search' || tab === 'agents' || tab === 'server') {
     settingsTab.value = tab;
   } else {
     settingsTab.value = 'permissions';
   }
   await openSettings();
+  await loadAppSettings();
 }
 
 function handleEscape(e: KeyboardEvent) {
@@ -606,11 +610,14 @@ onUnmounted(() => {
       :memories-loading="memories.isLoading.value"
       :active-project-path="projects.activeProjectPath.value"
       :active-project-name="projects.activeProject.value?.name || ''"
+      :settings="appSettings"
+      :settings-loading="isAppSettingsLoading"
       @close="permissions.closeSettings"
       @revoke="permissions.revokePermission"
       @clear-all="permissions.clearPermissions"
       @providers-saved="reloadProviders"
       @presets-saved="loadAgentPresets"
+      @settings-saved="loadAppSettings"
       @add-memory="memories.addMemory"
       @update-memory="memories.updateMemory($event.id, $event.content)"
       @delete-memory="memories.deleteMemory"

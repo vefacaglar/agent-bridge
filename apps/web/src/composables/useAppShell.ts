@@ -1,5 +1,5 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import type { ProviderMetadata, Run, AgentPreset } from '@locagens/shared';
+import type { ProviderMetadata, Run, AgentPreset, AppSettings } from '@locagens/shared';
 import { api } from '../api/client';
 import { useChatAutoScroll } from './useChatAutoScroll';
 import { useChatSession } from './useChatSession';
@@ -16,6 +16,8 @@ export function useAppShell() {
   const messagesContainer = ref<HTMLElement | null>(null);
   const providersConfig = ref<Record<string, any>>({});
   const isProvidersConfigLoading = ref(false);
+  const appSettings = ref<AppSettings | null>(null);
+  const isAppSettingsLoading = ref(false);
 
   const activeRunId = ref<string | null>(localStorage.getItem('activeRunId'));
   const activeRun = ref<Run | null>(null);
@@ -51,6 +53,16 @@ export function useAppShell() {
     ]);
   }
 
+  async function loadAppSettings() {
+    isAppSettingsLoading.value = true;
+    try {
+      const data = await api.getSettings();
+      appSettings.value = data;
+    } finally {
+      isAppSettingsLoading.value = false;
+    }
+  }
+
   const projects = useProjects(runs);
   const permissions = usePermissions();
   const memories = useMemories();
@@ -62,7 +74,8 @@ export function useAppShell() {
       permissions.openSettings(),
       memories.loadMemories(),
       loadProvidersConfig(),
-      loadAgentPresets()
+      loadAgentPresets(),
+      loadAppSettings()
     ]);
   }
   const chat = useChatSession({
@@ -178,6 +191,9 @@ export function useAppShell() {
     providersConfig,
     isProvidersConfigLoading,
     reloadProviders,
-    showUsageLogsPage
+    showUsageLogsPage,
+    appSettings,
+    isAppSettingsLoading,
+    loadAppSettings
   };
 }

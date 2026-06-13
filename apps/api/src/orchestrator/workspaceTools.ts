@@ -31,4 +31,7 @@ export {
   buildPermissionPreview
 } from "./workspace/permissionPreview.js";
 export { executeWorkspaceTool } from "./workspace/fileToolExecutor.js";
-export { executeWorkspaceToolAsync } from "./workspace/networkTools.js";
+export {
+  executeWorkspaceToolAsync,
+  configureSearchService
+} from "./workspace/networkTools.js";

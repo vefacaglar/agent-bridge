@@ -47,8 +47,8 @@ export function createAppContext(): AppContext {
   const planRepo = new PlanRepository(db);
   const memoryRepo = new MemoryRepository(db);
   const usageLogRepo = new UsageLogRepository(db);
-  const orchestrator = new Orchestrator(runRepo, messageRepo, registry, planRepo, memoryRepo, usageLogRepo);
   const settingsStore = new AppSettingsStore();
+  const orchestrator = new Orchestrator(runRepo, messageRepo, registry, planRepo, memoryRepo, usageLogRepo, settingsStore);
 
   return {
     registry,

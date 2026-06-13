@@ -6,7 +6,7 @@ const KEYCHAIN_REF_PREFIX = "macos-keychain:";
 export interface ProviderSecretStore {
   readonly supportsSecurePersistence: boolean;
   get(ref: string): string;
-  set(providerId: string, apiKey: string): string;
+  set(refId: string, apiKey: string): string;
 }
 
 export class MacOSKeychainProviderSecretStore implements ProviderSecretStore {
@@ -14,9 +14,9 @@ export class MacOSKeychainProviderSecretStore implements ProviderSecretStore {
 
   get(ref: string): string {
     if (!this.supportsSecurePersistence || !ref.startsWith(KEYCHAIN_REF_PREFIX)) return "";
-    const providerId = ref.slice(KEYCHAIN_REF_PREFIX.length);
+    const account = ref.slice(KEYCHAIN_REF_PREFIX.length);
     try {
-      return execFileSync("security", ["find-generic-password", "-w", "-a", providerId, "-s", KEYCHAIN_SERVICE], {
+      return execFileSync("security", ["find-generic-password", "-w", "-a", account, "-s", KEYCHAIN_SERVICE], {
         encoding: "utf-8",
         stdio: ["ignore", "pipe", "ignore"]
       }).trim();
@@ -25,14 +25,14 @@ export class MacOSKeychainProviderSecretStore implements ProviderSecretStore {
     }
   }
 
-  set(providerId: string, apiKey: string): string {
+  set(refId: string, apiKey: string): string {
     if (!this.supportsSecurePersistence) {
       throw new Error("Secure provider secret storage is only available on macOS Keychain.");
     }
-    execFileSync("security", ["add-generic-password", "-U", "-a", providerId, "-s", KEYCHAIN_SERVICE, "-w", apiKey], {
+    execFileSync("security", ["add-generic-password", "-U", "-a", refId, "-s", KEYCHAIN_SERVICE, "-w", apiKey], {
       stdio: ["ignore", "ignore", "pipe"]
     });
-    return `${KEYCHAIN_REF_PREFIX}${providerId}`;
+    return `${KEYCHAIN_REF_PREFIX}${refId}`;
   }
 }
 
@@ -44,8 +44,8 @@ export class InMemoryProviderSecretStore implements ProviderSecretStore {
     return this.secrets.get(ref) || "";
   }
 
-  set(providerId: string, apiKey: string): string {
-    const ref = `memory:${providerId}`;
+  set(refId: string, apiKey: string): string {
+    const ref = `memory:${refId}`;
     this.secrets.set(ref, apiKey);
     return ref;
   }
